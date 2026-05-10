@@ -100,3 +100,7 @@ The skill implements manual facilitation. Deterministic automated orchestration 
 This is an early, practical skill for developers experimenting with multi-agent engineering workflows. The protocol is deliberately file-first, auditable, and resumable. That makes it useful today with ordinary CLI agents, while leaving room for deeper A2A automation later.
 
 Start with the skill, run one real discussion, and inspect the files it leaves behind. The protocol's value should be obvious from the artifact trail.
+
+## License
+
+Apache-2.0. See `LICENSE`.
