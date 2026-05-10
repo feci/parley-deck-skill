@@ -1,6 +1,6 @@
 {
   "name": "parley-deck-skill",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Install the Parley Deck vendor-neutral AI cooperation skill into Codex, Claude Code, Gemini CLI, or a custom skill directory.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/feci/parley-deck-skill#readme",

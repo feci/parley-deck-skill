@@ -1,20 +1,23 @@
 # Template for feci/homebrew-parley.
-# Replace the sha256 value after creating the v1.0.1 GitHub release tarball.
+# Replace the sha256 value after creating the v1.0.2 GitHub release tarball.
 
 class ParleyDeckSkill < Formula
   desc "Installer for the Parley Deck multi-agent cooperation skill"
   homepage "https://github.com/feci/parley-deck-skill"
-  url "https://github.com/feci/parley-deck-skill/archive/refs/tags/v1.0.1.tar.gz"
-  sha256 "REPLACE_WITH_V1_0_1_TARBALL_SHA256"
+  url "https://github.com/feci/parley-deck-skill/archive/refs/tags/v1.0.2.tar.gz"
+  sha256 "REPLACE_WITH_V1_0_2_TARBALL_SHA256"
   license "Apache-2.0"
 
   depends_on "node"
 
   def install
-    libexec.install "SKILL.md", "README.md", "LICENSE", "package.json"
-    libexec.install "agents", "bin", "lib", "references", "gemini-extension.json"
-    chmod 0755, libexec/"bin/parley-deck-skill.js"
-    bin.install_symlink libexec/"bin/parley-deck-skill.js" => "parley-deck-skill"
+    readme = (buildpath/"README.md").read
+    license_text = (buildpath/"LICENSE").read
+
+    libexec.install Dir["*"]
+    (libexec/"README.md").write(readme)
+    (libexec/"LICENSE").write(license_text)
+    bin.write_exec_script libexec/"bin/parley-deck-skill.js"
   end
 
   test do
