@@ -84,6 +84,8 @@ Recommended:
 npx -y parley-deck-skill@latest install
 ```
 
+The installer uses an AionUI-style local runtime registry: it checks known user-level agent directories and CLI commands, then installs into the runtimes it can detect. Current native targets are Codex, Claude Code, Gemini CLI extension mode, Hermes, Qwen, CodeBuddy, Goose, Kimi, Factory Droid, Vibe, Cursor, OpenCode, and AionRS.
+
 Install everywhere, whether or not the runtime is currently detected:
 
 ```bash
@@ -96,6 +98,7 @@ Install a single target:
 npx -y parley-deck-skill@latest install --target codex
 npx -y parley-deck-skill@latest install --target claude
 npx -y parley-deck-skill@latest install --target gemini
+npx -y parley-deck-skill@latest install --target hermes
 ```
 
 Install into a project instead of your personal skill directories:
@@ -127,7 +130,7 @@ parley-deck-skill install
 Standalone Windows binaries are attached to GitHub releases. They do not require Node:
 
 ```powershell
-.\parley-deck-skill-v1.0.4-windows-x64.exe install --target all --force
+.\parley-deck-skill-v1.0.5-windows-x64.exe install --target all --force
 ```
 
 This is the packaging shape intended for WinGet. Until the WinGet manifest is accepted, download the `.exe` from the latest GitHub release.
@@ -143,9 +146,13 @@ Use either the Gemini extension command or `parley-deck-skill install --target g
 Manual paths:
 
 ```text
-Codex:  ${CODEX_HOME:-~/.codex}/skills/parley-deck
-Claude: ~/.claude/skills/parley-deck
-Gemini: ~/.gemini/extensions/parley-deck
+Codex:    ${CODEX_HOME:-~/.codex}/skills/parley-deck
+Claude:   ~/.claude/skills/parley-deck
+Gemini:   ~/.gemini/extensions/parley-deck
+Hermes:   ~/.hermes/skills/parley-deck
+Qwen:     ~/.qwen/skills/parley-deck
+Goose:    ~/.goose/skills/parley-deck
+OpenCode: ~/.opencode/skills/parley-deck
 ```
 
 Codex users can also use the built-in `$skill-installer` with the GitHub repository URL, then restart Codex.
@@ -163,7 +170,7 @@ parley-deck-skill --version
 Useful flags:
 
 ```text
---target auto|all|codex|claude|gemini|generic
+--target auto|all|codex|claude|gemini|hermes|qwen|codebuddy|goose|kimi|droid|vibe|cursor|opencode|aionrs|generic
 --scope user|project
 --project <path>
 --dest <path>
@@ -182,7 +189,7 @@ Recommended update:
 npx -y parley-deck-skill@latest install --target all --force
 ```
 
-That downloads the latest npm release and replaces existing managed installs for Codex, Claude, and Gemini. Restart the affected agent runtime after updating so it reloads `SKILL.md`.
+That downloads the latest npm release and replaces existing managed installs for every supported target. Restart the affected agent runtime after updating so it reloads `SKILL.md`.
 
 Update only one runtime:
 
@@ -190,6 +197,7 @@ Update only one runtime:
 npx -y parley-deck-skill@latest install --target codex --force
 npx -y parley-deck-skill@latest install --target claude --force
 npx -y parley-deck-skill@latest install --target gemini --force
+npx -y parley-deck-skill@latest install --target hermes --force
 ```
 
 Preview an update without writing files:

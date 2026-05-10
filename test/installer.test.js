@@ -40,16 +40,20 @@ test("resolves user and project target paths", () => {
   const home = tmpDir();
   const userTargets = installer.resolveTargets(context(home, { target: "all" }));
 
-  assert.equal(userTargets.length, 3);
   assert.equal(userTargets.find((target) => target.name === "codex").dest, path.join(home, ".codex", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "claude").dest, path.join(home, ".claude", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "gemini").dest, path.join(home, ".gemini", "extensions", "parley-deck"));
+  assert.equal(userTargets.find((target) => target.name === "hermes").dest, path.join(home, ".hermes", "skills", "parley-deck"));
+  assert.equal(userTargets.find((target) => target.name === "qwen").dest, path.join(home, ".qwen", "skills", "parley-deck"));
+  assert.equal(userTargets.find((target) => target.name === "droid").dest, path.join(home, ".factory", "skills", "parley-deck"));
+  assert.equal(userTargets.find((target) => target.name === "aionrs").dest, path.join(home, ".aionrs", "skills", "parley-deck"));
 
   const project = path.join(home, "project");
   const projectTargets = installer.resolveTargets(context(home, { target: "all", scope: "project", project }));
   assert.equal(projectTargets.find((target) => target.name === "codex").dest, path.join(project, ".codex", "skills", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "claude").dest, path.join(project, ".claude", "skills", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "gemini").dest, path.join(project, ".gemini", "extensions", "parley-deck"));
+  assert.equal(projectTargets.find((target) => target.name === "hermes").dest, path.join(project, ".hermes", "skills", "parley-deck"));
 });
 
 test("auto target installs only detected runtimes", () => {
@@ -67,6 +71,14 @@ test("project auto target only installs detected project runtimes", () => {
 
   const targets = installer.resolveTargets(context(home, { target: "auto", scope: "project", project }));
   assert.deepEqual(targets.map((target) => target.name), ["gemini"]);
+});
+
+test("auto target detects Hermes runtime directory", () => {
+  const home = tmpDir();
+  fs.mkdirSync(path.join(home, ".hermes"), { recursive: true });
+
+  const targets = installer.resolveTargets(context(home, { target: "auto" }));
+  assert.deepEqual(targets.map((target) => target.name), ["hermes"]);
 });
 
 test("installs a codex skill with marker", () => {
