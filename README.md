@@ -37,24 +37,37 @@ The result is a reusable cooperation loop for serious AI-assisted engineering wo
 
 ```text
 parley-deck-skill/
+|-- bin/
+|   `-- parley-deck-skill.js
+|-- lib/
+|   `-- installer.js
 |-- SKILL.md
 |-- agents/
 |   |-- manifest.yaml
 |   `-- openai.yaml
+|-- gemini-extension.json
 `-- references/
     |-- COOPERATION.md
     `-- WORKED_EXAMPLES.md
 ```
 
+- `bin/` and `lib/` contain the dependency-free Node installer.
 - `SKILL.md` is the canonical entrypoint for agents.
 - `references/COOPERATION.md` is a portability snapshot of the protocol.
 - `references/WORKED_EXAMPLES.md` contains non-authoritative examples and config shapes.
 - `agents/manifest.yaml` is vendor-neutral metadata.
 - `agents/openai.yaml` is only UI metadata for Codex/OpenAI skill tooling.
+- `gemini-extension.json` lets Gemini CLI load the repository as an extension.
 
 ## Quick Start
 
-Clone or copy this repository into the skill directory used by your agent runtime, then ask the runtime to use Parley Deck:
+Install into detected personal agent runtimes:
+
+```bash
+npx -y parley-deck-skill@latest install
+```
+
+Then restart the target agent runtime and ask it to use Parley Deck:
 
 ```text
 Use $parley-deck to start a design review for this task.
@@ -62,6 +75,115 @@ Discover installed CLI agents, show me the capability matrix, and ask before sen
 ```
 
 If your runtime does not support skills directly, attach `SKILL.md` and `references/COOPERATION.md` as instruction context. The skill is plain Markdown by design, so any capable tier-1 model can follow it.
+
+## Installation
+
+Recommended:
+
+```bash
+npx -y parley-deck-skill@latest install
+```
+
+Install everywhere, whether or not the runtime is currently detected:
+
+```bash
+npx -y parley-deck-skill@latest install --target all
+```
+
+Install a single target:
+
+```bash
+npx -y parley-deck-skill@latest install --target codex
+npx -y parley-deck-skill@latest install --target claude
+npx -y parley-deck-skill@latest install --target gemini
+```
+
+Install into a project instead of your personal skill directories:
+
+```bash
+npx -y parley-deck-skill@latest install --scope project --target all --project .
+```
+
+Install into an explicit directory:
+
+```bash
+npx -y parley-deck-skill@latest install --target generic --dest /path/to/skills/parley-deck
+```
+
+Global npm install:
+
+```bash
+npm install -g parley-deck-skill
+parley-deck-skill install
+```
+
+Homebrew:
+
+```bash
+# Available after the feci/homebrew-parley tap is published.
+brew install feci/parley/parley-deck-skill
+parley-deck-skill install
+```
+
+Gemini CLI can also install the repository as an extension:
+
+```bash
+gemini extensions install https://github.com/feci/parley-deck-skill
+```
+
+Use either the Gemini extension command or `parley-deck-skill install --target gemini`, not both. The npm installer writes to `~/.gemini/extensions/parley-deck`; Gemini's own GitHub installer may name the copy from the repository URL.
+
+Manual paths:
+
+```text
+Codex:  ${CODEX_HOME:-~/.codex}/skills/parley-deck
+Claude: ~/.claude/skills/parley-deck
+Gemini: ~/.gemini/extensions/parley-deck
+```
+
+Codex users can also use the built-in `$skill-installer` with the GitHub repository URL, then restart Codex.
+
+## Installer Commands
+
+```bash
+parley-deck-skill install
+parley-deck-skill paths
+parley-deck-skill doctor
+parley-deck-skill uninstall
+parley-deck-skill --version
+```
+
+Useful flags:
+
+```text
+--target auto|all|codex|claude|gemini|generic
+--scope user|project
+--project <path>
+--dest <path>
+--force
+--dry-run
+--json
+```
+
+The installer writes `.parley-deck-skill-install.json` into every managed destination. Updates replace marked installs safely. Unmarked directories are never overwritten or removed unless you pass `--force`.
+
+Before changing your system, inspect what would happen:
+
+```bash
+npx -y parley-deck-skill@latest install --target all --dry-run
+```
+
+Check an install:
+
+```bash
+parley-deck-skill doctor --target all
+```
+
+Uninstall managed copies:
+
+```bash
+parley-deck-skill uninstall --target all
+```
 
 ## Local Agent Contract
 
