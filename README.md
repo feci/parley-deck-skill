@@ -117,10 +117,11 @@ npm install -g parley-deck-skill
 parley-deck-skill install
 ```
 
-Homebrew:
+Homebrew is not published yet. Until the `feci/homebrew-parley` tap exists,
+use the `npx` installer above.
 
 ```bash
-# Available after the feci/homebrew-parley tap is published.
+# Future Homebrew flow, once the tap is published:
 brew install feci/parley/parley-deck-skill
 parley-deck-skill install
 ```
@@ -204,11 +205,15 @@ If you installed via Gemini's native extension manager instead of the npm instal
 gemini extensions update parley-deck
 ```
 
-If you installed via Homebrew after the tap is published:
+Homebrew is not available yet. If you run `brew upgrade parley-deck-skill`
+before the tap is published, Homebrew will report `No available formula`.
+Use the `npx` update command above for now.
+
+After the Homebrew tap is published, the update flow will be:
 
 ```bash
 brew update
-brew upgrade parley-deck-skill
+brew upgrade feci/parley/parley-deck-skill
 parley-deck-skill install --target all --force
 ```
 
