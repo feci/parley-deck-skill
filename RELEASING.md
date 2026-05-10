@@ -70,7 +70,13 @@ WinGet uses the Windows executables from the GitHub release. The draft manifest 
 packaging/winget/manifests/f/Feci/ParleyDeckSkill/X.Y.Z/
 ```
 
-After the release assets exist, copy the manifest directory into a fork of `microsoft/winget-pkgs`, validate on Windows, and open a pull request.
+After the release assets exist, update the manifest hashes from the final GitHub release assets. Do not use hashes from a local build if the release workflow uploaded or clobbered assets.
+
+```bash
+gh release view "v${VERSION}" --json assets --jq '.assets[] | [.name, .digest] | @tsv'
+```
+
+Then copy the manifest directory into a fork of `microsoft/winget-pkgs`, validate on Windows, and open a pull request.
 
 ```powershell
 winget validate .\manifests\f\Feci\ParleyDeckSkill\X.Y.Z
