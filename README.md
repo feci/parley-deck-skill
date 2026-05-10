@@ -167,10 +167,49 @@ Useful flags:
 
 The installer writes `.parley-deck-skill-install.json` into every managed destination. Updates replace marked installs safely. Unmarked directories are never overwritten or removed unless you pass `--force`.
 
-Before changing your system, inspect what would happen:
+## Updating
+
+Recommended update:
+
+```bash
+npx -y parley-deck-skill@latest install --target all --force
+```
+
+That downloads the latest npm release and replaces existing managed installs for Codex, Claude, and Gemini. Restart the affected agent runtime after updating so it reloads `SKILL.md`.
+
+Update only one runtime:
+
+```bash
+npx -y parley-deck-skill@latest install --target codex --force
+npx -y parley-deck-skill@latest install --target claude --force
+npx -y parley-deck-skill@latest install --target gemini --force
+```
+
+Preview an update without writing files:
 
 ```bash
 npx -y parley-deck-skill@latest install --target all --dry-run
+```
+
+If you installed the package globally, update the global installer first:
+
+```bash
+npm install -g parley-deck-skill@latest
+parley-deck-skill install --target all --force
+```
+
+If you installed via Gemini's native extension manager instead of the npm installer:
+
+```bash
+gemini extensions update parley-deck
+```
+
+If you installed via Homebrew after the tap is published:
+
+```bash
+brew update
+brew upgrade parley-deck-skill
+parley-deck-skill install --target all --force
 ```
 
 Check an install:
