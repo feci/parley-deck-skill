@@ -84,6 +84,27 @@ test("installs a codex skill with marker", () => {
   assert.equal(marker.target, "codex");
 });
 
+test("installs when optional README and LICENSE payload files are absent", () => {
+  const home = tmpDir();
+  const packageRoot = tmpDir();
+  fs.mkdirSync(path.join(packageRoot, "agents"), { recursive: true });
+  fs.mkdirSync(path.join(packageRoot, "references"), { recursive: true });
+  fs.writeFileSync(path.join(packageRoot, "SKILL.md"), "skill\n", "utf8");
+  fs.writeFileSync(path.join(packageRoot, "agents", "manifest.yaml"), "name: parley-deck\n", "utf8");
+  fs.writeFileSync(path.join(packageRoot, "references", "COOPERATION.md"), "protocol\n", "utf8");
+  fs.writeFileSync(path.join(packageRoot, "gemini-extension.json"), "{}\n", "utf8");
+
+  const testContext = context(home, { target: "codex" });
+  testContext.packageRoot = packageRoot;
+  const result = installer.installCommand(testContext);
+  const dest = path.join(home, ".codex", "skills", "parley-deck");
+
+  assert.equal(result.ok, true);
+  assert.equal(fs.existsSync(path.join(dest, "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(dest, "README.md")), false);
+  assert.equal(fs.existsSync(path.join(dest, "LICENSE")), false);
+});
+
 test("refuses to overwrite unmarked destination without force", () => {
   const home = tmpDir();
   const dest = path.join(home, ".codex", "skills", "parley-deck");
