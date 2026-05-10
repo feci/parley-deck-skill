@@ -7,11 +7,11 @@ These examples are non-authoritative. `SKILL.md` and `COOPERATION.md` remain can
 ```markdown
 | Agent ID | CLI | Installed | Headless mode | Write mode | Models | Thinking | Speed | Timeout | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| agent-a | agent-a-cli | yes | stdin + configured args | workspace write args | user-selected | high/deep if supported | deep | 75m | external backend approved |
-| agent-b | agent-b-cli | yes | stdin + configured args | workspace write args | unknown | unknown | balanced | 45m | ask user before launch |
+| agent-a | agent-a-cli | yes | stdin + configured args | workspace write args | strongest discovered | strongest discovered | balanced smart-fast | 30m | external backend default yes |
+| agent-b | agent-b-cli | yes | stdin + configured args | workspace write args | cli-default | cli-default | balanced smart-fast | 30m | discovery incomplete |
 ```
 
-When options are unknown, do not guess. Ask the user or run non-destructive CLI discovery.
+When options are unknown, do not guess. Use CLI defaults, record the unknowns, and ask only if the missing setting blocks launch.
 
 ## Local Config Example
 
@@ -20,9 +20,9 @@ When options are unknown, do not guess. Ask the user or run non-destructive CLI 
   "defaults": {
     "timeouts": {
       "signoffMs": 900000,
-      "roundMs": 2700000,
-      "reviewMs": 3600000,
-      "deepReasoningMs": 4500000
+        "roundMs": 1800000,
+        "reviewMs": 1800000,
+        "deepReasoningMs": 1800000
     }
   },
   "agents": {
@@ -32,11 +32,11 @@ When options are unknown, do not guess. Ask the user or run non-destructive CLI 
       "promptMode": "stdin",
       "writeModeArgs": ["--workspace-write"],
       "modelFlag": "--model",
-      "model": "user-selected-model",
+      "model": "strongest-discovered-or-cli-default",
       "thinkingFlag": "--effort",
-      "thinking": "user-selected-thinking-level",
-      "speed": "deep",
-      "timeoutMs": 4500000
+      "thinking": "strongest-discovered-or-cli-default",
+      "speed": "balanced",
+      "timeoutMs": 1800000
     }
   }
 }
@@ -57,11 +57,27 @@ Facilitator flow:
 1. Load live `parley-deck/COOPERATION.md`.
 2. Run the session-start check for inbox, open ideas, missing round/review files, and PR/MR actions.
 3. Discover candidate CLI agents and build the capability matrix.
-4. Ask the user to choose transport, facilitator, participants, model, thinking level, speed, timeouts, and external disclosure approval.
+4. If the task statement is missing, ask for that single required answer. Otherwise present defaults and continue.
 5. Create `ideas/<slug>/00-prompt.md` and `round-01/`.
 6. If the facilitator is a participant, write its own round file first.
 7. Invoke each headless participant with one exact output path.
 8. Verify all expected files exist, then continue to cross-review, consensus, finalization, implementation, review, and fix-up as required.
+
+Default startup prompt:
+
+```text
+Task is required. Everything else has defaults.
+
+Defaults if you just press Enter:
+- participants: all discovered installed CLI agents
+- facilitator: current agent
+- model/thinking: strongest discovered per agent, otherwise CLI default
+- speed: balanced smart-fast
+- timeout: 30m
+- external backend disclosure: yes for task brief and necessary repo/code context, secrets excluded
+
+Reply with only the task, or include overrides.
+```
 
 ## Portability Notes
 

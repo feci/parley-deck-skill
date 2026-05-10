@@ -1,6 +1,6 @@
 ---
 name: parley-deck
-description: "Run Parley Deck multi-agent idea, implementation, review, or consensus workflows through user-selected local CLI agents, using the user's chosen transport: local files, GitHub PRs, or GitLab MRs. Use when a user wants a task, design, implementation plan, or code review to be independently analyzed by multiple headless or interactive agents according to parley-deck/COOPERATION.md, with each participant writing its own canonical artifacts under parley-deck/ideas/."
+description: "Run Parley Deck multi-agent idea, implementation, review, or consensus workflows through local CLI agents, using defaulted or user-overridden transport: local files, GitHub PRs, or GitLab MRs. Use when a user wants a task, design, implementation plan, or code review to be independently analyzed by multiple headless or interactive agents according to parley-deck/COOPERATION.md, with each participant writing its own canonical artifacts under parley-deck/ideas/."
 ---
 
 # Parley Deck
@@ -86,7 +86,7 @@ If any checklist item is unclear for the requested workflow, ask the user before
    - For GitHub/GitLab transports, check the matching open PR/MR actions if tools and permissions are available.
    - If outstanding protocol work conflicts with the user's new request, surface it and ask which to handle first.
 
-3. Ask the user to choose the transport when the project is new, the transport is still a placeholder, or the user explicitly starts a new Parley workflow without naming a transport. Offer exactly:
+3. Use the active `COOPERATION.md` transport when it is set. If the project is new, the transport is still a placeholder, or the user starts a workflow without naming a transport, default to `local-dir` and mention the available overrides:
 
    - `local-dir` / files only
    - `github-pr` / GitHub Pull Requests
@@ -102,11 +102,11 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 5. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
 
-6. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix to the user and ask them to choose facilitator, participants, model, thinking/reasoning level, speed profile, and timeout policy.
+6. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix and the effective defaults, but do not block on optional choices. The only required startup answer is the task statement when it was not already provided.
 
-7. If a candidate agent is not in the roster, ask before using it. Do not silently add it to quorum. Either run it as a temporary observer or open a separate roster-update idea.
+7. If a candidate agent is not in the roster, list the proposed stable agent ID in the default summary. Pressing Enter accepts that agent for the current workflow. If the user explicitly rejects roster expansion, run it only as a temporary observer or skip it.
 
-8. If source code, private documents, secrets, or customer data will be sent to external model backends through CLIs, obtain explicit user approval before sending that content.
+8. Default external-backend disclosure approval is YES for the task brief and necessary repository/code context. Still redact obvious secrets and stop for explicit confirmation before sending credentials, customer data, private documents unrelated to the task, or other clearly sensitive material.
 
 ## Transport Selection
 
@@ -172,13 +172,19 @@ Use non-destructive discovery commands first:
 <cli> --version
 ```
 
-If the CLI exposes model discovery, use it. Common names include `models`, `model list`, `list-models`, `config`, or provider-specific subcommands, but do not assume they exist. If discovery cannot prove supported model or thinking options, present them as `unknown` and ask the user.
+If the CLI exposes model discovery, use it. Common names include `models`, `model list`, `list-models`, `config`, or provider-specific subcommands, but do not assume they exist. If discovery cannot prove supported model or thinking options, present them as `unknown`, default to the CLI default, and ask only if launch would fail without an explicit setting.
 
 Do not invent model names, aliases, or thinking levels. If the user wants a specific model such as a top-tier or slow/deep model, use that exact choice only when the target CLI supports it or the user accepts the risk of trying it.
 
 ## Selection Checkpoint
 
-Before every new idea, every new round, Phase 5 implementation, Phase 6 review cycle, or any requested mid-stream model change, ask the user to confirm or reuse:
+Before every new idea, every new round, Phase 5 implementation, Phase 6 review cycle, or any requested mid-stream model change, prepare defaults first. Do not ask seven separate required questions.
+
+Required input:
+
+- task statement, if the user has not already provided it.
+
+Optional overrides:
 
 - transport: `local-dir`, `github-pr`, or `gitlab-mr`
 - facilitator agent
@@ -189,6 +195,37 @@ Before every new idea, every new round, Phase 5 implementation, Phase 6 review c
 - timeout policy
 - whether code/private data may be sent to each selected external backend
 
+Default selection policy:
+
+- transport: current `COOPERATION.md` transport when set; otherwise `local-dir`.
+- participants: all discovered installed CLI agents that can run headlessly and write their own artifact. If a discovered agent is not in the roster, list it and treat pressing Enter as approval to include it with a stable agent ID for this workflow.
+- facilitator: the agent/runtime that invoked the skill.
+- model: strongest discovered model for each agent. If discovery cannot prove model options, use the CLI default and record `model: cli-default`.
+- thinking/reasoning/effort: strongest discovered mode for each agent. If discovery cannot prove thinking options, use the CLI default and record `thinking: cli-default`.
+- speed profile: `balanced`, interpreted as smart-fast: the fastest available setting that still keeps the strongest available model/reasoning choice. Use `fast` only when the user explicitly chooses speed over quality.
+- timeout: 30 minutes per agent process unless the user overrides it.
+- external backend disclosure: YES for task brief and necessary repository/code context, except for credentials, customer data, private documents unrelated to the task, or other clearly sensitive material.
+
+Prompt shape:
+
+```text
+Task is required. Everything else has defaults.
+
+Task: <missing or already-known task>
+
+Defaults if you just press Enter:
+- participants: <all discovered installed CLI agents>
+- facilitator: <current agent>
+- model/thinking: strongest discovered per agent, otherwise CLI default
+- speed: balanced smart-fast
+- timeout: 30m
+- external backend disclosure: yes for task brief and necessary repo/code context, secrets excluded
+
+Reply with only the task, or include overrides.
+```
+
+If the task statement is already known, do not stop just to ask for optional settings. Present the defaults briefly, then proceed unless the user overrides them in the same message.
+
 Default to keeping the same selected model/thinking/speed config for all rounds of one idea unless the user changes it. If the user changes config mid-idea, record the change in an inbox note or the next round file so the audit trail explains the difference.
 
 When the user chooses "always use X" preferences, record them in `parley-deck/meta/headless-agents.local.json` only after asking. Treat that file as local machine configuration; do not require it to be committed.
@@ -198,7 +235,7 @@ Temporary observers are not quorum members and do not sign off. If the user want
 Speed profile semantics:
 
 - `fast`: shortest acceptable reasoning, smallest/fastest user-approved model, for low-risk drafting or mechanical signoff.
-- `balanced`: default for normal design rounds when the user has no strong preference.
+- `balanced`: default smart-fast mode for normal design rounds; use the strongest available model/reasoning that can still complete promptly.
 - `deep`: stronger model or deeper reasoning setting for architecture, ambiguity, or contentious decisions.
 - `review`: optimize for careful defect finding; prefer deeper reasoning and longer timeout over speed.
 
@@ -220,10 +257,10 @@ Use this generic JSON shape for local configuration:
 {
   "defaults": {
     "timeouts": {
-      "signoffMs": 900000,
-      "roundMs": 2700000,
-      "reviewMs": 3600000,
-      "deepReasoningMs": 4500000
+      "signoffMs": 600000,
+      "roundMs": 1800000,
+      "reviewMs": 1800000,
+      "deepReasoningMs": 1800000
     }
   },
   "agents": {
@@ -233,19 +270,19 @@ Use this generic JSON shape for local configuration:
       "promptMode": "stdin",
       "writeModeArgs": ["<arg>", "<arg>"],
       "modelFlag": "--model",
-      "model": "<user-selected-model>",
+      "model": "<strongest-discovered-or-cli-default>",
       "thinkingFlag": "<optional-thinking-flag>",
-      "thinking": "<user-selected-thinking-level>",
+      "thinking": "<strongest-discovered-or-cli-default>",
       "profileFlag": "<optional-profile-flag>",
       "profile": "<optional-profile>",
-      "speed": "deep",
-      "timeoutMs": 4500000
+      "speed": "balanced",
+      "timeoutMs": 1800000
     }
   }
 }
 ```
 
-All values above are placeholders. The facilitator must fill them from user choice and CLI capability discovery.
+All values above are placeholders. The facilitator must fill them from explicit user choice, CLI capability discovery, or the default selection policy.
 
 Record the effective launch config in the orchestration summary: agent ID, CLI path, selected model, selected thinking/profile/effort, speed profile, timeout, and transport.
 
@@ -255,11 +292,10 @@ Use generous process timeouts. Top-tier models, deep reasoning modes, large code
 
 Recommended defaults:
 
-- Signoff append: 15 minutes.
-- Normal round contribution: 45 minutes.
-- Cross-review or code review with substantial context: 60 minutes.
-- Deep/top-tier reasoning mode: 75 minutes.
-- Very large implementation review: ask the user whether to allow 90 minutes or split the review.
+- Default per-agent process timeout: 30 minutes.
+- Signoff append: 10 minutes unless the selected CLI is known to be slow.
+- Cross-review or code review with substantial context: default 30 minutes; if the agent times out, recover by re-invoking only that agent with a longer timeout.
+- Very large implementation review: split the review or ask before raising the timeout above 60 minutes.
 
 Do not confuse UI polling intervals with process timeouts. Poll long-running CLI processes periodically, but do not terminate them unless the configured process timeout is reached.
 
@@ -669,8 +705,8 @@ Do not pass placeholder brackets literally. Do not use broad bypass modes unless
 Before reporting completion:
 
 - Verify the user selected or confirmed the transport used for the workflow.
-- Verify the user selected or confirmed facilitator, participants, model, thinking/reasoning level, speed profile, and timeout policy.
-- Verify each headless agent launch used explicit or acknowledged model/profile/effort settings and sufficient timeout.
+- Verify facilitator, participants, model, thinking/reasoning level, speed profile, and timeout policy were either selected by the user or defaulted according to Selection Checkpoint.
+- Verify each headless agent launch used explicit, discovered, or defaulted model/profile/effort settings and sufficient timeout.
 - Verify every participant has exactly one file per completed round.
 - Verify every participant file was written by that participant's invocation; otherwise stop and report a blocker.
 - Verify protocol files under `parley-deck/` are in English.

@@ -24,7 +24,7 @@ When invoked by an AI agent, this skill guides it to:
 
 - read the live `COOPERATION.md` protocol, or the bundled fallback
 - discover available local CLI agents without assuming vendor names
-- ask the user to choose transport, participants, models, thinking levels, speed profiles, and timeouts
+- ask only for the required task statement, then continue with clear defaults unless the user overrides them
 - start a new idea with independent Round 1 analysis
 - run cross-review rounds and consensus signoff
 - continue into implementation, code review, review consensus, and fix-up cycles
@@ -71,7 +71,7 @@ Then restart the target agent runtime and ask it to use Parley Deck:
 
 ```text
 Use $parley-deck to start a design review for this task.
-Discover installed CLI agents, show me the capability matrix, and ask before sending code to external model backends.
+Discover installed CLI agents, show me the capability matrix, and use the default participants/model/thinking/speed/timeout choices unless I override them.
 ```
 
 If your runtime does not support skills directly, attach `SKILL.md` and `references/COOPERATION.md` as instruction context. The skill is plain Markdown by design, so any capable tier-1 model can follow it.
@@ -195,7 +195,7 @@ Parley Deck does not require hardcoded agent names. Any CLI agent can participat
 - write exactly the requested protocol file
 - report enough failure information for recovery
 
-The facilitator builds a capability matrix before each workflow so the user can choose model, reasoning depth, speed, timeout, and write mode per participant.
+The facilitator builds a capability matrix before each workflow. By default it uses all discovered installed CLI agents, the current agent as facilitator, the strongest discovered model and thinking mode per agent, balanced smart-fast speed, a 30 minute timeout, and YES for sending the task brief plus necessary repository/code context to external CLI backends. Obvious secrets and clearly sensitive private/customer data still require explicit handling.
 
 ## Transports
 

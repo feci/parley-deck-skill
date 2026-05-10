@@ -35,8 +35,8 @@ npx -y parley-deck-skill@latest install
 ## GitHub Tag
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 ## Homebrew Tap
@@ -56,10 +56,10 @@ Formula/parley-deck-skill.rb
 Generate the release tarball checksum:
 
 ```bash
-curl -L https://github.com/feci/parley-deck-skill/archive/refs/tags/v1.0.0.tar.gz | shasum -a 256
+curl -L https://github.com/feci/parley-deck-skill/archive/refs/tags/v1.0.1.tar.gz | shasum -a 256
 ```
 
-Replace `REPLACE_WITH_V0_1_0_TARBALL_SHA256` in the formula, then run where Homebrew is available:
+Replace `REPLACE_WITH_V1_0_1_TARBALL_SHA256` in the formula, then run where Homebrew is available:
 
 ```bash
 brew audit --strict --online parley-deck-skill
