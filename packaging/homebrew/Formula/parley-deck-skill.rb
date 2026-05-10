@@ -15,9 +15,9 @@ class ParleyDeckSkill < Formula
     license_text = (buildpath/"LICENSE").read
 
     libexec.install Dir["*"]
-    (libexec/"README.md").write(readme)
-    (libexec/"LICENSE").write(license_text)
-    bin.write_exec_script libexec/"bin/parley-deck-skill.js"
+    (libexec/"README.md").write(readme) unless (libexec/"README.md").exist?
+    (libexec/"LICENSE").write(license_text) unless (libexec/"LICENSE").exist?
+    bin.install_symlink libexec/"bin/parley-deck-skill.js" => "parley-deck-skill"
   end
 
   test do
