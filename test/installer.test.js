@@ -16,6 +16,19 @@ function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "parley-deck-skill-test-"));
 }
 
+function writeRuntimeEvidence(home, runtimeDir) {
+  fs.mkdirSync(path.join(home, runtimeDir), { recursive: true });
+  fs.writeFileSync(path.join(home, runtimeDir, "config.json"), "{}\n", "utf8");
+}
+
+function writeExecutable(dir, name) {
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, "#!/bin/sh\nexit 0\n", "utf8");
+  fs.chmodSync(file, 0o755);
+  return file;
+}
+
 function context(home, options) {
   return {
     options: {
@@ -27,6 +40,7 @@ function context(home, options) {
       force: false,
       dryRun: false,
       json: false,
+      includeUndetected: false,
       ...options
     },
     env: { HOME: home, PATH: "" },
@@ -38,7 +52,7 @@ function context(home, options) {
 
 test("resolves user and project target paths", () => {
   const home = tmpDir();
-  const userTargets = installer.resolveTargets(context(home, { target: "all" }));
+  const userTargets = installer.resolveTargets(context(home, { target: "all", includeUndetected: true }));
 
   assert.equal(userTargets.find((target) => target.name === "codex").dest, path.join(home, ".codex", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "claude").dest, path.join(home, ".claude", "skills", "parley-deck"));
@@ -49,7 +63,7 @@ test("resolves user and project target paths", () => {
   assert.equal(userTargets.find((target) => target.name === "aionrs").dest, path.join(home, ".aionrs", "skills", "parley-deck"));
 
   const project = path.join(home, "project");
-  const projectTargets = installer.resolveTargets(context(home, { target: "all", scope: "project", project }));
+  const projectTargets = installer.resolveTargets(context(home, { target: "all", scope: "project", project, includeUndetected: true }));
   assert.equal(projectTargets.find((target) => target.name === "codex").dest, path.join(project, ".codex", "skills", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "claude").dest, path.join(project, ".claude", "skills", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "gemini").dest, path.join(project, ".gemini", "extensions", "parley-deck"));
@@ -58,16 +72,32 @@ test("resolves user and project target paths", () => {
 
 test("auto target installs only detected runtimes", () => {
   const home = tmpDir();
-  fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+  writeRuntimeEvidence(home, ".claude");
 
   const targets = installer.resolveTargets(context(home, { target: "auto" }));
   assert.deepEqual(targets.map((target) => target.name), ["claude"]);
 });
 
+test("all target installs only detected runtimes by default", () => {
+  const home = tmpDir();
+  writeRuntimeEvidence(home, ".claude");
+
+  const targets = installer.resolveTargets(context(home, { target: "all" }));
+  assert.deepEqual(targets.map((target) => target.name), ["claude"]);
+});
+
+test("all target can include undetected runtimes explicitly", () => {
+  const home = tmpDir();
+
+  const targets = installer.resolveTargets(context(home, { target: "all", includeUndetected: true }));
+  assert.ok(targets.some((target) => target.name === "codex"));
+  assert.ok(targets.some((target) => target.name === "qwen"));
+});
+
 test("project auto target only installs detected project runtimes", () => {
   const home = tmpDir();
   const project = path.join(home, "project");
-  fs.mkdirSync(path.join(project, ".gemini"), { recursive: true });
+  writeRuntimeEvidence(project, ".gemini");
 
   const targets = installer.resolveTargets(context(home, { target: "auto", scope: "project", project }));
   assert.deepEqual(targets.map((target) => target.name), ["gemini"]);
@@ -75,10 +105,41 @@ test("project auto target only installs detected project runtimes", () => {
 
 test("auto target detects Hermes runtime directory", () => {
   const home = tmpDir();
-  fs.mkdirSync(path.join(home, ".hermes"), { recursive: true });
+  writeRuntimeEvidence(home, ".hermes");
 
   const targets = installer.resolveTargets(context(home, { target: "auto" }));
   assert.deepEqual(targets.map((target) => target.name), ["hermes"]);
+});
+
+test("auto target ignores marker-only directories created by the installer", () => {
+  const home = tmpDir();
+  const installResult = installer.installCommand(context(home, { target: "qwen" }));
+  assert.equal(installResult.ok, true);
+
+  const targets = installer.resolveTargets(context(home, { target: "auto" }));
+  assert.deepEqual(targets.map((target) => target.name), []);
+});
+
+test("extended targets are not detected by command alone", () => {
+  const home = tmpDir();
+  const binDir = path.join(home, "bin");
+  writeExecutable(binDir, "vibe-acp");
+
+  const testContext = context(home, { target: "auto" });
+  testContext.env.PATH = binDir;
+  const targets = installer.resolveTargets(testContext);
+  assert.deepEqual(targets.map((target) => target.name), []);
+});
+
+test("core targets can be detected by command alone", () => {
+  const home = tmpDir();
+  const binDir = path.join(home, "bin");
+  writeExecutable(binDir, "claude");
+
+  const testContext = context(home, { target: "auto" });
+  testContext.env.PATH = binDir;
+  const targets = installer.resolveTargets(testContext);
+  assert.deepEqual(targets.map((target) => target.name), ["claude"]);
 });
 
 test("installs a codex skill with marker", () => {
@@ -191,7 +252,7 @@ test("uninstall refuses forged marker contents", () => {
 
 test("default doctor only inspects detected runtimes", () => {
   const home = tmpDir();
-  fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+  writeRuntimeEvidence(home, ".claude");
   const result = installer.doctorCommand(context(home, { command: "doctor", target: "auto" }));
 
   assert.equal(result.ok, false);

@@ -84,12 +84,18 @@ Recommended:
 npx -y parley-deck-skill@latest install
 ```
 
-The installer uses an AionUI-style local runtime registry: it checks known user-level agent directories and CLI commands, then installs into the runtimes it can detect. Current native targets are Codex, Claude Code, Gemini CLI extension mode, Hermes, Qwen, CodeBuddy, Goose, Kimi, Factory Droid, Vibe, Cursor, OpenCode, and AionRS.
+The installer uses an AionUI-style local runtime registry: it checks known user-level agent directories and CLI commands, then installs into the runtimes it can detect. For broad AionUI-derived targets, a marker-only directory created by this installer is not treated as a real runtime. Current native targets are Codex, Claude Code, Gemini CLI extension mode, Hermes, Qwen, CodeBuddy, Goose, Kimi, Factory Droid, Vibe, Cursor, OpenCode, and AionRS.
 
-Install everywhere, whether or not the runtime is currently detected:
+Install into every detected runtime:
 
 ```bash
 npx -y parley-deck-skill@latest install --target all
+```
+
+Seed every supported target path even when the runtime is not detected:
+
+```bash
+npx -y parley-deck-skill@latest install --target all --include-undetected
 ```
 
 Install a single target:
@@ -130,7 +136,7 @@ parley-deck-skill install
 Standalone Windows binaries are attached to GitHub releases. They do not require Node:
 
 ```powershell
-.\parley-deck-skill-v1.0.5-windows-x64.exe install --target all --force
+.\parley-deck-skill-v1.0.6-windows-x64.exe install --target all --force
 ```
 
 This is the packaging shape intended for WinGet. Until the WinGet manifest is accepted, download the `.exe` from the latest GitHub release.
@@ -177,6 +183,7 @@ Useful flags:
 --force
 --dry-run
 --json
+--include-undetected
 ```
 
 The installer writes `.parley-deck-skill-install.json` into every managed destination. Updates replace marked installs safely. Unmarked directories are never overwritten or removed unless you pass `--force`.
@@ -189,7 +196,7 @@ Recommended update:
 npx -y parley-deck-skill@latest install --target all --force
 ```
 
-That downloads the latest npm release and replaces existing managed installs for every supported target. Restart the affected agent runtime after updating so it reloads `SKILL.md`.
+That downloads the latest npm release and replaces existing managed installs for every detected target. Restart the affected agent runtime after updating so it reloads `SKILL.md`.
 
 Update only one runtime:
 
