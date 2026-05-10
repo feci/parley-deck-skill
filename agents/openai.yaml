@@ -1,0 +1,4 @@
+interface:
+  display_name: "Parley Deck"
+  short_description: "Run Parley with chosen CLI agents"
+  default_prompt: "Use $parley-deck to discover available CLI agents, choose transport, models, thinking levels, and speed, then start a Parley Deck workflow."
