@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+PackageIdentifier: Feci.ParleyDeckSkill
+PackageVersion: 1.0.4
+InstallerType: portable
+Commands:
+- parley-deck-skill
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/feci/parley-deck-skill/releases/download/v1.0.4/parley-deck-skill-v1.0.4-windows-x64.exe
+  InstallerSha256: 27852D015B7E7685933032683A563A8F10CD672E704C0A190D915933C3716F89
+- Architecture: arm64
+  InstallerUrl: https://github.com/feci/parley-deck-skill/releases/download/v1.0.4/parley-deck-skill-v1.0.4-windows-arm64.exe
+  InstallerSha256: 8595B5B7FC7E150B602BDDAC65F5C2AEFFAE346197DC13E30C0169C655B99C3E
+ManifestType: installer
+ManifestVersion: 1.12.0

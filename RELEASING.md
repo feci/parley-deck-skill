@@ -7,6 +7,7 @@ This repository publishes a portable `SKILL.md` package plus a small dependency-
 ```bash
 npm test
 npm pack --dry-run
+npm run build:portable:current
 node bin/parley-deck-skill.js install --target all --dry-run
 node bin/parley-deck-skill.js doctor --target all --json
 ```
@@ -17,6 +18,7 @@ Ask a second model to review the final diff before publishing. Use this checklis
 - safe overwrite, update, and uninstall behavior
 - Codex, Claude, and Gemini target correctness
 - npm package file whitelist
+- portable binary build and asset upload
 - Homebrew formula correctness
 - README install clarity
 
@@ -38,6 +40,41 @@ npx -y parley-deck-skill@latest install
 VERSION="x.y.z" # package version without the leading v
 git tag "v${VERSION}"
 git push origin main "v${VERSION}"
+```
+
+## Portable Release Assets
+
+Portable Windows executables are built with `@yao-pkg/pkg` and uploaded to each GitHub release by `.github/workflows/release-portable.yml`.
+
+Manual build:
+
+```bash
+npm ci
+npm run build:portable:windows
+```
+
+Expected artifacts:
+
+```text
+dist/parley-deck-skill-vX.Y.Z-windows-x64.exe
+dist/parley-deck-skill-vX.Y.Z-windows-arm64.exe
+```
+
+After release publication, verify the assets are attached and that the workflow passed. These `.exe` files are the inputs for WinGet manifests.
+
+## WinGet
+
+WinGet uses the Windows executables from the GitHub release. The draft manifest lives under:
+
+```text
+packaging/winget/manifests/f/Feci/ParleyDeckSkill/X.Y.Z/
+```
+
+After the release assets exist, copy the manifest directory into a fork of `microsoft/winget-pkgs`, validate on Windows, and open a pull request.
+
+```powershell
+winget validate .\manifests\f\Feci\ParleyDeckSkill\X.Y.Z
+winget install --manifest .\manifests\f\Feci\ParleyDeckSkill\X.Y.Z
 ```
 
 ## Homebrew Tap

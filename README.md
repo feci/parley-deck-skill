@@ -120,10 +120,17 @@ parley-deck-skill install
 Homebrew:
 
 ```bash
-# Available after the feci/homebrew-parley tap is published.
 brew install feci/parley/parley-deck-skill
 parley-deck-skill install
 ```
+
+Standalone Windows binaries are attached to GitHub releases. They do not require Node:
+
+```powershell
+.\parley-deck-skill-v1.0.4-windows-x64.exe install --target all --force
+```
+
+This is the packaging shape intended for WinGet. Until the WinGet manifest is accepted, download the `.exe` from the latest GitHub release.
 
 Gemini CLI can also install the repository as an extension:
 
