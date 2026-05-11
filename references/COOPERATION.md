@@ -27,6 +27,7 @@ Once chosen, replace the `Transport:` line in the header with the active value. 
 - The `parley-deck/` directory layout (§3) is identical.
 - Files are **canonical** (the audit trail). PR/MR conversations are _ergonomic_ — easier for humans to read — but never the source of truth.
 - Signoff blocks in `consensus.md` are canonical. In B and C they are mirrored by a native PR/MR review; if they diverge, the file wins.
+- Multi-agent execution is mandatory (§1). A transport MAY change how agents publish artifacts, but it MUST NOT collapse Parley Deck into a solo facilitator process.
 - English-only rule (§6.6) applies to every file _and_ every PR/MR description, comment, review summary, and commit message.
 
 ## 1. Scope and purpose
@@ -39,6 +40,14 @@ This document defines how multiple AI agents collaborate on a shared idea, desig
 4. **Auditable trail** — every argument, change of mind, and decision lives in a file that survives context compaction.
 
 The protocol is designed to scale to **any number of agents (≥ 2)** and is **agent-implementation agnostic** — it does not assume any particular model, vendor, or runtime. It is also **transport-agnostic** in content; the three transports in §0 are surface-level variations on the same protocol.
+
+### Non-solo execution requirement
+
+A request to use `parley`, `parley-deck`, or this protocol ALWAYS means a real multi-agent workflow with other available models or agents. Parley Deck is never satisfied by one agent working alone as a solo checklist, solo review, or solo process framework.
+
+If at least one other participant or CLI agent is available, the facilitator MUST invoke other agents. Each participant MUST create its own canonical artifact. The facilitator MUST NOT claim "Parley Deck was used" unless other participant artifacts exist, or the protocol explicitly records why multi-agent execution was impossible.
+
+If no other agent can be invoked because of auth, CLI, timeout, permissions, or tooling failure, the facilitator MUST stop before merge, finalization, or claiming completion and report the blocker to the user. Work may continue only if the user explicitly authorizes a solo exception. That exception MUST be recorded in `inbox/` or the active idea's protocol notes before work continues.
 
 ## 2. Active agents (roster)
 
@@ -122,6 +131,8 @@ The agent (or user) who starts the idea creates `ideas/<slug>/00-prompt.md`:
 
 After creating `00-prompt.md`, the author creates an empty `round-01/` dir. The idea is now "open". _(Transport-specific: see §11 for how this is published — a commit, a draft PR, a draft MR.)_
 
+The `participants:` list MUST include at least one non-facilitator participant when another agent can be invoked. Optional participant selection MUST NOT silently collapse to only the facilitator. If discovery finds no invokable non-facilitator participant, the author MUST record the blocker and obtain an explicit user-authorized solo exception before continuing.
+
 ### Phase 1 — Round 1 (independent analysis)
 
 Every listed participant creates `ideas/<slug>/round-01/<agent-id>.md`:
@@ -138,7 +149,7 @@ Every listed participant creates `ideas/<slug>/round-01/<agent-id>.md`:
     ## Concerns / open questions
     ## Risks
 
-**Rule:** Round 1 is written _without reading other agents' round-1 files_ — the point is independent analyses on the table before anchoring. Write your file, save (or commit/push), _then_ read the others. _(Transport B/C may use sub-branches for stronger isolation — see §11.)_
+**Rule:** Round 1 is written _without reading other agents' round-1 files_ — the point is independent analyses on the table before anchoring. Write your file, save (or commit/push), _then_ read the others. The facilitator MUST NOT substitute its own solo analysis for missing participant files. _(Transport B/C may use sub-branches for stronger isolation — see §11.)_
 
 ### Phase 2 — Cross-review rounds (2, 3, …)
 
@@ -222,6 +233,8 @@ The drafter writes:
 
 `FINAL.md` is the **single source of truth**. If later invalidated, open a new idea (`<slug>-v2`) — do **not** edit the old FINAL. Update `00-prompt.md` `status: final` and optionally move the dir to `ideas/archived/<slug>/` after implementation.
 
+Before publishing `FINAL.md`, the drafter MUST verify that every active non-facilitator participant has created the expected canonical artifacts or that a recorded solo exception explains why multi-agent execution was impossible. A missing non-facilitator artifact is a blocker, not a reason to claim Parley Deck completed as a solo run.
+
 **Closing the idea (transport-specific):** The drafter publishes `FINAL.md` and closes the idea on disk in a single transaction. In transport A this is a commit; in B/C it is a PR/MR merge that bundles the final commit. Either way, the closing transaction also picks up any uncommitted/unmerged contributions inside `ideas/<slug>/` so no deliberation history is orphaned. See §11 for the exact form.
 
 ### Phase 5 — Implementation
@@ -281,6 +294,8 @@ Once `IMPLEMENTATION.md` is published, every active participant **except the imp
     ## Open questions
 
 **Severity tags** are fixed: `CRITICAL` (must fix before merge), `MAJOR` (should fix before merge), `MINOR` (nice to have), `NIT` (stylistic / optional). The implementer does not write a review-round file — they respond in Phase 7.
+
+If there is no invokable non-implementer reviewer, the implementation MUST NOT be merged or marked complete under Parley Deck. The implementer MUST report the blocker and continue only after either another reviewer is added or the user explicitly authorizes a recorded solo exception.
 
 Rules for later review rounds mirror Phase 2: never edit another reviewer's file, respond in your own next-round file with `responding-to:` listing prior review files, address every other active reviewer explicitly.
 
@@ -367,6 +382,7 @@ Escalation is not a veto — the user's answer becomes input to the next round l
 ## 5. Quorum and async participation
 
 - **Quorum = all agents listed in `participants:` of `00-prompt.md`.**
+- A valid Parley Deck idea normally has at least two active participants. A one-participant idea is valid only when a user-authorized solo exception is recorded with the auth/CLI/timeout/tooling blocker that made multi-agent execution impossible.
 - An agent joining after round 1: either catch up (read priors, write late round-1, join from round 2) or decline (❌ NON-PARTICIPANT note in consensus).
 - If an agent is inactive > 2 rounds and the idea has a deadline, others may drop them from quorum — but only after a `inbox/<from>-to-<missing>_<slug>.md` ping.
 - For ideas with **only two participants**, the same rules apply unchanged: both must sign off ✅ for consensus, and disagreement still requires counter-proposals rather than tie-breaking. If a tie cannot be broken in rounds, escalate to the user (§4).
@@ -414,19 +430,21 @@ Inbox messages are outside the round/consensus protocol. Recipients read them at
 5. For each open idea where you're a participant, check:
    - Your round file for the current design round is missing → write it **before** starting other work.
    - `IMPLEMENTATION.md` exists and `review/round-0N/<your-id>.md` is missing → write your review file **before** starting other work.
-6. Only then proceed to the user's current task.
+6. Before accepting or finalizing Parley Deck work, verify that at least one non-facilitator participant has been invoked and has written the expected canonical artifact, or that a recorded solo exception explains why this was impossible.
+7. Only then proceed to the user's current task.
 
 ## 10. TL;DR
 
-1. One file per agent per round — no cross-editing.
-2. Round 1 = independent analysis; later rounds = cross-review.
-3. Consensus = all ✅ signoffs in `consensus.md`. In B/C, also mirrored by native PR/MR review approvals; the file wins on conflict.
-4. The **idea initiator** (`author:` in `00-prompt.md`) drafts `FINAL.md`. Closing the idea is a single transaction (commit in A, PR/MR merge in B/C) that sweeps in any orphaned files.
-5. Full dev flow: **idea → implementation → code review → fix-up**. The FINAL drafter is the default implementer; every other participant reviews; the same signoff mechanism gates each cycle; fix-up/review iterates until zero Agreed fixes.
-6. **Any agent can escalate to the user** via `inbox/<from>-to-user_...md`. The user's answer is quoted into the next round/review file for the audit trail.
-7. **English only** in every `parley-deck/` file _and_ every PR/MR description, comment, review, or commit message (unless the project deliberately overrides).
-8. Change the protocol the same way you'd change any other artifact: open an idea.
-9. **Files are canonical; PR/MR conversations are ergonomic.**
+1. Parley Deck is non-solo: if another agent can be invoked, at least one non-facilitator participant MUST write its own canonical artifact.
+2. One file per agent per round — no cross-editing.
+3. Round 1 = independent analysis; later rounds = cross-review.
+4. Consensus = all ✅ signoffs in `consensus.md`. In B/C, also mirrored by native PR/MR review approvals; the file wins on conflict.
+5. The **idea initiator** (`author:` in `00-prompt.md`) drafts `FINAL.md`. Closing the idea is a single transaction (commit in A, PR/MR merge in B/C) that sweeps in any orphaned files.
+6. Full dev flow: **idea → implementation → code review → fix-up**. The FINAL drafter is the default implementer; every other participant reviews; the same signoff mechanism gates each cycle; fix-up/review iterates until zero Agreed fixes.
+7. **Any agent can escalate to the user** via `inbox/<from>-to-user_...md`. The user's answer is quoted into the next round/review file for the audit trail.
+8. **English only** in every `parley-deck/` file _and_ every PR/MR description, comment, review, or commit message (unless the project deliberately overrides).
+9. Change the protocol the same way you'd change any other artifact: open an idea.
+10. **Files are canonical; PR/MR conversations are ergonomic.**
 
 ---
 

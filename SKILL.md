@@ -11,6 +11,14 @@ Act as the facilitator agent. Every participant writes its own protocol artifact
 
 Always read `parley-deck/COOPERATION.md` first. Follow the active transport, roster, phase rules, and English-only rule for every file under `parley-deck/`.
 
+## Non-Solo Requirement
+
+A request to use `parley`, `parley-deck`, or this skill ALWAYS means a real multi-agent workflow with other available models or agents. Parley Deck is never satisfied by one agent working alone as a solo checklist, solo review, or solo process framework.
+
+If at least one other participant or CLI agent is available, the facilitator MUST invoke other agents. Each participant MUST create its own canonical artifact. The facilitator MUST NOT claim "Parley Deck was used" unless other participant artifacts exist, or the protocol explicitly records why multi-agent execution was impossible.
+
+If no other agent can be invoked because of auth, CLI, timeout, permissions, or tooling failure, the facilitator MUST stop before merge, finalization, or claiming completion and report the blocker to the user. The facilitator may continue only if the user explicitly authorizes a solo exception, and that exception MUST be recorded in an inbox/protocol note before work continues.
+
 ## Required Protocol Context
 
 Do not run this skill from the abbreviated workflow alone. Load the full cooperation protocol before acting:
@@ -53,10 +61,11 @@ Before starting work, verify that the workflow plan covers all applicable protoc
 
 - Transport choice and stickiness: choose exactly one of `local-dir`, `github-pr`, or `gitlab-mr`; do not switch later without a protocol-change idea.
 - Scope and purpose: parallel work without collisions, explicit rounds, consensus before execution, durable audit trail.
+- Non-solo execution: if any other participant or CLI agent is available, invoke at least one non-facilitator participant and verify its canonical artifacts exist.
 - Active roster: use stable agent IDs from the roster; do not silently add new quorum members.
 - Directory layout: create and maintain `00-prompt.md`, `round-NN/`, `consensus.md`, `FINAL.md`, `IMPLEMENTATION.md`, and `review/` artifacts in the required paths.
 - Phase 0 kickoff: create `ideas/<slug>/00-prompt.md` and `round-01/` with correct frontmatter.
-- Phase 1 independent analysis: every participant writes its own `round-01/<agent-id>.md` before reading other round-1 files.
+- Phase 1 independent analysis: every participant writes its own `round-01/<agent-id>.md` before reading other round-1 files; the facilitator MUST NOT substitute its own solo analysis for missing participant files.
 - Phase 2 cross-review rounds: each participant writes its own next-round file, explicitly addresses every other participant, and provides counter-proposals for disagreements.
 - Phase 3 consensus: draft `consensus.md`, then each participant appends its own signoff block. All active participants must accept, or blockers start another round.
 - Phase 4 finalization: the initiator or agreed drafter writes `FINAL.md`, updates status, and closes the idea per transport rules.
@@ -104,9 +113,11 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 6. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix and the effective defaults, but do not block on optional choices. The only required startup answer is the task statement when it was not already provided.
 
-7. If a candidate agent is not in the roster, list the proposed stable agent ID in the default summary. Pressing Enter accepts that agent for the current workflow. If the user explicitly rejects roster expansion, run it only as a temporary observer or skip it.
+7. Verify that participant selection includes at least one non-facilitator participant when another agent or CLI is available. Optional selection MUST NOT silently collapse to only the facilitator. If no non-facilitator participant can be invoked, stop and report the blocker unless the user explicitly authorizes a recorded solo exception.
 
-8. Default external-backend disclosure approval is YES for the task brief and necessary repository/code context. Still redact obvious secrets and stop for explicit confirmation before sending credentials, customer data, private documents unrelated to the task, or other clearly sensitive material.
+8. If a candidate agent is not in the roster, list the proposed stable agent ID in the default summary. Pressing Enter accepts that agent for the current workflow. If the user explicitly rejects roster expansion, run it only as a temporary observer or skip it. Rejecting every non-facilitator participant requires an explicit solo exception note before continuing.
+
+9. Default external-backend disclosure approval is YES for the task brief and necessary repository/code context. Still redact obvious secrets and stop for explicit confirmation before sending credentials, customer data, private documents unrelated to the task, or other clearly sensitive material.
 
 ## Transport Selection
 
@@ -198,7 +209,7 @@ Optional overrides:
 Default selection policy:
 
 - transport: current `COOPERATION.md` transport when set; otherwise `local-dir`.
-- participants: all discovered installed CLI agents that can run headlessly and write their own artifact. If a discovered agent is not in the roster, list it and treat pressing Enter as approval to include it with a stable agent ID for this workflow.
+- participants: all discovered installed CLI agents that can run headlessly and write their own artifact. This MUST include at least one non-facilitator participant when one is available. If a discovered agent is not in the roster, list it and treat pressing Enter as approval to include it with a stable agent ID for this workflow.
 - facilitator: the agent/runtime that invoked the skill.
 - model: strongest discovered model for each agent. If discovery cannot prove model options, use the CLI default and record `model: cli-default`.
 - thinking/reasoning/effort: strongest discovered mode for each agent. If discovery cannot prove thinking options, use the CLI default and record `thinking: cli-default`.
@@ -214,7 +225,7 @@ Task is required. Everything else has defaults.
 Task: <missing or already-known task>
 
 Defaults if you just press Enter:
-- participants: <all discovered installed CLI agents>
+- participants: <all discovered installed CLI agents, including at least one non-facilitator when available>
 - facilitator: <current agent>
 - model/thinking: strongest discovered per agent, otherwise CLI default
 - speed: balanced smart-fast
@@ -225,6 +236,8 @@ Reply with only the task, or include overrides.
 ```
 
 If the task statement is already known, do not stop just to ask for optional settings. Present the defaults briefly, then proceed unless the user overrides them in the same message.
+
+If participant defaults would select only the facilitator, do not proceed as Parley Deck. Retry discovery, ask for another invokable agent, or record a user-authorized solo exception before continuing. The facilitator MUST NOT present a solo run as a completed Parley Deck workflow.
 
 Default to keeping the same selected model/thinking/speed config for all rounds of one idea unless the user changes it. If the user changes config mid-idea, record the change in an inbox note or the next round file so the audit trail explains the difference.
 
@@ -706,6 +719,9 @@ Before reporting completion:
 
 - Verify the user selected or confirmed the transport used for the workflow.
 - Verify facilitator, participants, model, thinking/reasoning level, speed profile, and timeout policy were either selected by the user or defaulted according to Selection Checkpoint.
+- Verify Parley Deck did not collapse to a solo facilitator run: at least one non-facilitator participant was invoked when another agent was available.
+- Verify each invoked non-facilitator participant created its own canonical artifact in the expected path before claiming a round, review, consensus, or finalization is complete.
+- If no non-facilitator participant artifact exists, verify the protocol records why multi-agent execution was impossible and that the user explicitly authorized any solo exception before merge/finalization.
 - Verify each headless agent launch used explicit, discovered, or defaulted model/profile/effort settings and sufficient timeout.
 - Verify every participant has exactly one file per completed round.
 - Verify every participant file was written by that participant's invocation; otherwise stop and report a blocker.
