@@ -131,6 +131,22 @@ test("extended targets are not detected by command alone", () => {
   assert.deepEqual(targets.map((target) => target.name), []);
 });
 
+test("cursor target requires its CLI command", () => {
+  const home = tmpDir();
+  writeRuntimeEvidence(home, ".cursor");
+
+  let targets = installer.resolveTargets(context(home, { target: "auto" }));
+  assert.deepEqual(targets.map((target) => target.name), []);
+
+  const binDir = path.join(home, "bin");
+  writeExecutable(binDir, "agent");
+  const testContext = context(home, { target: "auto" });
+  testContext.env.PATH = binDir;
+
+  targets = installer.resolveTargets(testContext);
+  assert.deepEqual(targets.map((target) => target.name), ["cursor"]);
+});
+
 test("core targets can be detected by command alone", () => {
   const home = tmpDir();
   const binDir = path.join(home, "bin");

@@ -1,6 +1,6 @@
 {
   "name": "parley-deck-skill",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Install the Parley Deck vendor-neutral AI cooperation skill into local AI agent runtimes or a custom skill directory.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/feci/parley-deck-skill#readme",
