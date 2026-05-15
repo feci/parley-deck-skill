@@ -75,9 +75,11 @@ Before starting work, verify that the workflow plan covers all applicable protoc
 - Phase 8 fix-up: implement agreed fixes, update `IMPLEMENTATION.md`, repeat review until there are zero agreed fixes, then mark complete.
 - Escalation to user: use `inbox/<from>-to-user_<slug>_<topic>.md` when human judgment is needed; quote the user's answer into the next round/review file.
 - Quorum and async participation: quorum is all participants in `00-prompt.md`; dropping inactive agents requires the protocol's ping/deadline rules.
+- Participant sizing and lenses: default to 2-4 active participants, use optional per-idea `roles:` only as advisory lenses, and do not let roles change quorum, ownership, signoff weight, or drafter eligibility.
 - Conflict avoidance: one file per agent per round, append-only signoffs, never edit another agent's file, and copy external snippets when other agents may lack access.
+- Internal helpers: participants may use internal subagents/tools/retrieval/scratchpads, but those helpers are not Parley Deck participants, do not satisfy non-solo execution, and do not own canonical artifacts.
 - Protocol changes: open a meta-protocol-change idea; do not edit the protocol ad hoc.
-- Inbox: use for lightweight durable pings; promote design discussions to ideas.
+- Inbox: use for lightweight durable pings; promote design discussions to ideas, and mirror phase-affecting decisions into canonical round/review/consensus/final artifacts.
 - Session start: read protocol, inbox, open idea prompts, and outstanding PR/MR actions before new work.
 - Transport mechanics: apply the exact mechanics for Local Directory, GitHub PRs, or GitLab MRs from section 11 of the protocol.
 - English-only rule: every file under `parley-deck/`, PR/MR comment, review summary, and commit message is English unless the project protocol explicitly overrides it.
@@ -209,7 +211,7 @@ Optional overrides:
 Default selection policy:
 
 - transport: current `COOPERATION.md` transport when set; otherwise `local-dir`.
-- participants: all discovered installed CLI agents that can run headlessly and write their own artifact. This MUST include at least one non-facilitator participant when one is available. If a discovered agent is not in the roster, list it and treat pressing Enter as approval to include it with a stable agent ID for this workflow.
+- participants: a bounded set of discovered installed CLI agents that can run headlessly and write their own artifact, normally 2-4 active participants unless the task genuinely benefits from more distinct modules, review scopes, or competing hypotheses. This MUST include at least one non-facilitator participant when one is available. If a discovered agent is not in the roster, list it and treat pressing Enter as approval to include it with a stable agent ID for this workflow.
 - facilitator: the agent/runtime that invoked the skill.
 - model: strongest discovered model for each agent. If discovery cannot prove model options, use the CLI default and record `model: cli-default`.
 - thinking/reasoning/effort: strongest discovered mode for each agent. If discovery cannot prove thinking options, use the CLI default and record `thinking: cli-default`.
@@ -244,6 +246,14 @@ Default to keeping the same selected model/thinking/speed config for all rounds 
 When the user chooses "always use X" preferences, record them in `parley-deck/meta/headless-agents.local.json` only after asking. Treat that file as local machine configuration; do not require it to be committed.
 
 Temporary observers are not quorum members and do not sign off. If the user wants an observer to write a protocol file, first clarify whether to add it as a participant through the roster/protocol path or to keep its output as a non-quorum inbox note.
+
+Participant sizing and per-idea roles:
+
+- Default to 2-4 active participants for normal ideas.
+- Add more participants only when the task splits cleanly by module, review scope, or competing hypothesis.
+- Use optional `roles:` metadata in `00-prompt.md` when distinct lenses improve coverage.
+- Role/lens values are advisory only. They do not change quorum, signoff weight, artifact ownership, drafter eligibility, or roster membership.
+- Avoid multi-agent overhead for sequential same-file work or tightly coupled edits.
 
 Speed profile semantics:
 
@@ -345,6 +355,8 @@ The canonical protocol artifact must be created by the agent whose ID appears in
 
 For headless CLI participants, give the agent one exact output path and enough workspace-write permission to create that file. If the CLI cannot write the file, stop and report the blocker instead of silently writing the participant file yourself.
 
+A participant may use internal helper mechanisms such as subagents, retrieval, tools, scratchpads, or additional model calls to produce its own artifact. Those helpers are not Parley Deck participants, do not satisfy the non-solo requirement, do not sign off, and do not own protocol files. Participant-spawned helpers MUST NOT create canonical round, review, consensus, or signoff files under a separate helper identity unless that identity is explicitly listed in the idea's `participants:` list. The named participant remains fully accountable for its own file and signoff.
+
 ## Idea Kickoff
 
 For a new task, create:
@@ -362,6 +374,9 @@ idea: <idea-slug>
 author: <facilitator-agent-id or "user">
 created: YYYY-MM-DD
 participants: [<agent-id-1>, <agent-id-2>, ...]
+roles:
+  <agent-id-1>: <optional-advisory-lens>
+  <agent-id-2>: <optional-advisory-lens>
 status: round-01
 ---
 
@@ -373,6 +388,8 @@ status: round-01
 ```
 
 Preserve the user's intent, but translate non-English user text into English for protocol files. Note the original language only when it matters.
+
+Keep `participants:` as a list of agent IDs. Omit `roles:` when it is not useful. If present, `roles:` is a per-idea advisory lens map only; it must not change quorum, ownership, signoff weight, or drafter eligibility.
 
 ## Round 1: Independent Analysis
 
@@ -393,12 +410,15 @@ Rules:
 - Write the complete file, including YAML frontmatter.
 - Return only a short confirmation with the path written.
 - Be concrete, concise, and state trade-offs.
+- If `00-prompt.md` assigns you a role/lens, use it as an advisory perspective only; it does not change your ownership or signoff obligations.
 
 Effective launch config:
 - model: <selected-model>
 - thinking/reasoning/effort/profile: <selected-setting>
 - speed: <selected-speed-profile>
 - timeoutMs: <configured-timeout>
+
+Role/lens for this idea: <role from 00-prompt.md roles map, or "general participant">
 
 Idea:
 <contents or concise extract of 00-prompt.md>
@@ -514,6 +534,7 @@ You are <agent-id>, the implementer for Parley Deck idea <idea-slug>.
 
 Rules:
 - Implement strictly according to parley-deck/ideas/<idea-slug>/FINAL.md.
+- Before multi-file changes or changes outside `parley-deck/`, open or update parley-deck/ideas/<idea-slug>/IMPLEMENTATION.md with a short implementation plan/checklist. For risky plans, use the active transport surface or `inbox/` for a brief feedback window before proceeding.
 - Do not silently deviate from FINAL.md.
 - Record unavoidable deviations in parley-deck/ideas/<idea-slug>/IMPLEMENTATION.md.
 - Create or update exactly the implementation files needed for the requested target repo plus IMPLEMENTATION.md.
@@ -540,6 +561,10 @@ and sections:
 
 ```markdown
 ## Summary of work
+## Implementation plan / checklist
+- [ ] Files or areas to change:
+- [ ] Checks to run:
+- [ ] Review or risk notes:
 ## Deviations from FINAL.md
 ## Notes for reviewers
 ```
@@ -692,6 +717,8 @@ date: YYYY-MM-DD
 
 Include `## Question`, `## Context`, and `## What I need from you`. If `blocking: yes`, pause the escalating agent's work for that idea. When the user answers, quote the answer verbatim into the next round/review file under `## User direction`, then archive or delete the inbox escalation because the next round/review file becomes authoritative.
 
+For non-escalation inbox handoffs, progress notes, or mid-round discoveries, keep the message lightweight. Any decision or position that affects a phase transition must be mirrored in the next canonical round/review file, `consensus.md`, `FINAL.md`, or `IMPLEMENTATION.md`; inbox messages are coordination aids, not substitutes for protocol artifacts.
+
 ## Protocol Changes
 
 When the skill or workflow exposes a protocol ambiguity that should persist for future agents, do not patch `COOPERATION.md` ad hoc. Open a meta-protocol-change idea under `parley-deck/ideas/meta-protocol-change-<topic>/` and run Phase 0-4 at minimum. Only update `COOPERATION.md` after that idea reaches consensus/finalization.
@@ -725,6 +752,9 @@ Before reporting completion:
 - Verify each headless agent launch used explicit, discovered, or defaulted model/profile/effort settings and sufficient timeout.
 - Verify every participant has exactly one file per completed round.
 - Verify every participant file was written by that participant's invocation; otherwise stop and report a blocker.
+- Verify any `roles:` metadata is advisory only and did not change quorum, ownership, signoff weight, or drafter eligibility.
+- Verify any internal helper/subagent use is represented only through the owning participant's canonical artifact, was not counted as a non-facilitator participant, and did not create canonical files under a helper identity that is absent from `participants:`.
+- For non-trivial implementation, verify `IMPLEMENTATION.md` includes a plan/checklist before or alongside the implementation summary.
 - Verify protocol files under `parley-deck/` are in English.
 - Verify the facilitator did not overwrite another agent's file.
 - Summarize which transport and CLIs were used, which models/thinking levels were selected, which rounds ran, where artifacts were written, and whether consensus/finalization was reached.

@@ -2,7 +2,7 @@
 
 **Workspace:** `parley-deck`
 **Parley deck:** `./parley-deck/`
-**Transport:** `local-dir`
+**Transport:** `github-pr`
 **Created:** 2026-05-09 (initial draft)
 **Status:** Living document — any agent may propose changes via a dedicated idea (see §7).
 
@@ -48,6 +48,21 @@ A request to use `parley`, `parley-deck`, or this protocol ALWAYS means a real m
 If at least one other participant or CLI agent is available, the facilitator MUST invoke other agents. Each participant MUST create its own canonical artifact. The facilitator MUST NOT claim "Parley Deck was used" unless other participant artifacts exist, or the protocol explicitly records why multi-agent execution was impossible.
 
 If no other agent can be invoked because of auth, CLI, timeout, permissions, or tooling failure, the facilitator MUST stop before merge, finalization, or claiming completion and report the blocker to the user. Work may continue only if the user explicitly authorizes a solo exception. That exception MUST be recorded in `inbox/` or the active idea's protocol notes before work continues.
+
+### Participant sizing and lenses
+
+Use enough participants to get genuinely different analysis without creating coordination drag:
+
+- Default to 2–4 active participants for normal ideas.
+- Use per-idea roles or lenses when distinct perspectives materially improve coverage.
+- Add more participants only for cleanly separable modules, review scopes, or competing hypotheses.
+- Avoid multi-agent overhead for sequential same-file work or tightly coupled edits.
+
+Per-idea role/lens metadata is advisory only. It does not change quorum, signoff weight, artifact ownership, drafter eligibility, or the non-solo requirement.
+
+### Internal helpers
+
+An agent MAY use internal helper mechanisms such as subagents, retrieval, tools, scratchpads, or additional model calls to produce its own canonical artifact. These helpers are not Parley Deck participants, do not count toward the non-solo requirement, do not sign off, and do not own protocol files. Participant-spawned helpers MUST NOT create canonical round, review, consensus, or signoff files under a separate helper identity unless that identity is explicitly listed in the idea's `participants:` list. The named participant remains fully accountable for its own file and signoff.
 
 ## 2. Active agents (roster)
 
@@ -121,6 +136,9 @@ The agent (or user) who starts the idea creates `ideas/<slug>/00-prompt.md`:
     author: <agent-id or "user">
     created: YYYY-MM-DD
     participants: [<agent-id-1>, <agent-id-2>, ...]
+    roles:                         # optional; advisory per-idea lenses only
+      <agent-id-1>: <lens-or-role>
+      <agent-id-2>: <lens-or-role>
     deadline: YYYY-MM-DD        # optional
     status: round-01            # round-N | consensus | final | abandoned
     ---
@@ -132,6 +150,8 @@ The agent (or user) who starts the idea creates `ideas/<slug>/00-prompt.md`:
 After creating `00-prompt.md`, the author creates an empty `round-01/` dir. The idea is now "open". _(Transport-specific: see §11 for how this is published — a commit, a draft PR, a draft MR.)_
 
 The `participants:` list MUST include at least one non-facilitator participant when another agent can be invoked. Optional participant selection MUST NOT silently collapse to only the facilitator. If discovery finds no invokable non-facilitator participant, the author MUST record the blocker and obtain an explicit user-authorized solo exception before continuing.
+
+Keep `participants:` as a list of agent IDs. If the idea benefits from distinct perspectives, add an optional `roles:` map keyed by participant ID. Roles are free-form advisory lenses for this idea only; they do not change quorum, signoff weight, artifact ownership, drafter eligibility, or roster membership.
 
 ### Phase 1 — Round 1 (independent analysis)
 
@@ -244,8 +264,9 @@ Once `FINAL.md` is published, the idea moves from design to build. **The default
 The implementer:
 
 - Creates a branch in the **target code repo** per that repo's branching convention (e.g. `feature/<slug>` off the integration branch).
+- For multi-file changes or changes outside `parley-deck/`, opens or updates `IMPLEMENTATION.md` with a short implementation plan/checklist before making code changes. For risky plans, the implementer may use the active transport surface or `inbox/` for a brief feedback window before proceeding. Reviewers may block material divergence from that plan through the normal review process. This is not a new phase or artifact.
 - Implements strictly to `FINAL.md`. Any unavoidable deviation is logged in `IMPLEMENTATION.md` — not silently absorbed into the code.
-- On completion, creates `ideas/<slug>/IMPLEMENTATION.md`:
+- On completion, finalizes `ideas/<slug>/IMPLEMENTATION.md`:
 
         ---
         idea: <slug>
@@ -261,6 +282,13 @@ The implementer:
 
         ## Summary of work
         (What was built. Which parts of FINAL.md this covers.)
+
+        ## Implementation plan / checklist
+        (Required before multi-file changes or changes outside `parley-deck/`; "N/A" is valid for trivial or design-only work.)
+
+        - [ ] Files or areas to change:
+        - [ ] Checks to run:
+        - [ ] Review or risk notes:
 
         ## Deviations from FINAL.md
         (Any divergence, with rationale. "None" is a valid answer.)
@@ -418,6 +446,8 @@ Examples:
 - `inbox/<agent-id-1>-to-user_<slug>_<topic>.md` (escalation — see §4)
 
 Inbox messages are outside the round/consensus protocol. Recipients read them at session start. If an inbox thread starts to look like a design discussion, promote it to `ideas/<slug>/`.
+
+Mid-round discoveries, handoffs, and progress notes may use `inbox/`, but substantive decisions and positions that influence a phase transition MUST be mirrored in the next round/review file, `consensus.md`, `FINAL.md`, or `IMPLEMENTATION.md`. Inbox messages are coordination aids, not a substitute for canonical artifacts.
 
 **In transports B and C**, casual inbox-style chatter _may_ additionally happen in PR/MR conversations or in a dedicated chat channel, but **escalations to the user (`to-user`) and any handoff that influences phase transitions MUST be filed as inbox files**. PR/MR threads are too easy to bury and not durable enough for audit purposes.
 
