@@ -48,12 +48,14 @@ parley-deck-skill/
 |-- gemini-extension.json
 `-- references/
     |-- COOPERATION.md
+    |-- compatibility.json
     `-- WORKED_EXAMPLES.md
 ```
 
 - `bin/` and `lib/` contain the dependency-free Node installer.
 - `SKILL.md` is the canonical entrypoint for agents.
 - `references/COOPERATION.md` is a portability snapshot of the protocol.
+- `references/compatibility.json` describes packaged protocol and project metadata schema compatibility.
 - `references/WORKED_EXAMPLES.md` contains non-authoritative examples and config shapes.
 - `agents/manifest.yaml` is vendor-neutral metadata.
 - `agents/openai.yaml` is only UI metadata for Codex/OpenAI skill tooling.
@@ -136,7 +138,7 @@ parley-deck-skill install
 Standalone Windows binaries are attached to GitHub releases. They do not require Node:
 
 ```powershell
-.\parley-deck-skill-v1.0.9-windows-x64.exe install --target all --force
+.\parley-deck-skill-v1.1.0-windows-x64.exe install --target all --force
 ```
 
 This is the packaging shape intended for WinGet. Until the WinGet manifest is accepted, download the `.exe` from the latest GitHub release.
@@ -169,6 +171,8 @@ Codex users can also use the built-in `$skill-installer` with the GitHub reposit
 parley-deck-skill install
 parley-deck-skill paths
 parley-deck-skill doctor
+parley-deck-skill status --target all --project . --json
+parley-deck-skill sync-project --project . --dry-run
 parley-deck-skill uninstall
 parley-deck-skill --version
 ```
@@ -182,6 +186,7 @@ Useful flags:
 --dest <path>
 --force
 --dry-run
+--yes
 --json
 --include-undetected
 ```

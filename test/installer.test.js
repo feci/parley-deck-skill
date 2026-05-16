@@ -8,6 +8,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const installer = require("../lib/installer");
+const packageJson = require("../package.json");
 
 const root = path.resolve(__dirname, "..");
 const bin = path.join(root, "bin", "parley-deck-skill.js");
@@ -39,6 +40,7 @@ function context(home, options) {
       dest: null,
       force: false,
       dryRun: false,
+      yes: false,
       json: false,
       includeUndetected: false,
       ...options
@@ -181,6 +183,7 @@ test("installs when optional README and LICENSE payload files are absent", () =>
   fs.writeFileSync(path.join(packageRoot, "SKILL.md"), "skill\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "agents", "manifest.yaml"), "name: parley-deck\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "references", "COOPERATION.md"), "protocol\n", "utf8");
+  fs.writeFileSync(path.join(packageRoot, "references", "compatibility.json"), "{\"schemaVersion\":1}\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "gemini-extension.json"), "{}\n", "utf8");
 
   const testContext = context(home, { target: "codex" });
@@ -251,7 +254,60 @@ test("doctor reports missing and malformed installs", () => {
   result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
   assert.equal(result.ok, false);
   assert.equal(result.targets[0].status, "malformed");
-  assert.deepEqual(result.targets[0].missing, ["SKILL.md", "references/COOPERATION.md", "agents/manifest.yaml"]);
+  assert.deepEqual(result.targets[0].missing, ["SKILL.md", "references/COOPERATION.md", "references/compatibility.json", "agents/manifest.yaml"]);
+});
+
+test("status reports installer version, runtime drift, and project metadata state", () => {
+  const home = tmpDir();
+  const installResult = installer.installCommand(context(home, { target: "codex" }));
+  assert.equal(installResult.ok, true);
+
+  const dest = path.join(home, ".codex", "skills", "parley-deck");
+  const markerFile = path.join(dest, installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+  marker.version = "0.0.1";
+  fs.writeFileSync(markerFile, `${JSON.stringify(marker, null, 2)}\n`, "utf8");
+
+  const project = path.join(home, "project");
+  const protocol = path.join(project, "parley-deck", "COOPERATION.md");
+  fs.mkdirSync(path.dirname(protocol), { recursive: true });
+  fs.writeFileSync(protocol, "local protocol\n", "utf8");
+
+  const result = installer.statusCommand(context(home, { command: "status", target: "codex", project }));
+
+  assert.equal(result.ok, true);
+  assert.equal(result.installer.version, packageJson.version);
+  assert.equal(result.runtimeInstalls[0].versionMatchesInstaller, false);
+  assert.equal(result.project.exists, true);
+  assert.equal(result.project.metadataStatus, "missing");
+  assert.equal(result.compatibility.status, "warning");
+  assert.ok(result.actions.some((action) => action.includes("sync-project")));
+});
+
+test("sync-project is dry-run by default and writes metadata only with --yes", () => {
+  const home = tmpDir();
+  const project = path.join(home, "project");
+  const protocol = path.join(project, "parley-deck", "COOPERATION.md");
+  const metadataFile = path.join(project, "parley-deck", "meta", "version.json");
+  const protocolText = "project protocol\n";
+  fs.mkdirSync(path.dirname(protocol), { recursive: true });
+  fs.writeFileSync(protocol, protocolText, "utf8");
+
+  let result = installer.syncProjectCommand(context(home, { command: "sync-project", project }));
+  assert.equal(result.ok, true);
+  assert.equal(result.dryRun, true);
+  assert.equal(fs.existsSync(metadataFile), false);
+  assert.equal(result.metadata.deckVersion, packageJson.version);
+  assert.match(result.metadata.protocolSha256, /^[a-f0-9]{64}$/);
+
+  result = installer.syncProjectCommand(context(home, { command: "sync-project", project, yes: true }));
+  assert.equal(result.ok, true);
+  assert.equal(result.dryRun, false);
+  assert.equal(fs.readFileSync(protocol, "utf8"), protocolText);
+
+  const metadata = JSON.parse(fs.readFileSync(metadataFile, "utf8"));
+  assert.equal(metadata.deckVersion, packageJson.version);
+  assert.equal(metadata.protocolSha256, result.metadata.protocolSha256);
 });
 
 test("uninstall refuses forged marker contents", () => {

@@ -39,6 +39,8 @@ The live `parley-deck/COOPERATION.md` is canonical. The bundled reference is onl
 
 `references/WORKED_EXAMPLES.md` contains non-authoritative examples for capability matrices, local config, and installation/portability notes. Use it only after loading the protocol.
 
+`references/compatibility.json` describes the packaged protocol/metadata schema and compatibility policy. It is informational; the live project protocol remains canonical.
+
 ## Automation Mode
 
 This skill implements **manual facilitation**: an agent follows this skill, invokes other CLI agents, and verifies canonical files. It is not a deterministic A2A facilitator service by itself.
@@ -46,6 +48,28 @@ This skill implements **manual facilitation**: an agent follows this skill, invo
 If the live protocol later contains an `Automation:` header, an `Automation write profile:`, or a section for automated orchestration, read that section before acting and apply it. If the live protocol and bundled fallback disagree, the live protocol wins.
 
 ## Protocol Drift Check
+
+If `parley-deck-skill` is available, start with the structured status check:
+
+```bash
+parley-deck-skill status --target all --project . --json
+```
+
+Use it to report the actual system installer version, installed runtime skill versions, project metadata state, and compatibility warnings. Do not force global lockstep: stale runtime installs or project metadata are warnings unless the live protocol or installer reports an explicit blocker.
+
+When the system installer version changed or `parley-deck/meta/version.json` is missing/stale, run a dry-run project sync check:
+
+```bash
+parley-deck-skill sync-project --project . --dry-run --json
+```
+
+Ask before writing project metadata. If the user approves, run:
+
+```bash
+parley-deck-skill sync-project --project . --yes
+```
+
+`sync-project` updates only `parley-deck/meta/version.json`; it must not overwrite `parley-deck/COOPERATION.md`. Protocol content changes still require a protocol-change idea.
 
 When both the live protocol and bundled fallback exist, compare them before work:
 
@@ -78,6 +102,7 @@ Before starting work, verify that the workflow plan covers all applicable protoc
 - Participant sizing and lenses: default to 2-4 active participants, use optional per-idea `roles:` only as advisory lenses, and do not let roles change quorum, ownership, signoff weight, or drafter eligibility.
 - Conflict avoidance: one file per agent per round, append-only signoffs, never edit another agent's file, and copy external snippets when other agents may lack access.
 - Internal helpers: participants may use internal subagents/tools/retrieval/scratchpads, but those helpers are not Parley Deck participants, do not satisfy non-solo execution, and do not own canonical artifacts.
+- Version/project sync: check `parley-deck-skill status` when available; if project metadata is missing or stale after a system skill update, propose `sync-project` before starting work.
 - Protocol changes: open a meta-protocol-change idea; do not edit the protocol ad hoc.
 - Inbox: use for lightweight durable pings; promote design discussions to ideas, and mirror phase-affecting decisions into canonical round/review/consensus/final artifacts.
 - Session start: read protocol, inbox, open idea prompts, and outstanding PR/MR actions before new work.
@@ -90,20 +115,28 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 1. Read `parley-deck/COOPERATION.md` and identify the current `Transport:` value and active roster.
 
-2. Run the session-start state check before accepting new work:
+2. Run the version and project sync check before accepting new work:
+
+   - Prefer `parley-deck-skill status --target all --project . --json` when the command is installed.
+   - Note the actual installer version, each installed runtime skill marker version, and `parley-deck/meta/version.json` state.
+   - If metadata is missing/stale, run `parley-deck-skill sync-project --project . --dry-run --json` and ask before `--yes`.
+   - If runtime skill copies are older than the installer, warn and suggest `parley-deck-skill install --target all --force` for managed installs.
+   - If the command is unavailable, fall back to the manual hash comparison in the Protocol Drift Check section.
+
+3. Run the session-start state check before accepting new work:
 
    - Read `parley-deck/inbox/` for messages addressed to the current agent, `all`, or unresolved `to-user` escalations.
    - Read open `parley-deck/ideas/*/00-prompt.md` files and note ideas where the current agent owes a round, signoff, implementation update, review, or fix-up.
    - For GitHub/GitLab transports, check the matching open PR/MR actions if tools and permissions are available.
    - If outstanding protocol work conflicts with the user's new request, surface it and ask which to handle first.
 
-3. Use the active `COOPERATION.md` transport when it is set. If the project is new, the transport is still a placeholder, or the user starts a workflow without naming a transport, default to `local-dir` and mention the available overrides:
+4. Use the active `COOPERATION.md` transport when it is set. If the project is new, the transport is still a placeholder, or the user starts a workflow without naming a transport, default to `local-dir` and mention the available overrides:
 
    - `local-dir` / files only
    - `github-pr` / GitHub Pull Requests
    - `gitlab-mr` / GitLab Merge Requests
 
-4. Discover candidate agents generically. Do not assume any fixed vendor, model family, or CLI command. Use this order:
+5. Discover candidate agents generically. Do not assume any fixed vendor, model family, or CLI command. Use this order:
 
    - User-provided agent list in the current request.
    - `PARLEY_HEADLESS_AGENT_CONFIG` pointing to a JSON config file.
@@ -111,15 +144,15 @@ If any checklist item is unclear for the requested workflow, ask the user before
    - Active agent IDs and workspace hints in `COOPERATION.md`.
    - If still unclear, ask the user which installed CLI commands should be considered.
 
-5. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
+6. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
 
-6. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix and the effective defaults, but do not block on optional choices. The only required startup answer is the task statement when it was not already provided.
+7. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix and the effective defaults, but do not block on optional choices. The only required startup answer is the task statement when it was not already provided.
 
-7. Verify that participant selection includes at least one non-facilitator participant when another agent or CLI is available. Optional selection MUST NOT silently collapse to only the facilitator. If no non-facilitator participant can be invoked, stop and report the blocker unless the user explicitly authorizes a recorded solo exception.
+8. Verify that participant selection includes at least one non-facilitator participant when another agent or CLI is available. Optional selection MUST NOT silently collapse to only the facilitator. If no non-facilitator participant can be invoked, stop and report the blocker unless the user explicitly authorizes a recorded solo exception.
 
-8. If a candidate agent is not in the roster, list the proposed stable agent ID in the default summary. Pressing Enter accepts that agent for the current workflow. If the user explicitly rejects roster expansion, run it only as a temporary observer or skip it. Rejecting every non-facilitator participant requires an explicit solo exception note before continuing.
+9. If a candidate agent is not in the roster, list the proposed stable agent ID in the default summary. Pressing Enter accepts that agent for the current workflow. If the user explicitly rejects roster expansion, run it only as a temporary observer or skip it. Rejecting every non-facilitator participant requires an explicit solo exception note before continuing.
 
-9. Default external-backend disclosure approval is YES for the task brief and necessary repository/code context. Still redact obvious secrets and stop for explicit confirmation before sending credentials, customer data, private documents unrelated to the task, or other clearly sensitive material.
+10. Default external-backend disclosure approval is YES for the task brief and necessary repository/code context. Still redact obvious secrets and stop for explicit confirmation before sending credentials, customer data, private documents unrelated to the task, or other clearly sensitive material.
 
 ## Transport Selection
 
