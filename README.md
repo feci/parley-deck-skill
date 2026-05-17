@@ -6,6 +6,83 @@ Parley Deck is a protocol for making several AI agents think independently, chal
 
 It is intentionally not tied to one model, one vendor, or one orchestration platform.
 
+## Install
+
+Fastest path:
+
+```bash
+npx -y parley-deck-skill@latest install --target all
+```
+
+Then restart your agent runtime and verify:
+
+```bash
+npx -y parley-deck-skill@latest doctor --target all
+```
+
+Homebrew:
+
+```bash
+brew install feci/parley/parley-deck-skill
+parley-deck-skill install --target all
+```
+
+## Use Parley Deck
+
+After installing, ask your agent to use the skill by name. In Codex, use `$parley-deck`.
+
+```text
+Use $parley-deck to design this feature.
+Discover available CLI agents, use the default participants, and write the Parley Deck artifacts.
+```
+
+```text
+Use $parley-deck to implement the accepted plan for <idea-slug>.
+Follow FINAL.md, record IMPLEMENTATION.md, run review rounds, and do not merge until consensus is ready.
+```
+
+```text
+Use $parley-deck to review this branch against the idea's FINAL.md.
+Ask every non-implementer agent for its own review file, draft review consensus, and list agreed fixes.
+```
+
+```text
+Use $parley-deck to continue the current Parley Deck workflow.
+Start with the session-start checklist, read inbox and open ideas, then tell me the next required action.
+```
+
+Useful copy/paste prompts:
+
+```text
+Use $parley-deck for a quick architecture decision on:
+<task>
+
+Use participants codex, claude, gemini, hermes if available.
+Keep the scope small and stop after FINAL.md.
+```
+
+```text
+Use $parley-deck to compare two implementation approaches:
+<approach A>
+<approach B>
+
+Make each agent argue independently in round 1, then converge on a recommendation.
+```
+
+```text
+Use $parley-deck to ship this change end to end:
+<task>
+
+Run design, implementation, code review, fix-up, tests, and merge only after all signoffs are ready.
+```
+
+```text
+Use $parley-deck with GitHub PR transport.
+Create or continue the idea for <task>, keep canonical files under parley-deck/ideas/, and mirror the lifecycle in PRs.
+```
+
+If your runtime does not support skills directly, attach `SKILL.md` and `references/COOPERATION.md` as instruction context. The skill is plain Markdown by design, so any capable tier-1 model can follow it.
+
 ## Why This Exists
 
 Most multi-agent workflows fail in predictable ways:
@@ -61,29 +138,12 @@ parley-deck-skill/
 - `agents/openai.yaml` is only UI metadata for Codex/OpenAI skill tooling.
 - `gemini-extension.json` lets Gemini CLI load the repository as an extension.
 
-## Quick Start
-
-Install into detected personal agent runtimes:
-
-```bash
-npx -y parley-deck-skill@latest install
-```
-
-Then restart the target agent runtime and ask it to use Parley Deck:
-
-```text
-Use $parley-deck to start a design review for this task.
-Discover installed CLI agents, show me the capability matrix, and use the default participants/model/thinking/speed/timeout choices unless I override them.
-```
-
-If your runtime does not support skills directly, attach `SKILL.md` and `references/COOPERATION.md` as instruction context. The skill is plain Markdown by design, so any capable tier-1 model can follow it.
-
-## Installation
+## Installation Details
 
 Recommended:
 
 ```bash
-npx -y parley-deck-skill@latest install
+npx -y parley-deck-skill@latest install --target all
 ```
 
 The installer uses an AionUI-style local runtime registry: it checks known user-level agent directories and CLI commands, then installs into the runtimes it can detect. For broad AionUI-derived targets, a marker-only directory created by this installer is not treated as a real runtime. Current native targets are Codex, Claude Code, Gemini CLI extension mode, Hermes, Qwen, CodeBuddy, Goose, Kimi, Factory Droid, Vibe, Cursor, OpenCode, and AionRS.
