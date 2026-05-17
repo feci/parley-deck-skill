@@ -198,7 +198,7 @@ parley-deck-skill install
 Standalone Windows binaries are attached to GitHub releases. They do not require Node:
 
 ```powershell
-.\parley-deck-skill-v1.1.0-windows-x64.exe install --target all --force
+.\parley-deck-skill-v1.1.1-windows-x64.exe install --target all --force
 ```
 
 This is the packaging shape intended for WinGet. Until the WinGet manifest is accepted, download the `.exe` from the latest GitHub release.

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "skillPackage": "parley-deck-skill",
-  "skillVersion": "1.1.0",
+  "skillVersion": "1.1.1",
   "protocolSchema": 1,
   "projectMetadataSchema": 1,
   "compatibilityPolicy": "Report actual component versions and warn on drift; do not force global lockstep between installer, runtime skills, CLI, and project decks.",
