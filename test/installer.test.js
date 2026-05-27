@@ -58,6 +58,7 @@ test("resolves user and project target paths", () => {
 
   assert.equal(userTargets.find((target) => target.name === "codex").dest, path.join(home, ".codex", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "claude").dest, path.join(home, ".claude", "skills", "parley-deck"));
+  assert.equal(userTargets.find((target) => target.name === "agy").dest, path.join(home, ".gemini", "config", "plugins", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "gemini").dest, path.join(home, ".gemini", "extensions", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "hermes").dest, path.join(home, ".hermes", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "qwen").dest, path.join(home, ".qwen", "skills", "parley-deck"));
@@ -68,6 +69,7 @@ test("resolves user and project target paths", () => {
   const projectTargets = installer.resolveTargets(context(home, { target: "all", scope: "project", project, includeUndetected: true }));
   assert.equal(projectTargets.find((target) => target.name === "codex").dest, path.join(project, ".codex", "skills", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "claude").dest, path.join(project, ".claude", "skills", "parley-deck"));
+  assert.equal(projectTargets.find((target) => target.name === "agy").dest, path.join(project, ".gemini", "config", "plugins", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "gemini").dest, path.join(project, ".gemini", "extensions", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "hermes").dest, path.join(project, ".hermes", "skills", "parley-deck"));
 });
@@ -102,7 +104,7 @@ test("project auto target only installs detected project runtimes", () => {
   writeRuntimeEvidence(project, ".gemini");
 
   const targets = installer.resolveTargets(context(home, { target: "auto", scope: "project", project }));
-  assert.deepEqual(targets.map((target) => target.name), ["gemini"]);
+  assert.deepEqual(targets.map((target) => target.name), ["agy", "gemini"]);
 });
 
 test("auto target detects Hermes runtime directory", () => {
@@ -153,11 +155,12 @@ test("core targets can be detected by command alone", () => {
   const home = tmpDir();
   const binDir = path.join(home, "bin");
   writeExecutable(binDir, "claude");
+  writeExecutable(binDir, "agy");
 
   const testContext = context(home, { target: "auto" });
   testContext.env.PATH = binDir;
   const targets = installer.resolveTargets(testContext);
-  assert.deepEqual(targets.map((target) => target.name), ["claude"]);
+  assert.deepEqual(targets.map((target) => target.name), ["claude", "agy"]);
 });
 
 test("installs a codex skill with marker", () => {
@@ -184,6 +187,7 @@ test("installs when optional README and LICENSE payload files are absent", () =>
   fs.writeFileSync(path.join(packageRoot, "agents", "manifest.yaml"), "name: parley-deck\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "references", "COOPERATION.md"), "protocol\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "references", "compatibility.json"), "{\"schemaVersion\":1}\n", "utf8");
+  fs.writeFileSync(path.join(packageRoot, "plugin.json"), "{}\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "gemini-extension.json"), "{}\n", "utf8");
 
   const testContext = context(home, { target: "codex" });
@@ -195,6 +199,22 @@ test("installs when optional README and LICENSE payload files are absent", () =>
   assert.equal(fs.existsSync(path.join(dest, "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(dest, "README.md")), false);
   assert.equal(fs.existsSync(path.join(dest, "LICENSE")), false);
+});
+
+test("installs an Antigravity plugin with plugin metadata", () => {
+  const home = tmpDir();
+  const result = installer.installCommand(context(home, { target: "agy" }));
+  const dest = path.join(home, ".gemini", "config", "plugins", "parley-deck");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.actions[0].action, "installed");
+  assert.equal(fs.existsSync(path.join(dest, "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(dest, "skills", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(dest, "plugin.json")), true);
+  assert.equal(fs.existsSync(path.join(dest, "agents", "manifest.yaml")), true);
+
+  const marker = JSON.parse(fs.readFileSync(path.join(dest, installer.MARKER_FILE), "utf8"));
+  assert.equal(marker.target, "agy");
 });
 
 test("refuses to overwrite unmarked destination without force", () => {

@@ -57,7 +57,7 @@ Useful copy/paste prompts:
 Use $parley-deck for a quick architecture decision on:
 <task>
 
-Use participants codex, claude, gemini, hermes if available.
+Use participants codex, claude, agy, hermes if available.
 Keep the scope small and stop after FINAL.md.
 ```
 
@@ -122,6 +122,7 @@ parley-deck-skill/
 |-- agents/
 |   |-- manifest.yaml
 |   `-- openai.yaml
+|-- plugin.json
 |-- gemini-extension.json
 `-- references/
     |-- COOPERATION.md
@@ -136,7 +137,8 @@ parley-deck-skill/
 - `references/WORKED_EXAMPLES.md` contains non-authoritative examples and config shapes.
 - `agents/manifest.yaml` is vendor-neutral metadata.
 - `agents/openai.yaml` is only UI metadata for Codex/OpenAI skill tooling.
-- `gemini-extension.json` lets Gemini CLI load the repository as an extension.
+- `plugin.json` lets Antigravity CLI load the repository as a plugin.
+- `gemini-extension.json` lets legacy Gemini CLI load the repository as an extension.
 
 ## Installation Details
 
@@ -146,7 +148,7 @@ Recommended:
 npx -y parley-deck-skill@latest install --target all
 ```
 
-The installer uses an AionUI-style local runtime registry: it checks known user-level agent directories and CLI commands, then installs into the runtimes it can detect. For broad AionUI-derived targets, a marker-only directory created by this installer is not treated as a real runtime. Current native targets are Codex, Claude Code, Gemini CLI extension mode, Hermes, Qwen, CodeBuddy, Goose, Kimi, Factory Droid, Vibe, Cursor, OpenCode, and AionRS.
+The installer uses an AionUI-style local runtime registry: it checks known user-level agent directories and CLI commands, then installs into the runtimes it can detect. For broad AionUI-derived targets, a marker-only directory created by this installer is not treated as a real runtime. Current native targets are Codex, Claude Code, Antigravity CLI plugin mode, legacy Gemini CLI extension mode, Hermes, Qwen, CodeBuddy, Goose, Kimi, Factory Droid, Vibe, Cursor, OpenCode, and AionRS.
 
 Install into every detected runtime:
 
@@ -165,8 +167,9 @@ Install a single target:
 ```bash
 npx -y parley-deck-skill@latest install --target codex
 npx -y parley-deck-skill@latest install --target claude
-npx -y parley-deck-skill@latest install --target gemini
+npx -y parley-deck-skill@latest install --target agy
 npx -y parley-deck-skill@latest install --target hermes
+npx -y parley-deck-skill@latest install --target gemini  # legacy Gemini only
 ```
 
 Install into a project instead of your personal skill directories:
@@ -198,25 +201,33 @@ parley-deck-skill install
 Standalone Windows binaries are attached to GitHub releases. They do not require Node:
 
 ```powershell
-.\parley-deck-skill-v1.1.1-windows-x64.exe install --target all --force
+.\parley-deck-skill-v1.2.0-windows-x64.exe install --target all --force
 ```
 
 This is the packaging shape intended for WinGet. Until the WinGet manifest is accepted, download the `.exe` from the latest GitHub release.
 
-Gemini CLI can also install the repository as an extension:
+Antigravity CLI uses the `agy` installer target:
+
+```bash
+npx -y parley-deck-skill@latest install --target agy
+agy plugin validate ~/.gemini/config/plugins/parley-deck
+```
+
+Legacy Gemini CLI can also install the repository as an extension:
 
 ```bash
 gemini extensions install https://github.com/feci/parley-deck-skill
 ```
 
-Use either the Gemini extension command or `parley-deck-skill install --target gemini`, not both. The npm installer writes to `~/.gemini/extensions/parley-deck`; Gemini's own GitHub installer may name the copy from the repository URL.
+Use either the Gemini extension command or `parley-deck-skill install --target gemini`, not both. The npm installer writes to `~/.gemini/extensions/parley-deck`; Gemini's own GitHub installer may name the copy from the repository URL. Prefer `--target agy` for new Antigravity installs.
 
 Manual paths:
 
 ```text
 Codex:    ${CODEX_HOME:-~/.codex}/skills/parley-deck
 Claude:   ~/.claude/skills/parley-deck
-Gemini:   ~/.gemini/extensions/parley-deck
+Antigravity: ~/.gemini/config/plugins/parley-deck
+Gemini legacy: ~/.gemini/extensions/parley-deck
 Hermes:   ~/.hermes/skills/parley-deck
 Qwen:     ~/.qwen/skills/parley-deck
 Goose:    ~/.goose/skills/parley-deck
@@ -240,7 +251,7 @@ parley-deck-skill --version
 Useful flags:
 
 ```text
---target auto|all|codex|claude|gemini|hermes|qwen|codebuddy|goose|kimi|droid|vibe|cursor|opencode|aionrs|generic
+--target auto|all|codex|claude|agy|gemini|hermes|qwen|codebuddy|goose|kimi|droid|vibe|cursor|opencode|aionrs|generic
 --scope user|project
 --project <path>
 --dest <path>
@@ -268,8 +279,9 @@ Update only one runtime:
 ```bash
 npx -y parley-deck-skill@latest install --target codex --force
 npx -y parley-deck-skill@latest install --target claude --force
-npx -y parley-deck-skill@latest install --target gemini --force
+npx -y parley-deck-skill@latest install --target agy --force
 npx -y parley-deck-skill@latest install --target hermes --force
+npx -y parley-deck-skill@latest install --target gemini --force  # legacy Gemini only
 ```
 
 Preview an update without writing files:

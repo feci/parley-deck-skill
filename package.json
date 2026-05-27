@@ -1,6 +1,6 @@
 {
   "name": "parley-deck-skill",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Install the Parley Deck vendor-neutral AI cooperation skill into local AI agent runtimes or a custom skill directory.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/feci/parley-deck-skill#readme",
@@ -15,6 +15,8 @@
     "ai",
     "agent",
     "agent-skill",
+    "agy",
+    "antigravity",
     "codex",
     "claude",
     "gemini",
@@ -34,6 +36,7 @@
     "bin/",
     "gemini-extension.json",
     "lib/",
+    "plugin.json",
     "references/"
   ],
   "pkg": {
@@ -43,6 +46,7 @@
       "LICENSE",
       "agents/**/*",
       "references/**/*",
+      "plugin.json",
       "gemini-extension.json"
     ]
   },

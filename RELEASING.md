@@ -16,7 +16,7 @@ Ask a second model to review the final diff before publishing. Use this checklis
 
 - cross-platform path handling
 - safe overwrite, update, and uninstall behavior
-- Codex, Claude, and Gemini target correctness
+- Codex, Claude, Antigravity, Hermes, and legacy Gemini target correctness
 - npm package file whitelist
 - portable binary build and asset upload
 - Homebrew formula correctness
