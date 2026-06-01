@@ -758,7 +758,13 @@ When the skill or workflow exposes a protocol ambiguity that should persist for 
 
 ## Generic CLI Invocation Contract
 
-Prefer stdin for prompts. Avoid passing large or private prompts through argv because process listings may expose them and OS argument limits can fail.
+Prefer stdin for prompts. Avoid passing large or private prompts through argv because process listings may expose them and OS argument limits can fail. This is a preference, not a rule: some CLIs do not read the prompt from stdin, so always honor the selected agent's actual prompt-delivery contract over this default.
+
+`promptMode` records how the chosen CLI takes the prompt. Discover it before launch and record it in the capability matrix:
+
+- `stdin`: pipe the prompt to the process's standard input. Default preference.
+- `argv`: pass the prompt as a positional argument.
+- `flag:<name>`: pass the prompt as the *value* of a specific flag, for example `flag:--print`. The prompt token must come immediately after that flag and be the final argument. Never leave a value-taking prompt flag as the last token while sending the prompt on stdin: such a CLI aborts with a "flag needs an argument" parse error and writes no output, so the launch silently fails. Antigravity (`agy --print "<prompt>"`) is the canonical example — its `--print`/`--prompt` is value-taking, so `agy ... --print` with the prompt piped to stdin fails, while `agy ... --print "<prompt>"` succeeds.
 
 Use one-shot invocations. Do not resume hidden sessions unless the user explicitly asks for continuity.
 
@@ -768,7 +774,7 @@ Construct the command from the capability matrix and local config:
 2. Add `headlessArgs`.
 3. Add `writeModeArgs` needed for the agent to write exactly one protocol artifact.
 4. Add model/thinking/profile flags only when discovered or configured.
-5. Send the prompt using the configured `promptMode`, preferably `stdin`.
+5. Deliver the prompt using the configured `promptMode`: pipe it to stdin, append it as a positional argument, or place it as the value of the configured prompt flag (last). When the prompt flag is value-taking, the prompt must be its explicit value rather than stdin.
 6. Apply the configured process timeout.
 
 Do not pass placeholder brackets literally. Do not use broad bypass modes unless the user explicitly approves them. The intended permission shape is narrow workspace writes to the participant's own protocol file.
