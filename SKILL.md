@@ -146,7 +146,13 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 6. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
 
-7. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix and the effective defaults, but do not block on optional choices. The only required startup answer is the task statement when it was not already provided.
+7. **Session-start roster & model confirmation — MANDATORY, once per session.** Build the capability matrix, then run an explicit confirmation with the user before the first idea of the session. This is a required startup gate (alongside the task statement); it is the one exception to "do not block on optional choices":
+
+   a. **List the active roster** — each agent ID and its CLI — and ask the user to confirm or adjust which agents participate.
+   b. **For each confirmed agent, list its available models** — use model discovery where the CLI exposes it (e.g. `<cli> models`, `model list`, documented aliases); where it does not, show the configured model (or `cli-default`) and let the user enter an exact model id. Ask which model the user wants for that agent.
+   c. **The chosen model is persistent.** Record each pick in `parley-deck/meta/headless-agents.local.json` (per the Selection Checkpoint, after asking) so it is the model used for that agent in **every** run until the user changes it. Prefer an **exact model id over a vendor "latest" alias** when the user wants a specific version — an alias can resolve to an older model.
+
+   On later sessions, **show the saved roster + per-agent model picks and require an explicit confirmation** (pressing Enter keeps them); changing any pick updates the persistent file. All OTHER optional settings (thinking, speed, timeout, transport) keep the default-and-proceed rule — do not block on those. The required startup answers are therefore the task statement and this once-per-session roster + per-agent-model confirmation.
 
 8. Verify that participant selection includes at least one non-facilitator participant when another agent or CLI is available. Optional selection MUST NOT silently collapse to only the facilitator. If no non-facilitator participant can be invoked, stop and report the blocker unless the user explicitly authorizes a recorded solo exception.
 
@@ -229,6 +235,7 @@ Before every new idea, every new round, Phase 5 implementation, Phase 6 review c
 Required input:
 
 - task statement, if the user has not already provided it.
+- once per session: the roster + per-agent model confirmation (Startup Flow step 7). This is the one mandatory gate beyond the task statement; everything in "Optional overrides" below keeps the default-and-proceed rule.
 
 Optional overrides:
 
@@ -270,7 +277,7 @@ Defaults if you just press Enter:
 Reply with only the task, or include overrides.
 ```
 
-If the task statement is already known, do not stop just to ask for optional settings. Present the defaults briefly, then proceed unless the user overrides them in the same message.
+If the task statement is already known, do not stop just to ask for optional settings — **except** the once-per-session roster + per-agent model confirmation (Startup Flow step 7), which is mandatory. Present the defaults for everything else briefly, then proceed unless the user overrides them in the same message.
 
 If participant defaults would select only the facilitator, do not proceed as Parley Deck. Retry discovery, ask for another invokable agent, or record a user-authorized solo exception before continuing. The facilitator MUST NOT present a solo run as a completed Parley Deck workflow.
 
