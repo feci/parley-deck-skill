@@ -146,13 +146,7 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 6. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
 
-7. **Session-start roster & model confirmation — MANDATORY, once per session.** Build the capability matrix, then run an explicit confirmation with the user before the first idea of the session. This is a required startup gate (alongside the task statement); it is the one exception to "do not block on optional choices":
-
-   a. **List the active roster** — each agent ID and its CLI — and ask the user to confirm or adjust which agents participate.
-   b. **For each confirmed agent, list its available models** — use model discovery where the CLI exposes it (e.g. `<cli> models`, `model list`, documented aliases); where it does not, show the configured model (or `cli-default`) and let the user enter an exact model id. Ask which model the user wants for that agent.
-   c. **The chosen model is persistent.** Record each pick in `parley-deck/meta/headless-agents.local.json` (per the Selection Checkpoint, after asking) so it is the model used for that agent in **every** run until the user changes it. Prefer an **exact model id over a vendor "latest" alias** when the user wants a specific version — an alias can resolve to an older model.
-
-   On later sessions, **show the saved roster + per-agent model picks and require an explicit confirmation** (pressing Enter keeps them); changing any pick updates the persistent file. All OTHER optional settings (thinking, speed, timeout, transport) keep the default-and-proceed rule — do not block on those. The required startup answers are therefore the task statement and this once-per-session roster + per-agent-model confirmation.
+7. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix and the effective defaults, but do not block on optional choices. The only required startup answer is the task statement when it was not already provided. _(The one-time roster + per-agent model confirmation is a **bootstrap** step performed when the deck is first created — see "Transport Selection / deck bootstrap" — not a per-idea gate.)_
 
 8. Verify that participant selection includes at least one non-facilitator participant when another agent or CLI is available. Optional selection MUST NOT silently collapse to only the facilitator. If no non-facilitator participant can be invoked, stop and report the blocker unless the user explicitly authorizes a recorded solo exception.
 
@@ -160,9 +154,17 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 10. Default external-backend disclosure approval is YES for the task brief and necessary repository/code context. Still redact obvious secrets and stop for explicit confirmation before sending credentials, customer data, private documents unrelated to the task, or other clearly sensitive material.
 
-## Transport Selection
+## Transport Selection / deck bootstrap
 
 The user chooses the coordination transport before the first idea starts. Once `COOPERATION.md` has a concrete transport, treat that choice as sticky. Do not switch transports silently; switching later requires a protocol-change idea.
+
+**Deck bootstrap — mandatory roster & model confirmation (once, at deck creation).** When the `parley-deck/` directory is first created in a project (`parley init` / first bootstrap), the facilitator MUST run an explicit roster + per-agent model confirmation with the user as a required setup step before the first idea. This fires **only at deck creation** — not per idea and not on later sessions:
+
+- **List the candidate roster** (agent IDs + their CLIs) and ask the user to confirm or adjust which agents are in the deck.
+- **For each confirmed agent, list its available models** — use model discovery where the CLI exposes it (e.g. `<cli> models`, `model list`, documented aliases); otherwise show the configured/`cli-default` model and let the user enter an exact model id. Ask which model the user wants for that agent.
+- **Record each pick as the persistent default** in `parley-deck/meta/headless-agents.local.json` (and the §2 roster). It is the model used for that agent in every run until the user changes it. Prefer an **exact model id over a vendor "latest" alias** (an alias can resolve to an older model).
+
+An **already-bootstrapped deck** (roster + per-agent models already recorded) does **not** re-prompt — the saved selection is reused. The user may re-run this confirmation any time on request (e.g. to change an agent's model); changing a pick updates the persistent file. This bootstrap gate is separate from the per-idea Startup Flow (step 7) and from the §9.0 readiness check (which only pings agent liveness per idea).
 
 Use this decision rule:
 
@@ -235,7 +237,8 @@ Before every new idea, every new round, Phase 5 implementation, Phase 6 review c
 Required input:
 
 - task statement, if the user has not already provided it.
-- once per session: the roster + per-agent model confirmation (Startup Flow step 7). This is the one mandatory gate beyond the task statement; everything in "Optional overrides" below keeps the default-and-proceed rule.
+
+(The roster + per-agent model confirmation is **not** required here — it is a one-time deck-bootstrap step, see "Transport Selection / deck bootstrap".)
 
 Optional overrides:
 
@@ -277,7 +280,7 @@ Defaults if you just press Enter:
 Reply with only the task, or include overrides.
 ```
 
-If the task statement is already known, do not stop just to ask for optional settings — **except** the once-per-session roster + per-agent model confirmation (Startup Flow step 7), which is mandatory. Present the defaults for everything else briefly, then proceed unless the user overrides them in the same message.
+If the task statement is already known, do not stop just to ask for optional settings. Present the defaults briefly, then proceed unless the user overrides them in the same message.
 
 If participant defaults would select only the facilitator, do not proceed as Parley Deck. Retry discovery, ask for another invokable agent, or record a user-authorized solo exception before continuing. The facilitator MUST NOT present a solo run as a completed Parley Deck workflow.
 
