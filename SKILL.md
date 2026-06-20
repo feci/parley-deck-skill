@@ -140,9 +140,12 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
    - User-provided agent list in the current request.
    - `PARLEY_HEADLESS_AGENT_CONFIG` pointing to a JSON config file.
-   - `parley-deck/meta/headless-agents.local.json` when present.
+   - `parley-deck/meta/headless-agents.local.json` (or `parley-deck/agents.toml`) when present — the **per-project override**.
+   - `~/.parley/agents.toml` — the **user-global central default** (each agent's model + reasoning), created by `parley init` and inherited by every project unless the deck overrides it.
    - Active agent IDs and workspace hints in `COOPERATION.md`.
    - If still unclear, ask the user which installed CLI commands should be considered.
+
+   Precedence is low-to-high: built-in defaults → `~/.parley/agents.toml` (central) → project deck config → `PARLEY_HEADLESS_AGENT_CONFIG`. The deck overrides the central default; a field the deck leaves unset falls through to the central value.
 
 6. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
 
@@ -158,13 +161,14 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 The user chooses the coordination transport before the first idea starts. Once `COOPERATION.md` has a concrete transport, treat that choice as sticky. Do not switch transports silently; switching later requires a protocol-change idea.
 
-**Deck bootstrap — mandatory roster & model confirmation (once, at deck creation).** When the `parley-deck/` directory is first created in a project (`parley init` / first bootstrap), the facilitator MUST run an explicit roster + per-agent model confirmation with the user as a required setup step before the first idea. This fires **only at deck creation** — not per idea and not on later sessions:
+**Deck bootstrap — mandatory roster, model & reasoning confirmation (once, at deck creation).** When the `parley-deck/` directory is first created in a project (`parley init` / first bootstrap), the facilitator MUST run an explicit roster + per-agent model + per-agent reasoning/effort confirmation with the user as a required setup step before the first idea. This fires **only at deck creation** — not per idea and not on later sessions:
 
+- **Seed from the central default.** Load `~/.parley/agents.toml` (the user-global default that `parley init` creates) and present its agents, models, and reasoning as the starting point. The deck inherits these unless the user changes them here; a per-project change is written to the deck config and overrides the central default for this project only.
 - **List the candidate roster** (agent IDs + their CLIs) and ask the user to confirm or adjust which agents are in the deck.
-- **For each confirmed agent, list its available models** — use model discovery where the CLI exposes it (e.g. `<cli> models`, `model list`, documented aliases); otherwise show the configured/`cli-default` model and let the user enter an exact model id. Ask which model the user wants for that agent.
-- **Record each pick as the persistent default** in `parley-deck/meta/headless-agents.local.json` (and the §2 roster). It is the model used for that agent in every run until the user changes it. Prefer an **exact model id over a vendor "latest" alias** (an alias can resolve to an older model).
+- **For each confirmed agent, list its available models AND its reasoning/effort levels** — use discovery where the CLI exposes it (e.g. `<cli> models`, `model list`, documented aliases; thinking/effort/reasoning flags such as `--effort`, `--reasoning`, thinking levels). Otherwise show the configured/`cli-default` value and let the user enter an exact model id / effort level. Ask which model **and which reasoning/effort level** the user wants for that agent. **The default reasoning/effort is the strongest (highest) level the agent supports** — only drop to `cli-default` when the level cannot be discovered.
+- **Record each pick as the persistent default** in `parley-deck/meta/headless-agents.local.json` (and the §2 roster): the agent's `model`, its `thinking`/effort level, and (where used) the `deep`/`review` profiles. These are used for that agent in every run until the user changes them. Prefer an **exact model id over a vendor "latest" alias** (an alias can resolve to an older model), and prefer the **highest reasoning level** unless the user chooses otherwise.
 
-An **already-bootstrapped deck** (roster + per-agent models already recorded) does **not** re-prompt — the saved selection is reused. The user may re-run this confirmation any time on request (e.g. to change an agent's model); changing a pick updates the persistent file. This bootstrap gate is separate from the per-idea Startup Flow (step 7) and from the §9.0 readiness check (which only pings agent liveness per idea).
+An **already-bootstrapped deck** (roster + per-agent models + reasoning already recorded) does **not** re-prompt — the saved selection is reused. The user may re-run this confirmation any time on request (e.g. to change an agent's model or effort level); changing a pick updates the persistent file. This bootstrap gate is separate from the per-idea Startup Flow (step 7) and from the §9.0 readiness check (which only pings agent liveness per idea).
 
 Use this decision rule:
 
