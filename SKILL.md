@@ -147,6 +147,8 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
    Precedence is low-to-high: built-in defaults → `~/.parley/agents.toml` (central) → project deck config → `PARLEY_HEADLESS_AGENT_CONFIG`. The deck overrides the central default; a field the deck leaves unset falls through to the central value.
 
+   `~/.parley/agents.toml` may also carry a `[defaults]` block of project-wide policy knobs: `ping_tier` (§9.0 liveness ping, e.g. `hosted-pong` or `none`), `preferred_transport` (the transport `parley init` seeds), `roster_change_policy` (e.g. `confirm-breaking`: auto-add newly available agents, but require user confirmation before dropping or breaking the roster), and `speed`/`timeouts`. Honor `roster_change_policy` when adjusting the roster after the liveness ping; a deck's `parley-deck/agents.toml` overrides any of these per-project.
+
 6. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
 
 7. Build a capability matrix before starting a new idea, implementation, or review cycle. Show the matrix and the effective defaults, but do not block on optional choices. The only required startup answer is the task statement when it was not already provided. _(The one-time roster + per-agent model confirmation is a **bootstrap** step performed when the deck is first created — see "Transport Selection / deck bootstrap" — not a per-idea gate.)_
