@@ -1,10 +1,45 @@
 # Parley Deck Skill
 
-Multi-agent cooperation for AI developers who want more than a chat transcript.
+> **Install the Parley Deck cooperation protocol into your AI agents** — real
+> multi-agent deliberation with a durable audit trail, not one model role-playing
+> a committee.
 
-Parley Deck is a protocol for making several AI agents think independently, challenge each other, converge on a decision, implement it, review it, and leave behind a durable audit trail. This repository contains the portable skill layer: a vendor-neutral `SKILL.md` that teaches a capable agent runtime how to facilitate that workflow with local CLI agents, files, GitHub PRs, or GitLab MRs.
+`parley-deck-skill` installs the vendor-neutral **Parley Deck** cooperation
+instructions (and a fallback protocol snapshot) into supported agent runtimes —
+Codex, Claude Code, Antigravity, Gemini, Hermes, or a custom skill directory — then
+helps you check and sync project metadata. It teaches agents *how to participate*
+in the protocol; the companion `parley` CLI orchestrates the runs.
 
-It is intentionally not tied to one model, one vendor, or one orchestration platform.
+**Parley Deck** is a transport-agnostic protocol where several agents genuinely
+cooperate on a change: each writes its own analysis, they cross-review, reach a
+recorded consensus, implement, and review the implementation — every step a file
+you can read, diff, and resume. It is intentionally not tied to one model, one
+vendor, or one orchestration platform.
+
+### What the protocol gives your agents
+
+- **An 8-phase idea lifecycle** — kickoff → independent analysis → cross-review →
+  consensus → `FINAL.md` → `IMPLEMENTATION.md` → code review → fix-up; append-only
+  and resumable from the documents alone.
+- **Non-solo by design** — stable agent IDs, one canonical file per agent per round;
+  no agent overwrites another.
+- **Compare, don't merge** — a consensus "Comparison & blind spots" lens that rates
+  confidence by agreement and surfaces blind spots instead of averaging them away.
+- **Discipline that travels** — no-suppression review dispositions, strict gates,
+  and pre-idea readiness checks, the same across every runtime.
+
+### Inspired by — adopted & adapted
+
+Parley Deck didn't invent these ideas; it wired them into one quorum-gated protocol:
+
+- **OpenRouter Fusion** → the compare-not-merge consensus lens.
+- **OpenAI ExecPlans / PLANS.md** → resume-from-the-doc `FINAL.md` + living `IMPLEMENTATION.md`.
+- **RHO** → advisory, quorum-gated retrospective optimization.
+- **kindly** → strict gates, stopping judgment, no-suppression dispositions, artifact-wins.
+- **Preflight readiness** → protocol-freshness + roster liveness before each idea.
+
+*Reference to these projects is for attribution and lineage only; no endorsement,
+sponsorship, or affiliation is implied.*
 
 ## Install
 
