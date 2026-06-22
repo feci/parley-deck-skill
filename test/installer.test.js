@@ -373,3 +373,229 @@ test("CLI supports dry-run JSON output", () => {
   assert.equal(output.command, "install");
   assert.equal(output.actions[0].dryRun, true);
 });
+
+test("discovers packaged add-on skills", () => {
+  const names = installer.discoverAddons(root).map((addon) => addon.name);
+  assert.deepEqual(names, ["parley-tracker", "parley-worktrees"]);
+  for (const addon of installer.discoverAddons(root)) {
+    assert.equal(fs.existsSync(path.join(addon.root, "SKILL.md")), true);
+  }
+});
+
+test("installs all add-ons by default alongside the core skill", () => {
+  const home = tmpDir();
+  const result = installer.installCommand(context(home, { target: "codex" }));
+  const skillsDir = path.join(home, ".codex", "skills");
+
+  assert.equal(result.ok, true);
+  // The first installed skill is the core skill; the rest are add-ons.
+  const action = result.actions[0];
+  assert.deepEqual(action.skills.map((skill) => skill.skill), ["parley-deck", "parley-tracker", "parley-worktrees"]);
+  for (const skill of action.skills) {
+    assert.equal(skill.action, "installed");
+  }
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-deck", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-worktrees", "SKILL.md")), true);
+
+  const addonMarker = JSON.parse(fs.readFileSync(path.join(skillsDir, "parley-tracker", installer.MARKER_FILE), "utf8"));
+  assert.equal(addonMarker.name, "parley-deck-skill");
+  assert.equal(addonMarker.skill, "parley-tracker");
+  assert.equal(addonMarker.addon, true);
+});
+
+test("--no-addons installs only the core skill", () => {
+  const home = tmpDir();
+  const result = installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const skillsDir = path.join(home, ".codex", "skills");
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), ["parley-deck"]);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-deck", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker")), false);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-worktrees")), false);
+});
+
+test("--only installs the core skill plus only the named add-on(s)", () => {
+  const home = tmpDir();
+  const result = installer.installCommand(context(home, { target: "codex", only: ["parley-tracker"] }));
+  const skillsDir = path.join(home, ".codex", "skills");
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), ["parley-deck", "parley-tracker"]);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-worktrees")), false);
+});
+
+test("parseArgs reads --no-addons and --only", () => {
+  const noAddons = installer.parseArgs(["install", "--target", "codex", "--no-addons"]);
+  assert.equal(noAddons.noAddons, true);
+  assert.equal(noAddons.only, null);
+
+  const only = installer.parseArgs(["install", "--target", "codex", "--only", "parley-tracker,parley-worktrees"]);
+  assert.deepEqual(only.only, ["parley-tracker", "parley-worktrees"]);
+
+  const onlyEquals = installer.parseArgs(["install", "--only=parley-tracker"]);
+  assert.deepEqual(onlyEquals.only, ["parley-tracker"]);
+});
+
+test("parseArgs rejects combining --no-addons and --only", () => {
+  assert.throws(
+    () => installer.parseArgs(["install", "--no-addons", "--only", "parley-tracker"]),
+    /cannot be combined/
+  );
+});
+
+test("run rejects an unknown --only add-on name", () => {
+  const home = tmpDir();
+  assert.throws(
+    () => installer.run(["install", "--target", "codex", "--only", "does-not-exist"], {
+      env: { HOME: home, PATH: "" },
+      cwd: home,
+      stdout: { write() {} },
+      stderr: { write() {} }
+    }),
+    /Unknown add-on/
+  );
+});
+
+test("uninstall --no-addons removes only the core skill", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const skillsDir = path.join(home, ".codex", "skills");
+
+  const result = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex", noAddons: true }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), ["parley-deck"]);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-deck")), false);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-worktrees", "SKILL.md")), true);
+});
+
+test("doctor reports add-on skills per target", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck", "parley-tracker", "parley-worktrees"]);
+  for (const skill of result.targets[0].skills) {
+    assert.equal(skill.status, "valid");
+  }
+});
+
+test("auto target ignores add-on skill dirs created by the installer", () => {
+  const home = tmpDir();
+  // A default install lays down the core skill plus add-on dirs, each marked.
+  const installResult = installer.installCommand(context(home, { target: "qwen" }));
+  assert.equal(installResult.ok, true);
+
+  // None of those marked dirs count as runtime evidence.
+  const targets = installer.resolveTargets(context(home, { target: "auto" }));
+  assert.deepEqual(targets.map((target) => target.name), []);
+});
+
+test("a default install records the selected add-ons in the core marker", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const dest = path.join(home, ".codex", "skills", "parley-deck");
+  const marker = JSON.parse(fs.readFileSync(path.join(dest, installer.MARKER_FILE), "utf8"));
+  assert.deepEqual(marker.addons, ["parley-tracker", "parley-worktrees"]);
+});
+
+test("a --no-addons install records addons:false in the core marker", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const dest = path.join(home, ".codex", "skills", "parley-deck");
+  const marker = JSON.parse(fs.readFileSync(path.join(dest, installer.MARKER_FILE), "utf8"));
+  assert.equal(marker.addons, false);
+});
+
+test("a --only install records the chosen add-ons in the core marker", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", only: ["parley-tracker"] }));
+  const dest = path.join(home, ".codex", "skills", "parley-deck");
+  const marker = JSON.parse(fs.readFileSync(path.join(dest, installer.MARKER_FILE), "utf8"));
+  assert.deepEqual(marker.addons, ["parley-tracker"]);
+});
+
+test("doctor after --no-addons install is healthy and reports only the core skill", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+
+  // A plain doctor (no flags) must derive the expected set from the marker, not the
+  // package default, so the intentionally-omitted add-ons are not flagged as missing.
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck"]);
+  assert.equal(result.targets[0].skills[0].status, "valid");
+});
+
+test("status after --no-addons install reports a valid core-only runtime install", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+
+  const result = installer.statusCommand(context(home, { command: "status", target: "codex" }));
+  // The intentionally core-only install must read as a valid runtime install and
+  // must not contribute an install-status reason to the compatibility summary.
+  assert.equal(result.runtimeInstalls[0].status, "valid");
+  assert.deepEqual(result.runtimeInstalls[0].skills.map((skill) => skill.skill), ["parley-deck"]);
+  assert.ok(!result.compatibility.reasons.some((reason) => reason.startsWith("codex-install-")));
+});
+
+test("paths after --no-addons install lists only the core skill", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+
+  const result = installer.pathsCommand(context(home, { command: "paths", target: "codex" }));
+  assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck"]);
+});
+
+test("doctor after --only install reports only the chosen add-on, never ok:false", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", only: ["parley-tracker"] }));
+
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck", "parley-tracker"]);
+  for (const skill of result.targets[0].skills) {
+    assert.equal(skill.status, "valid");
+  }
+});
+
+test("a legacy core-only marker without an addons field stays healthy", () => {
+  const home = tmpDir();
+  // Simulate a marker written by a release that predates the addons field.
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const dest = path.join(home, ".codex", "skills", "parley-deck");
+  const markerFile = path.join(dest, installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+  delete marker.addons;
+  fs.writeFileSync(markerFile, `${JSON.stringify(marker, null, 2)}\n`, "utf8");
+
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck"]);
+});
+
+test("doctor honors an explicit flag over the marker selection", () => {
+  const home = tmpDir();
+  // Installed core-only, but the operator explicitly asks doctor to expect an add-on.
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex", only: ["parley-tracker"] }));
+  assert.equal(result.ok, false);
+  const trackerSkill = result.targets[0].skills.find((skill) => skill.skill === "parley-tracker");
+  assert.equal(trackerSkill.status, "missing");
+});
+
+test("uninstall after --no-addons install removes only the core skill", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const skillsDir = path.join(home, ".codex", "skills");
+
+  const result = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), ["parley-deck"]);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-deck")), false);
+});

@@ -2,8 +2,8 @@
 
 **Workspace:** `parley-deck`
 **Parley deck:** `./parley-deck/`
-**Transport:** `github-pr`
-**Created:** 2026-05-09 (initial draft)
+**Transport:** `<transport-choice>` (pick one of local-dir | github-pr | gitlab-mr at deck bootstrap — see §0)
+**Created:** `<YYYY-MM-DD>` (set at deck bootstrap)
 **Status:** Living document — any agent may propose changes via a dedicated idea (see §7).
 
 ---

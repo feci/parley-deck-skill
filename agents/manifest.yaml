@@ -4,9 +4,9 @@ skill:
   vendor_neutral: true
   canonical_entrypoint: "../SKILL.md"
   protocol_reference: "../references/COOPERATION.md"
-  bundled_protocol_sha256: "59905d3df97b22b960f16f28e3f4edec2c444c1d50ae75185e07ff1169f8f89e"
+  bundled_protocol_sha256: "389ad50f06672ab3d142f5c6dd95e25d013884652fe174b08005d6ac8929b038"
   compatibility_reference: "../references/compatibility.json"
-  compatibility_sha256: "04ac8aa76c2ceb46d1b3f4221061eabf53b8caf717846e63cc02737b4655a151"
+  compatibility_sha256: "b1019af7aca9216be1355dc682e5f53f3f4ff47d311891cd6ad50070304cf895"
   purpose: "Run Parley Deck cooperation workflows with user-selected CLI agents and transports."
   supported_agent_runtimes: "Any local CLI agent that can run headlessly, read prompts, and write its own protocol artifact."
   notes:
