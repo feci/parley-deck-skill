@@ -1,6 +1,6 @@
 # COOPERATION.md — Multi-Agent Cooperation Protocol
 
-**Workspace:** `parley-deck`
+**Workspace:** `<workspace-name>`
 **Parley deck:** `./parley-deck/`
 **Transport:** `<transport-choice>` (pick one of local-dir | github-pr | gitlab-mr at deck bootstrap — see §0)
 **Created:** `<YYYY-MM-DD>` (set at deck bootstrap)
@@ -21,6 +21,8 @@ At project bootstrap, pick **exactly one** of three transports. The choice deter
 Once chosen, replace the `Transport:` line in the header with the active value. The rest of the document is read with that choice in mind. The detailed mechanics for each transport live in §11.
 
 **The choice is sticky for the project.** Switching transports later is possible but requires a meta-protocol-change idea (§7), because in-flight ideas span multiple PRs/branches.
+
+**Deck bootstrap (one-time).** When `parley-deck/` is first created in a project (`parley init`), in addition to the transport the facilitator MUST confirm the **active roster, each agent's model, and each agent's reasoning/effort level** with the user as a required one-time setup step, and record the persistent per-agent choices in the local agent config (`meta/headless-agents.local.json`; mirrored in the §2 roster). The **default reasoning/effort is the strongest (highest) level the agent supports**; fall back to `cli-default` only when the level cannot be discovered. This fires **only at deck creation** — not per idea, not per later session; an already-bootstrapped deck reuses the saved selection (and the user may re-run the confirmation on request). The protocol stays **model- and reasoning-agnostic** — it mandates the confirmation and a highest-by-default, not any specific model or level. Per-agent defaults are seeded from the **user-global central config `~/.parley/agents.toml`** (lists each agent's model + reasoning), which `parley init` creates and any deck overrides per-project via `parley-deck/agents.toml`. Its `[defaults]` block also carries project-wide policy defaults — `ping_tier` (§9.0 liveness ping), `preferred_transport` (used by `parley init`), `roster_change_policy`, and `speed`/`timeouts`. See the skill for the interactive list-roster → confirm → list-models-and-effort → pick flow. (The §9.0 readiness check only pings agent *liveness* per idea; it does not re-select models or effort.)
 
 **Universal invariants** that hold for every transport:
 
@@ -70,9 +72,11 @@ The roster is project-specific. Maintain it as a table here:
 
 | Agent ID       | Workspace dir                       | Role          |
 | -------------- | ----------------------------------- | ------------- |
-| `<agent-id-1>` | `<workspace-dir-or-transport-ref>`  | `participant` |
-| `<agent-id-2>` | `<workspace-dir-or-transport-ref>`  | `participant` |
-| ...            | ...                                 | ...           |
+
+**Local launch config (optional, gitignored):** Individual machines may keep
+`parley-deck/meta/headless-agents.local.json` with CLI launch settings for the
+rostered agents. This file is machine-local, not canonical project state, and
+does not change quorum, ownership, signoff weight, or transport rules.
 
 **Agent ID conventions:** short, stable, kebab-case, unique within the project. Suffix with a number if you may run multiple instances of the same family (e.g. `<family>-1`, `<family>-2`). Once chosen, an agent ID does not change for the lifetime of the project.
 
@@ -80,8 +84,6 @@ In transports B and C, each agent should also have a corresponding host account 
 
 | Agent ID       | Host handle    |
 | -------------- | -------------- |
-| `<agent-id-1>` | `@<host-user>` |
-| ...            | ...            |
 
 When a new agent joins:
 
@@ -105,8 +107,8 @@ When an agent leaves the project, mark its row as inactive (do not delete it) so
     │       ├── round-02/
     │       │   └── ...
     │       ├── consensus.md         ← created once everyone is ready to sign off
-    │       ├── FINAL.md             ← the authoritative artifact (plan / spec / ADR)
-    │       ├── IMPLEMENTATION.md    ← created in Phase 5; tracks branch + fix-up cycles
+    │       ├── FINAL.md             ← static, self-contained authoritative artifact (plan / spec / ADR)
+    │       ├── IMPLEMENTATION.md    ← living execution doc (Progress / Decision Log / Surprises / Outcomes)
     │       └── review/              ← Phase 6–8 code review lifecycle
     │           ├── round-01/
     │           │   ├── <agent-id-1>.md
@@ -140,6 +142,14 @@ The agent (or user) who starts the idea creates `ideas/<slug>/00-prompt.md`:
       <agent-id-1>: <lens-or-role>
       <agent-id-2>: <lens-or-role>
     deadline: YYYY-MM-DD        # optional
+    strict_gate: true|false     # optional; exact case-insensitive "true" opts into
+                                # the strict review gate (Phase 8); absent or any
+                                # other value keeps the default close rule
+    require_model_diversity: true|false  # optional; LE-3 — escalate (not just warn) if
+                                # every reviewer shares the implementer's model
+    checks: <command>           # optional; LE-4 — verification command the driver runs
+                                # (sh -c) as the Phase 5/8 build-test gate; a code-writing
+                                # (auto_implement) idea with no checks and no go.mod fails closed
     status: round-01            # round-N | consensus | final | abandoned
     ---
 
@@ -210,6 +220,10 @@ When discussion has converged, an agent creates `ideas/<slug>/consensus.md`:
     ## Agreed decisions
     ## Agreed trade-offs
     ## Open items deferred to implementation
+    ## Comparison & blind spots
+    <!-- Advisory (not a gate): contradictions not smoothed into vague trade-offs;
+         partial coverage (what only one participant covered); unique insights worth
+         keeping; and blind spots — what did NO participant address? -->
 
     ## Signoffs
     <!-- Each agent APPENDS their signoff block. Do NOT edit others' blocks. -->
@@ -227,6 +241,7 @@ Every listed participant then **appends** their own signoff block:
 - Any ❌ → new round; the blocker's counter-proposal is the starting point.
 - 🟡 is acceptable _if_ the reservation is logged as "open items deferred to implementation" and no one upgrades it to ❌.
 - Agent silent past deadline is treated as ✅ — but only if they were pinged via `inbox/` first.
+- The `## Comparison & blind spots` section is an **advisory drafting discipline**, not a gate: append-only signoffs remain the only gate, any participant may block if the comparison is inaccurate, and raw round files are never hidden behind the summary.
 
 _(Transport B/C: signoffs in `consensus.md` are mirrored by a native PR/MR review; see §11. The file remains canonical.)_
 
@@ -247,11 +262,20 @@ The drafter writes:
     ---
 
     ## Final plan / specification
+    ## Purpose / user-visible outcome
+    ## Context & orientation
+    ## Observable acceptance criteria
+    ## Idempotence & recovery
+    ## Known risks / de-risking
     ## References
     - Consensus: ./consensus.md
     - Rounds: ./round-01/, ./round-02/, …
 
 `FINAL.md` is the **single source of truth**. If later invalidated, open a new idea (`<slug>-v2`) — do **not** edit the old FINAL. Update `00-prompt.md` `status: final` and optionally move the dir to `ideas/archived/<slug>/` after implementation.
+
+The sections above the References are **written at design time and frozen** with the rest of `FINAL.md` — it is static; the *living* companion is `IMPLEMENTATION.md` (Phase 5). For complex, `auto_implement`, driver-managed, or pipeline ideas, `FINAL.md` plus `IMPLEMENTATION.md` MUST be self-contained enough that a fresh agent or the auto-drive driver can implement or resume **from them alone**, without session transcripts. **Observable acceptance criteria** state success as behavior a reviewer or the driver can check (e.g. "after X, Y is true"). For trivial or design-only ideas these added sections may be `N/A`.
+
+**Idempotence & recovery** states what state matters, what is safe to rerun, and what needs a human gate; it is required for `auto_implement` / action / pipeline ideas, where the driver treats it as the recovery contract.
 
 Before publishing `FINAL.md`, the drafter MUST verify that every active non-facilitator participant has created the expected canonical artifacts or that a recorded solo exception explains why multi-agent execution was impossible. A missing non-facilitator artifact is a blocker, not a reason to claim Parley Deck completed as a solo run.
 
@@ -296,6 +320,28 @@ The implementer:
         ## Notes for reviewers
         (Areas that need extra attention, known trade-offs, out-of-scope items.)
 
+        ## Progress
+        (Living checklist, updated at every stopping point; ISO timestamps
+        `(YYYY-MM-DD HH:MMZ)`, partial steps as `(completed: X; remaining: Y)`.
+        Required for complex / `auto_implement` / driver-managed / pipeline ideas;
+        "N/A" for trivial or design-only work.)
+
+        ## Decision Log
+        (Decisions made *after* FINAL.md — Decision / Rationale / Date·Author.
+        Deviations still go under `## Deviations from FINAL.md` above.)
+
+        ## Surprises & Discoveries
+        (Unexpected findings, with evidence — especially when they change choices.)
+
+        ## Validation evidence
+        (Which FINAL.md acceptance criteria were met, with the commands run and what
+        they proved.)
+
+        ## Outcomes & Retrospective
+        (At completion: achievements, gaps, lessons — framed to feed §13 `parley retro`.)
+
+`IMPLEMENTATION.md` is the **living** companion to the static `FINAL.md`: kept current at every stopping point so a fresh agent or the auto-drive driver has task-level resume context. §12 supplies the low-level effects ledger and idempotency keys; these sections supply the orientation and recovery narrative. The living sections are required for complex / `auto_implement` / driver-managed / pipeline ideas and may be `N/A` for trivial or design-only work.
+
 The implementer publishes `IMPLEMENTATION.md` (commit/PR/MR — see §11) and signals "open for review".
 
 If the idea is design-only (no code artifact), Phase 5 may be reduced to a brief `IMPLEMENTATION.md` describing where the design output was applied. Phases 6–8 still apply unless the participants agree in `consensus.md` that review is not required.
@@ -313,6 +359,7 @@ Once `IMPLEMENTATION.md` is published, every active participant **except the imp
     ---
 
     ## Summary            (1–3 sentences on overall health of the implementation)
+    ## Refutation attempts (per FINAL.md criterion: what you tried to break and the result)
     ## Findings
     ### [CRITICAL] <short title>
     <what is wrong, why it blocks, concrete suggested fix>
@@ -321,13 +368,38 @@ Once `IMPLEMENTATION.md` is published, every active participant **except the imp
     ### [NIT] <short title>
     ## Open questions
 
-**Severity tags** are fixed: `CRITICAL` (must fix before merge), `MAJOR` (should fix before merge), `MINOR` (nice to have), `NIT` (stylistic / optional). The implementer does not write a review-round file — they respond in Phase 7.
+**Severity tags** are fixed: `CRITICAL` (must fix before merge), `MAJOR` (should fix before merge), `MINOR` (nice to have), `NIT` (stylistic / optional). The implementer does not write a review-round file — they respond in Phase 7. Where `FINAL.md` states observable acceptance criteria, reviewers should check the implementation against them and may cite a criterion in a finding; this does **not** change the severity vocabulary — it only makes severity assignment less subjective.
+
+**Refutation-default (LE-1).** Reviewers assume the implementation is wrong until they fail to break it: for each observable acceptance criterion, attempt a failing case or run the relevant check, and record those attempts under `## Refutation attempts`. A "no findings" review is credible only with refutation attempts recorded — the driver's review-artifact validation requires the section. **Model diversity (LE-3):** a checker sharing the implementer's model is likelier to rubber-stamp; under auto-drive the driver warns when every reviewer shares the implementer's model, and `require_model_diversity: true` makes it a hard gate.
 
 If there is no invokable non-implementer reviewer, the implementation MUST NOT be merged or marked complete under Parley Deck. The implementer MUST report the blocker and continue only after either another reviewer is added or the user explicitly authorizes a recorded solo exception.
 
 Rules for later review rounds mirror Phase 2: never edit another reviewer's file, respond in your own next-round file with `responding-to:` listing prior review files, address every other active reviewer explicitly.
 
 _(Transport B/C: each review file is mirrored by a native PR review on the implementation PR/MR — see §11.)_
+
+#### Review briefs and dispositions
+
+Review briefs MUST NOT suppress findings. A facilitator, implementer, or prior
+review consensus MAY describe known findings, rebuttals, accepted trade-offs,
+sandbox artifacts, deferred follow-ups, and operator rulings as dispositions for
+the reviewer to weigh openly. The brief MUST NOT say or imply "do not report",
+"do not re-raise", "ignore", "only report above severity X", or otherwise narrow
+what the reviewer may inspect or report.
+
+When a brief includes a disposition, it SHOULD use this shape:
+
+    - Finding/disposition: <short identifier or summary>
+      Prior disposition: rebutted | accepted trade-off | deferred | dismissed | operator-ruling
+      Rationale: <one or two lines>
+      Authority: <review consensus path, follow-up idea, or quoted operator answer>
+      Reviewer prompt: Please evaluate whether this rationale holds under the current scope. Do you concur?
+
+The reviewer decides independently whether they concur with each disposition and
+states that decision in their review file. A disputed finding closes only when
+the reviewer withdraws it, the review consensus resolves it through the normal
+signoff process, or the operator explicitly rules on it and that ruling is quoted
+into the next review artifact.
 
 ### Phase 7 — Review consensus
 
@@ -349,6 +421,10 @@ When review discussion has converged, any participant (typically the implementer
 
     ## Dismissed findings
     (Findings the reviewer withdrew or the group judged not-an-issue, with 1-line rationale.)
+
+    ## Coverage & blind spots
+    (Advisory: findings everyone independently saw vs. only one reviewer saw, and
+    areas no reviewer inspected deeply. Not a gate; signoffs remain the gate.)
 
     ## Signoffs
     <!-- Each active participant (implementer included) APPENDS their signoff block. -->
@@ -373,6 +449,83 @@ The implementer applies the **Agreed fixes** from `review/consensus.md` on the s
 They also update the top-level frontmatter: bump `status:` to `fix-up-cycle-N`, update `head-commit:`. Then publish per the active transport (see §11) with message `[<agent-id>] <slug>: IMPLEMENTATION.md fix-up cycle N — ready for re-review`.
 
 Phases 6 → 7 → 8 repeat until a Phase 7 consensus lists **zero Agreed fixes**. At that point the implementer sets `status: complete` in `IMPLEMENTATION.md` frontmatter and publishes with `[<agent-id>] <slug>: IMPLEMENTATION.md — complete`. The implementation PR/MR is merged (B/C) or the idea is simply marked closed (A). Later invalidation follows the same rule as FINAL.md: open a new idea, do not edit the closed IMPLEMENTATION.md.
+
+#### Strict review gate (optional)
+
+An idea may opt into a strict review gate by setting `strict_gate: true` in
+`00-prompt.md` frontmatter (exact, case-insensitive `true`; absent, empty, or any
+other value means the default rule applies). If absent, the default Phase 8 rule
+remains unchanged: the implementation may complete when Phase 7 consensus lists
+zero Agreed fixes.
+
+For `strict_gate: true`, zero Agreed fixes is necessary but not sufficient. The
+gate closes only after a fresh full-scope Phase 6 review round — covering the
+complete implementation diff at the time of the pass: all files changed since the
+design FINAL plus every fix-up commit — produces no findings of any severity or
+kind, and the subsequent Phase 7 consensus records that clean result. A
+fix-verification or resumed pass may converge the gate by checking prior fixes,
+but it never closes the gate by itself. Findings classified as NIT, deferred
+follow-up, or accepted low severity still keep the strict gate open unless the
+reviewer withdraws the finding or the operator explicitly rules it closed.
+
+A finding under a strict gate must be an objective, code-grounded issue —
+correctness, security, robustness, maintainability, or a factual documentation
+error — in code the reviewer actually read; a subjective stylistic preference is
+never a finding at any severity. NITs (dead code, typos, misleading comments)
+remain findings and remain blocking.
+
+`strict_gate` may be set at kickoff by the idea author. After kickoff, adding,
+removing, or changing it requires either review/design consensus or explicit
+operator direction recorded in the idea. A participant MUST NOT silently relax a
+strict gate during implementation or review.
+
+**Driver enforcement (LE-2).** Under auto-drive this gate is machine-enforced, not
+advisory: the driver reads `strict_gate` from `00-prompt.md`; the Phase 7
+review-consensus drafter sets the machine-readable `closing_review_round` and
+`strict_gate_clean` fields; and the driver completes only when the named closing round
+is certified clean AND a deterministic finding-scan of that round's review files finds
+no concrete finding. The scan can only veto a clean claim (fail closed), never
+auto-pass one, and the strict-close loop is bounded by the fix-up budget.
+
+#### Stopping judgment
+
+Review cycles are judged by trajectory, not by a pass counter. If findings are
+fewer, lower severity, and confined to code changed by the latest fix-up, continue
+within the configured fix-up budget. If fresh CRITICAL/MAJOR findings keep landing
+on fix-up code, or the same ground is re-litigated despite open rebuttals, stop and
+escalate with a short trajectory summary. If a finding requires an operator
+decision, pause that finding's thread until the operator answers; unrelated fixes
+may continue.
+
+Illustrative triggers (examples, not normative thresholds): converging looks like
+"total findings dropping sharply each pass, new ones low-severity and confined to
+fresh fix code"; churning looks like "the finding count holding steady over two
+passes, or new CRITICAL/MAJOR findings on previously unchanged code".
+
+`MaxFixupCycles` and any driver retry budget are escalation thresholds, not close
+criteria. Hitting the budget never marks an implementation complete; it requires
+human review of the trajectory and either a new fix-up plan, a recorded operator
+ruling, or a decision to abandon/defer the work.
+
+**Loop budgets (LE-5).** An auto-driven loop carries explicit ceilings — max driver
+steps, max wall-clock, and (best-effort) max cost — alongside `MaxRounds`/
+`MaxFixupCycles`. Hitting any ceiling **escalates** (a durable blocking inbox note) and
+halts; it never marks an idea complete. The ceilings are seeded per user from
+`~/.parley [defaults.loop]` (`parley init` seeds generous safety-net defaults) and
+overridable by `parley run --max-driver-steps` / `--max-wall-clock`; `0` means unlimited
+(the backward-compatible default). Cost enforcement is telemetry-gated — it applies only
+once the runner emits `agent.usage` events.
+
+**Close-decision integrity (LE-7/LE-11).** Under `auto_implement`, a clean
+`outstanding_agreed_fixes == 0` is necessary but not sufficient to auto-complete: the
+driver refuses to auto-complete on an `ACCEPT-WITH-RESERVATIONS` triage (reservations need
+a human to read them) or with fewer than two independent reviewers. And under
+`auto_implement` or `strict_gate`, before completing, the driver runs a one-shot
+**goal-done check** — a fresh non-implementer agent verifies the `FINAL.md` observable
+acceptance criteria, and a confident fail escalates. The goal-check is defense-in-depth on
+top of the review consensus and fail-open on its own error (a broken or inconclusive
+checker never blocks a review-clean idea). A design-only idea keeps the lighter close
+(conditional rigor).
 
 ### Escalation to user (any phase)
 
@@ -410,6 +563,11 @@ Escalation is not a veto — the user's answer becomes input to the next round l
 ## 5. Quorum and async participation
 
 - **Quorum = all agents listed in `participants:` of `00-prompt.md`.**
+- **Quorum is set at the §9.0 pre-idea readiness check** and **locks once Phase 0
+  completes.** Agents excluded there (with user confirmation) do not count toward this
+  idea's quorum; a mid-idea unavailability does not silently shrink quorum — it falls to
+  the async rules below and the runtime watchdog. Excluding the last non-facilitator
+  still requires the §1 user-authorized solo exception.
 - A valid Parley Deck idea normally has at least two active participants. A one-participant idea is valid only when a user-authorized solo exception is recorded with the auth/CLI/timeout/tooling blocker that made multi-agent execution impossible.
 - An agent joining after round 1: either catch up (read priors, write late round-1, join from round 2) or decline (❌ NON-PARTICIPANT note in consensus).
 - If an agent is inactive > 2 rounds and the idea has a deadline, others may drop them from quorum — but only after a `inbox/<from>-to-<missing>_<slug>.md` ping.
@@ -433,6 +591,12 @@ Open an idea under `ideas/meta-protocol-change-<topic>/` and run the full lifecy
     Drafted by: <agent-id>
     Summary: <1–2 sentences>
 
+**Carve-out — a version sync is not a protocol change.** Adopting an upstream-ratified
+protocol version via the §9.0 freshness sync — when it is additive/compatible and
+preserves the project-specific zones — is a maintenance sync, **not** a protocol change,
+and does **not** require a meta-protocol-change idea. A breaking sync pauses for user
+confirmation (§9.0); any genuine *new* rule still goes through this section.
+
 ## 8. Inbox (lightweight channel)
 
 For pings, quick questions, heads-ups, handoffs — not a full design discussion:
@@ -451,7 +615,52 @@ Mid-round discoveries, handoffs, and progress notes may use `inbox/`, but substa
 
 **In transports B and C**, casual inbox-style chatter _may_ additionally happen in PR/MR conversations or in a dedicated chat channel, but **escalations to the user (`to-user`) and any handoff that influences phase transitions MUST be filed as inbox files**. PR/MR threads are too easy to bury and not durable enough for audit purposes.
 
+### Consults
+
+Consult artifacts (`parley-deck/consults/`, written by `parley consult`) are
+advisory and non-canonical: they are never round artifacts, signoffs, quorum
+evidence, or dispositions. Promoting a consult's conclusion into protocol state
+requires a normal idea/round/consensus artifact authored by a participant.
+
 ## 9. Session-start checklist for every agent
+
+### 9.0 Pre-idea readiness check (facilitator, before opening a new idea)
+
+Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness check
+(automatable via `parley preflight`) and records the result in the new idea's
+`00-prompt.md`:
+
+- **Protocol freshness.** Compare the live protocol against the installed skill's
+  packaged protocol (e.g. `parley-deck-skill status`; `protocolSha256` vs
+  `packagedProtocolSha256` in `meta/version.json`). Behaviour depends on
+  `meta/version.json` `protocolRole`:
+  - `source` → **advisory only; never auto-writes `COOPERATION.md`** (this project is
+    the protocol's upstream, so a packaged copy is older, not newer).
+  - `consumer` + a newer installed protocol → an **additive** change (a `deckVersion`
+    minor/patch bump) is **auto-synced** into `COOPERATION.md`, **preserving every
+    project-specific zone** (header, §0 transport, §2 roster — the same allowlist the
+    drift guard uses); the sync updates the `Protocol synced:` header line and records
+    `meta/protocol-sync_<ISO-timestamp>.md`. A **breaking** change (major `deckVersion`
+    bump, or one that modifies/removes existing rules) **pauses for user confirmation**.
+  - `protocolRole` missing/unknown → **do not auto-write**; ask the user once and
+    backfill the field.
+  - This sync adopts upstream-ratified text and is governed by the §7 carve-out; it is
+    not itself a meta-protocol-change idea.
+- **Roster liveness ping.** Probe every rostered participant (a bounded liveness
+  round-trip via each agent's real configured invocation; a missing CLI is unavailable
+  without a probe) and build an available/unavailable table.
+  - **Excluding** an unavailable agent from this idea's quorum requires **explicit user
+    confirmation** and is recorded in `00-prompt.md`
+    (`excluded: [<roster-id> — reason — confirmed <date>]`). Exclusion is **per-idea and
+    temporary**: the agent stays in the §2 roster and is re-probed at the next idea.
+  - **Re-including** a previously-excluded, now-available agent into quorum **also**
+    requires explicit user confirmation (no silent quorum expansion).
+  - Excluding the last non-facilitator still requires the §1 user-authorized solo
+    exception; the facilitator stops rather than silently going solo.
+  - The quorum **locks once Phase 0 completes**; a mid-idea unavailability falls to §5
+    and the runtime watchdog, downgrading to the same per-idea, user-confirmed waive.
+
+Then proceed with the per-agent session-start checklist:
 
 1. Read `parley-deck/COOPERATION.md` — note the active `Transport:` and check `meta/protocol-changelog.md` for updates.
 2. Read `parley-deck/inbox/` — filter for files addressed to you or `all`. Escalations addressed `to: user` that are still unanswered are context you should respect: don't cut across an active user-direction request.
@@ -751,9 +960,78 @@ Before consensus, the driver validates both sides: can the active roster satisfy
 Agents produce and reach consensus on a markdown action plan. The driver may call a provider only after: the plan artifact is finalized, the boundary gate is approved, provider-capability checks pass, and a ledger record exists in `planned` or `dry_run_ok`. Execution is never an informal continuation of Phase 1–4.
 
 ### 12.11 Monitoring loop-closure
-`MONITORING.md` defines signal sources, thresholds, destinations, breach fingerprints, and dedupe windows. A breach notifies and opens a human gate by default. Auto-opening a remediation idea is allowed only for predeclared low-risk breach classes and uses the same sticky transport as the pipeline; production remediation remains gated. Breaches are deduplicated by fingerprint so one ongoing breach cannot spawn duplicate ideas.
+`MONITORING.md` defines signal sources, thresholds, destinations, breach fingerprints, and dedupe windows. A breach notifies and opens a human gate by default. Auto-opening a remediation idea is allowed only for predeclared low-risk breach classes and uses the same sticky transport as the pipeline; production remediation remains gated. Breaches are deduplicated by fingerprint so one ongoing breach cannot spawn duplicate ideas. A watcher-auto-opened remediation idea is a non-active **candidate** (`status: candidate`, LE-10): the watcher does not staff a quorum, so it must not claim one (no `participants: []` at `round-01`). A human or the pipeline manifest sets `participants:` (at least one non-facilitator) and flips `status: round-01` before deliberation begins — the non-solo Phase-0 invariant.
 
 ### 12.12 Compatibility
 All pipeline files are optional and live under `parley-deck/pipelines/<slug>/`; `ideas/`, `inbox/`, `meta/`, `runs/` are unchanged. Existing `run.json`/manifests may gain optional `pipeline_slug`/`block_id` fields under a schema bump with zero-value defaulting; older drivers ignore unknown fields and degrade to advisory.
 
 Changing this section follows §7 (a meta-protocol-change idea). This section was ratified by idea `meta-protocol-change-end-to-end-pipeline` (2026-06-02).
+
+## 13. Retrospective optimization
+
+Inspired by Retrospective Harness Optimization (RHO): periodically mine the deck's own history to **propose** improvements to the harness — but never apply them automatically. A retrospective pass is **advisory input only**; every change it proposes enters through the normal lifecycle (Phases 0–8), and any protocol-text change goes through a meta-protocol-change idea (§7) with human approval. RHO's single-model self-preference is replaced here by the deck's multi-agent quorum.
+
+### 13.1 What a retro pass is
+
+A retro pass selects a diverse set of hard past cases (the **coreset**), diagnoses recurring failure modes from existing artifacts, and drafts the proposed improvement directions as an ordinary idea's `00-prompt.md`. It produces no canonical round/consensus/review/final/implementation content and applies no edit. Its output is a hypothesis, not a finding.
+
+### 13.2 Harness layers — what a proposal may change, and how
+
+- **Protocol harness** — `COOPERATION.md` and any in-repo copy kept in lockstep by the drift guard. Changeable only via a meta-protocol-change idea (§7) with human approval; a retro pass must never edit it directly.
+- **Runtime / shared harness — Repository Instruction Files** — tracked, shared files: skills, CLI behavior, helper scripts, docs, and repo-level instruction files. Changeable via an ordinary idea and the full review gate (a meta idea if the change alters protocol semantics).
+- **Local harness — Agent Local Memory** — operator-local, non-canonical state (caches, ignored launch config, per-machine memory). A retro pass may report observations only; it must never canonicalize them or infer protocol rules from one operator's local setup.
+- **Evidence corpus** — structured Parley Deck artifacts (`ideas/*` rounds, `review/`, `consensus.md`, `FINAL.md`, `IMPLEMENTATION.md`, run event logs) are the primary evidence. Raw session transcripts are secondary, off by default, and quarantined; include them only with recorded provenance. Within this corpus, a retro pass SHOULD surface **confident-error** signals — a dismissed `CRITICAL`/`MAJOR` finding, an unsupported assumption that shaped `FINAL.md`, or a missed risk that caused fix-up churn — drawn from the `IMPLEMENTATION.md` Outcomes & Surprises sections and the `consensus.md` blind-spots fields. This is diagnostic evidence only: **never** a new review severity, a blame label, or a merge gate.
+
+### 13.3 Acceptance gate
+
+A retro-proposed change is accepted only by the normal gate: multi-agent consensus + all-participant signoff + human approval for protocol or shared-harness changes + no regression (the drift guard green where applicable, the relevant checks/tests green, and a clean multi-agent re-review). A self-preference or self-consistency score may be attached to a proposal as a diagnostic note; it is never an acceptance criterion.
+
+### 13.4 Guardrails
+
+- **Audit** — a retro pass is itself an idea; its coreset, diagnosis, and the provenance of both selected and excluded sources are recorded.
+- **Adversarial-trajectory hygiene** — exclude trajectories that are compromised, contain injected or external content, or are out of project scope; record each exclusion and its reason.
+- **Reversibility** — all proposed edits land on an idea branch with git history; never a silent in-place rewrite.
+- **Multi-agent diagnosis** — when a retro pass opens an idea, its round-01 has each participant diagnose the coreset independently. Independent multi-agent disagreement is the deck's analogue of self-consistency, applied at diagnosis, not only at acceptance.
+
+Tooling that performs retro passes (e.g. a `parley retro` command) is governed by this section but specified separately; such tooling defaults to read-only and may at most scaffold a single new `ideas/<slug>/00-prompt.md`.
+
+Changing this section follows §7 (a meta-protocol-change idea). This section was ratified by idea `meta-protocol-change-rho-retrospective-optimization` (2026-06-16) and amended by idea `meta-protocol-change-fusion-execplans` (2026-06-18) to add the confident-error evidence signal.
+
+## 14. Automated outer loop (loop engineering) — the human brake
+
+Parley Deck is a loop-engineering substrate: the human (or a full quorum) owns the
+*decisions*, and automation may own only *discovery*. Any **automated, standing, or
+scheduled loop** — anything not driven by a human in the current session: a cron job, a CI
+hook, an MCP trigger, the `parley loop tick` command — is bound by this brake.
+
+### 14.1 What an automated loop MAY do
+
+- Discover candidate signals (new commits, CI results, issues, a signals file, monitoring
+  breaches) and **draft Phase 0/1 prompts only**.
+- A loop-drafted idea is always a non-active **`status: candidate`**: it carries provenance
+  and a `## Promotion` note, and it does **not** claim a `participants:` quorum (the non-solo
+  Phase-0 invariant — a loop must not staff a quorum it cannot itself convene). This is the
+  same shape the §12.11 monitoring watcher uses.
+
+### 14.2 What an automated loop MUST NOT do without a recorded human or full-quorum gate
+
+- Promote a candidate to quorum (staff `participants:` / flip `status: candidate` →
+  `round-01`), or otherwise start a deliberation or a `parley run`.
+- Implement, write code, or apply fixes.
+- Land, merge, push, or finalize (`FINAL.md` / closing an idea).
+- Modify the active roster (§2).
+- Override, bypass, reopen, or re-draft a consensus or signoff.
+
+### 14.3 Fail-safe
+
+The brake is fail-safe by construction: when an automated loop is uncertain, it does **less**
+— it drafts a candidate and stops, or escalates to the inbox (§8) — never more. A scheduled
+tick that is disabled, mis-configured, or sees no new signals writes nothing and exits
+cleanly. Promotion of any candidate into an active idea is always a human action or an
+explicit manifest action, recorded in the idea and (where it changes phase) mirrored into the
+canonical round/consensus artifacts.
+
+Tooling that runs an automated loop (e.g. a `parley loop tick` command) is governed by this
+section but specified separately; such tooling is **disabled by default** and, even when
+enabled, may at most scaffold `status: candidate` idea prompts. This section was ratified by
+idea `automation-outer-loop` (2026-06-24).
