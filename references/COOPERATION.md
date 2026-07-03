@@ -723,6 +723,22 @@ advisory and non-canonical: they are never round artifacts, signoffs, quorum
 evidence, or dispositions. Promoting a consult's conclusion into protocol state
 requires a normal idea/round/consensus artifact authored by a participant.
 
+## 10. TL;DR
+
+0. **Pick a track first (§4.0):** `fast` (1 reviewer, collapsed FINAL), `standard` (default), or `deliberation` (risky / protocol work). Trivial reversible work needs no Parley at all.
+1. Parley Deck is non-solo: if another agent can be invoked, at least one non-facilitator participant MUST write its own canonical artifact.
+2. One file per agent per round — no cross-editing.
+3. Round 1 = independent analysis; later rounds = cross-review.
+4. Consensus = all ✅ signoffs in `consensus.md`. In B/C, also mirrored by native PR/MR review approvals; the file wins on conflict.
+5. The **idea initiator** (`author:` in `00-prompt.md`) drafts `FINAL.md`. Closing the idea is a single transaction (commit in A, PR/MR merge in B/C) that sweeps in any orphaned files.
+6. Full dev flow: **idea → implementation → code review → fix-up**. The FINAL drafter is the default implementer; every other participant reviews; the same signoff mechanism gates each cycle; fix-up/review iterates until zero Agreed fixes.
+7. **Any agent can escalate to the user** via `inbox/<from>-to-user_...md`. The user's answer is quoted into the next round/review file for the audit trail.
+8. **English only** in every `parley-deck/` file _and_ every PR/MR description, comment, review, or commit message (unless the project deliberately overrides).
+9. Change the protocol the same way you'd change any other artifact: open an idea.
+10. **Files are canonical; PR/MR conversations are ergonomic.**
+
+---
+
 ## 9. Session-start checklist for every agent
 
 ### 9.0 Pre-idea readiness check (facilitator, before opening a new idea)
@@ -772,22 +788,6 @@ Then proceed with the per-agent session-start checklist:
    - `IMPLEMENTATION.md` exists and `review/round-0N/<your-id>.md` is missing → write your review file **before** starting other work.
 6. Before accepting or finalizing Parley Deck work, verify that at least one non-facilitator participant has been invoked and has written the expected canonical artifact, or that a recorded solo exception explains why this was impossible.
 7. Only then proceed to the user's current task.
-
-## 10. TL;DR
-
-0. **Pick a track first (§4.0):** `fast` (1 reviewer, collapsed FINAL), `standard` (default), or `deliberation` (risky / protocol work). Trivial reversible work needs no Parley at all.
-1. Parley Deck is non-solo: if another agent can be invoked, at least one non-facilitator participant MUST write its own canonical artifact.
-2. One file per agent per round — no cross-editing.
-3. Round 1 = independent analysis; later rounds = cross-review.
-4. Consensus = all ✅ signoffs in `consensus.md`. In B/C, also mirrored by native PR/MR review approvals; the file wins on conflict.
-5. The **idea initiator** (`author:` in `00-prompt.md`) drafts `FINAL.md`. Closing the idea is a single transaction (commit in A, PR/MR merge in B/C) that sweeps in any orphaned files.
-6. Full dev flow: **idea → implementation → code review → fix-up**. The FINAL drafter is the default implementer; every other participant reviews; the same signoff mechanism gates each cycle; fix-up/review iterates until zero Agreed fixes.
-7. **Any agent can escalate to the user** via `inbox/<from>-to-user_...md`. The user's answer is quoted into the next round/review file for the audit trail.
-8. **English only** in every `parley-deck/` file _and_ every PR/MR description, comment, review, or commit message (unless the project deliberately overrides).
-9. Change the protocol the same way you'd change any other artifact: open an idea.
-10. **Files are canonical; PR/MR conversations are ergonomic.**
-
----
 
 ## 11. Transport mechanics
 
