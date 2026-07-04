@@ -224,7 +224,7 @@ loop-engineering work). The tag is only a reference id; the rule text is what bi
 - **LE-1 — Refutation-default review.** A reviewer assumes the implementation is wrong and records concrete attempts to break each acceptance criterion; a "no findings" review counts only with refutation attempts shown.
 - **LE-2 — Driver auto-advance.** A deterministic driver may advance mechanical phase transitions; it never authors participant content or decides contested issues.
 - **LE-3 — Model diversity.** A reviewer sharing the implementer's model is likelier to rubber-stamp; `require_model_diversity: true` turns an all-shared-model reviewer set into a hard gate.
-- **LE-4 — Verification command.** `checks:` in `00-prompt.md` is the build/test gate the driver runs (as `sh -c`) at Phase 5/8.
+- **LE-4 — Verification command.** `checks:` in `00-prompt.md` is the build/test gate the driver runs (as `sh -c`) at Phase 5/8. `checks:` accepts either a scalar command (today's behavior) or an optional named list of `{name, command}` criteria (each expects exit 0); the list form activates the **completion contract** — the driver runs every criterion and writes the per-criterion result table into the `## Validation evidence` section of `IMPLEMENTATION.md` each cycle (overwriting the prior entry; git history preserves earlier cycles), with output secret-scrubbed and truncated.
 - **LE-5 — Loop budgets.** Driver runs are bounded by max steps / wall-clock / cost.
 - **LE-7 / LE-11 — Close-decision integrity.** Before an auto-driven close, a goal-done check verifies FINAL's observable acceptance criteria; reservations or too-few reviewers escalate rather than close.
 - **LE-10 — Candidate remediation.** Remediation ideas may start as `status: candidate`.
@@ -436,7 +436,9 @@ The implementer:
 
         ## Validation evidence
         (Which FINAL.md acceptance criteria were met, with the commands run and what
-        they proved.)
+        they proved. When `checks:` is a list (LE-4 completion contract), the driver
+        populates this section automatically each cycle; the implementer does not
+        hand-write it.)
 
         ## Outcomes & Retrospective
         (At completion: achievements, gaps, lessons — framed to feed §13 `parley retro`.)
@@ -535,6 +537,8 @@ Signoff blocks use the same `✅ ACCEPT / 🟡 ACCEPT-WITH-RESERVATIONS / ❌ BL
 ### Phase 8 — Fix-up
 
 The implementer applies the **Agreed fixes** from `review/consensus.md` on the same branch. On completion, they append a new section to `IMPLEMENTATION.md`:
+
+When `checks:` is a list (LE-4 completion contract), closing additionally requires the latest driver run to be all-pass at the current HEAD: the driver vetoes `status: complete` while any criterion fails (it can only fail a close claim, never auto-pass one — the same shape as `strict_gate`, and independent of it). A failing criterion is recorded in `## Validation evidence` and escalates via stopping judgment rather than auto-retrying.
 
     ## Fix-up cycle N
     status: complete
@@ -1095,9 +1099,13 @@ A retro-proposed change is accepted only by the normal gate: multi-agent consens
 - **Reversibility** — all proposed edits land on an idea branch with git history; never a silent in-place rewrite.
 - **Multi-agent diagnosis** — when a retro pass opens an idea, its round-01 has each participant diagnose the coreset independently. Independent multi-agent disagreement is the deck's analogue of self-consistency, applied at diagnosis, not only at acceptance.
 
+### 13.5 Playbooks (distilled retro output)
+
+A **playbook** is a second, advisory output of retrospection: `parley learn <closed-idea-slug>` scaffolds a reusable `parley-deck/playbooks/<topic>.md` from a COMPLETED idea — a deterministic skeleton (track, roster, phase checklist, plus prompts for gotchas + fixes and the verification pattern) that the author refines into transferable, idea-agnostic prose before committing. Playbooks are **advisory and non-canonical** — like consults (§8) they are never quorum evidence and never override protocol text; referencing one in Phase 0 is optional context. Substantive revision of a playbook's recommended process goes through a normal idea. `parley learn` is a tooling command (read-only over the idea; writes exactly one new playbook file, fail-closed if it exists), NOT a Parley round — the advisory playbook does not need quorum, and normal commit review is its quality gate.
+
 Tooling that performs retro passes (e.g. a `parley retro` command) is governed by this section but specified separately; such tooling defaults to read-only and may at most scaffold a single new `ideas/<slug>/00-prompt.md`.
 
-Changing this section follows §7 (a meta-protocol-change idea). This section was ratified by idea `meta-protocol-change-rho-retrospective-optimization` (2026-06-16) and amended by idea `meta-protocol-change-fusion-execplans` (2026-06-18) to add the confident-error evidence signal.
+Changing this section follows §7 (a meta-protocol-change idea). This section was ratified by idea `meta-protocol-change-rho-retrospective-optimization` (2026-06-16), amended by idea `meta-protocol-change-fusion-execplans` (2026-06-18) to add the confident-error evidence signal, and extended by idea `parley-learn-playbooks` (2026-07-04) to add §13.5 playbooks.
 
 ## 14. Automated outer loop (loop engineering) — the human brake
 
