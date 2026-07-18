@@ -61,6 +61,7 @@ test("resolves user and project target paths", () => {
   assert.equal(userTargets.find((target) => target.name === "agy").dest, path.join(home, ".gemini", "config", "plugins", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "gemini").dest, path.join(home, ".gemini", "extensions", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "hermes").dest, path.join(home, ".hermes", "skills", "parley-deck"));
+  assert.equal(userTargets.find((target) => target.name === "kimi").dest, path.join(home, ".kimi-code", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "qwen").dest, path.join(home, ".qwen", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "droid").dest, path.join(home, ".factory", "skills", "parley-deck"));
   assert.equal(userTargets.find((target) => target.name === "aionrs").dest, path.join(home, ".aionrs", "skills", "parley-deck"));
@@ -72,6 +73,31 @@ test("resolves user and project target paths", () => {
   assert.equal(projectTargets.find((target) => target.name === "agy").dest, path.join(project, ".gemini", "config", "plugins", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "gemini").dest, path.join(project, ".gemini", "extensions", "parley-deck"));
   assert.equal(projectTargets.find((target) => target.name === "hermes").dest, path.join(project, ".hermes", "skills", "parley-deck"));
+  assert.equal(projectTargets.find((target) => target.name === "kimi").dest, path.join(project, ".kimi-code", "skills", "parley-deck"));
+});
+
+test("kimi honors KIMI_CODE_HOME override", () => {
+  const home = tmpDir();
+  const kimiHome = path.join(home, "custom-kimi-code");
+  const targets = installer.resolveTargets({
+    ...context(home, { target: "kimi", includeUndetected: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  });
+  const kimi = targets.find((target) => target.name === "kimi");
+  assert.equal(kimi.dest, path.join(kimiHome, "skills", "parley-deck"));
+});
+
+test("kimi is not auto-detected from the ambiguous command alone (legacy kimi-cli guard)", () => {
+  const home = tmpDir();
+  const binDir = path.join(home, "bin");
+  writeExecutable(binDir, "kimi"); // a `kimi` on PATH could be the legacy kimi-cli, not Kimi Code
+  const ctx = context(home, { target: "all" });
+  ctx.env.PATH = binDir;
+  // No ~/.kimi-code runtime home: must NOT install into an unused .kimi-code/skills.
+  assert.equal(installer.resolveTargets(ctx).some((target) => target.name === "kimi"), false);
+  // With real Kimi Code runtime evidence present, it IS detected.
+  writeRuntimeEvidence(home, ".kimi-code");
+  assert.equal(installer.resolveTargets(ctx).some((target) => target.name === "kimi"), true);
 });
 
 test("auto target installs only detected runtimes", () => {
