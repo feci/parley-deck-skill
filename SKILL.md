@@ -236,6 +236,26 @@ If the CLI exposes model discovery, use it. Common names include `models`, `mode
 
 Do not invent model names, aliases, or thinking levels. If the user wants a specific model such as a top-tier or slow/deep model, use that exact choice only when the target CLI supports it or the user accepts the risk of trying it.
 
+## Autonomous Execution (required)
+
+Every headless participant MUST be invoked in its non-interactive auto-approve ("yolo") mode so it can WRITE its own canonical artifact (`round-NN/<id>.md`, signoffs, review files) without a blocking permission prompt. There is no single flag across vendors — each CLI has its own equivalent, scoped to the deck/workspace (never a blanket machine-wide bypass). Obvious-secret redaction still applies.
+
+| CLI | Autonomous write mode |
+| --- | --- |
+| claude | `--permission-mode bypassPermissions` (+ `--add-dir <deck>` to scope it) |
+| codex | `--sandbox workspace-write -c approval_policy="never"` |
+| hermes | `--yolo` |
+| agy (Antigravity) | `--dangerously-skip-permissions` (+ `--add-dir <deck>`) |
+| kimi (Kimi Code) | plain `-p` — its print mode already auto-approves in-workspace writes. NOTE: `--yolo`/`--auto` are mutually exclusive with `-p`, so `-p` IS kimi's yolo-equivalent. |
+
+The source of truth for each agent's mode is the spec's `autonomous_write` field; a vendor flag change is a config edit, not a skill revision. If workspace confinement cannot be demonstrated for an agent, treat its autonomous bit as unset (fail-closed) rather than escalating to a full-filesystem bypass.
+
+## Agent display names & roster init
+
+Agents are shown with self-documenting composite display names of the form `family_model_effort` — `_` separates the three meanings, `-` separates words within a section, `.` keeps version numbers (e.g. `claude_opus-4.8-1m_max`, `codex_gpt-5.6-sol_xHigh`, `agy_gemini-3.5-flash_high`, `kimi_k3_max`). The name is DERIVED from config for display; the stable roster ID (`claude-1`) remains the identity used in artifact paths and signoffs.
+
+When the CLI is available, run `parley roster show` to see the resolved roster with its display names, and `parley roster init [--scope session|machine]` to (re)build the roster: it discovers agents, records the roster-ID→family mapping, and lets model/effort be pinned per agent. `fast` is the standard startup speed on a separate axis from effort — same model + same effort, faster output — never a downgrade.
+
 ## Selection Checkpoint
 
 Before every new idea, every new round, Phase 5 implementation, Phase 6 review cycle, or any requested mid-stream model change, prepare defaults first. Do not ask seven separate required questions.
