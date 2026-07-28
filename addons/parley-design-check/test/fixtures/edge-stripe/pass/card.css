@@ -1,0 +1,6 @@
+/* The container is bounded on every side, so no edge is carrying a claim on its own. */
+.card {
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-raised);
+}

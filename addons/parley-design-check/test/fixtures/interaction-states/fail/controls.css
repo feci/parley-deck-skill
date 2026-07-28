@@ -1,0 +1,9 @@
+/* A control with the appearance generation is rewarded for, and nothing else. */
+.control {
+  display: inline-flex;
+  align-items: center;
+}
+
+.control:hover {
+  opacity: 0.9;
+}

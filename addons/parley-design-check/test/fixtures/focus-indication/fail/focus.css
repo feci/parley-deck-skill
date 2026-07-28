@@ -1,0 +1,4 @@
+/* The outline is switched off and nothing takes its place. */
+.control:focus {
+  outline: none;
+}

@@ -1,0 +1,4 @@
+/* The one token that is not referenced is recorded as reserved, with its reason. */
+.panel {
+  color: var(--color-text-body);
+}

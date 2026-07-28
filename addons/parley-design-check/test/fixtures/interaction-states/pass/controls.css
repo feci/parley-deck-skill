@@ -1,0 +1,21 @@
+/* Every state the default set names is declared, including the ones nobody screenshots. */
+.control {
+  display: inline-flex;
+  align-items: center;
+}
+
+.control:hover {
+  opacity: 0.9;
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+.control:active {
+  transform: none;
+}
+
+.control:disabled {
+  opacity: 0.5;
+}

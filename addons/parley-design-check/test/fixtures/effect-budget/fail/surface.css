@@ -1,0 +1,14 @@
+/* Five devices, each defensible alone, none attributable to a decision together. */
+.hero {
+  background-image: linear-gradient(180deg, var(--color-surface-page), var(--color-surface-raised));
+  box-shadow: 0 10px 30px var(--color-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.hero__mat {
+  background-image: url("../texture.png");
+}
+
+.hero__pulse {
+  animation: pulse 4s ease-in-out infinite;
+}

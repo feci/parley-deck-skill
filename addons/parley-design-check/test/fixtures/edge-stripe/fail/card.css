@@ -1,0 +1,6 @@
+/* A rounded container with one thick edge, the same colour on every card. */
+.card {
+  border-radius: 10px;
+  border-left: 4px solid var(--color-accent);
+  background-color: var(--color-surface-raised);
+}

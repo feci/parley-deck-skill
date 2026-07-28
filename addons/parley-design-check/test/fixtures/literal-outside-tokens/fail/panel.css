@@ -1,0 +1,6 @@
+/* Values the contract governs, written where no other check can read them. */
+.panel {
+  color: #1b1b1b;
+  padding: 13px;
+  border-radius: 10px;
+}

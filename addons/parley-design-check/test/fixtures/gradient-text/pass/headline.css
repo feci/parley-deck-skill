@@ -1,0 +1,9 @@
+/* One foreground colour on the type; the gradient sits where it carries no reading. */
+.headline {
+  color: var(--color-text-body);
+}
+
+.headline__rule {
+  background-image: linear-gradient(90deg, var(--color-accent), var(--color-accent-soft));
+  height: 2px;
+}

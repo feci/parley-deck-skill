@@ -1,0 +1,6 @@
+/* Every governed value resolves through the token layer. */
+.panel {
+  color: var(--color-text-body);
+  padding: var(--space-3);
+  border-radius: var(--radius-panel);
+}
