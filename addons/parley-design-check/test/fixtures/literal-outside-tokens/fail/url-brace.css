@@ -1,0 +1,11 @@
+/*
+ * A brace inside an unquoted url() token. CSS Syntax §4.3.6 reads it as an ordinary code
+ * point and ends the token at `)`, so a browser applies every declaration below it. A scanner
+ * that reads that brace as structure closes `.mark` early, and the raw colour and radius after
+ * it fall outside any rule block and are never judged.
+ */
+.mark {
+  background: url(sprite}glyph.svg);
+  color: #ff0000;
+  border-radius: 11px;
+}

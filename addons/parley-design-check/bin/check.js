@@ -116,6 +116,10 @@ function renderText(report) {
       lines.push(`recusal      not anchored for ${unanchored.join(", ")}: no other artifact of the run records the id`);
     }
   }
+  // A file the scanner could not tokenise is stated on the face of the report, not left to the
+  // UNJUDGEABLE list: every rule that would have read it was decided on a partial reading, and
+  // a reader who sees no findings must see why that is not the same as clean.
+  for (const entry of report.inputs.unreadable) lines.push(`unreadable   ${entry}`);
   for (const note of report.notes) lines.push(`note         ${note}`);
   for (const error of report["waiver-errors"]) lines.push(`waiver       rejected: ${error}`);
 

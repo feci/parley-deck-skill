@@ -17,7 +17,7 @@ several independent participants, binding it, applying it, auditing what shipped
 
 This spec governs a design run's typed artifacts, the gates at Parley's transitions,
 evidence and verdict vocabulary, rule authority, waivers, conformance levels, extension
-and versioning. Surface-agnostic: target numbers live in a target annex.
+and versioning. Surface-agnostic: target numbers live in an annex.
 
 ### §0.2 Non-goals
 
@@ -28,7 +28,7 @@ or implementation code.
 
 1. **One cursor.** `COOPERATION.md` owns phases, artifact ownership, quorum, the track
    classifier and terminal states. This spec MUST NOT introduce a second phase state
-   machine; its step names name work inside Parley phases (§1).
+   machine; its steps name work inside Parley phases (§1).
 2. **Conflict resolution.** On *process* `COOPERATION.md` wins; on the *content of a
    design artifact* this spec wins.
 
@@ -36,7 +36,7 @@ or implementation code.
 
 This spec owns meanings: artifact shapes, rule authority, thresholds, evidence minimums,
 waivers, conformance. The checker owns execution: parsing, detectors, reports, exit codes.
-With no checker the doctrine binds and findings are written by hand in the same form:
+With no checker the doctrine binds and findings are hand-written in the same form:
 `rule-id — violation — remedy`.
 
 ### §0.5 Normative language
@@ -45,17 +45,17 @@ With no checker the doctrine binds and findings are written by hand in the same 
    meaning and appear only inside normative statements; lowercase binds nothing.
 2. **Unlabelled is normative.** A heading marked `(informative)` is advisory; anything not
    so marked binds.
-3. **Statements are numbered and named.** Each normative statement carries a number within
-   its section and a bold short name; cite as `§4 rule 3`. A table binds through the
-   rule governing it and carries no keyword of its own.
+3. **Statements are numbered and named.** Each normative statement carries a number in its
+   section and a bold short name; cite as `§4 rule 3`. A table binds through its
+   governing rule and carries no keyword of its own.
 4. **Counts are derived, never written.** Normative prose MUST NOT state how many rules,
-   kinds or gates exist; derive a count from the registry or from this file.
+   kinds or gates exist; derive a count from the registry or this file.
 
 ## §1 Parley mapping
 
 1. **Design steps are Parley homes, not states.** Each step below MUST be performed in the
    Parley phase named for it and produce the artifact named for it; a run MUST NOT report a
-   step that contradicts its phase.
+   step contradicting its phase.
 
 | Design step | Parley home | Artifact |
 |---|---|---|
@@ -71,23 +71,26 @@ With no checker the doctrine binds and findings are written by hand in the same 
 
 2. **Gates attach to transitions.** Every gate in §3 MUST be recorded at the transition
    named for it. A transition crossed with its gate unrecorded fails L2 (§9), and so does one
-   whose recorded outcome the run's own evidence contradicts: the outcome is the gate's
+   whose recorded outcome the run's own evidence contradicts: the outcome is its
    conditions, never the word.
+3. **One token sidecar per direction.** A DIRECTION's `tokens` path resolves against its own
+   directory and MUST name the adjacent `<agent>.tokens.json` above; two DIRECTIONs MUST NOT
+   name one file.
 
 ## §2 Artifact kinds
 
 1. **Typed and versioned.** Every artifact MUST carry `spec: PDS/1.0` and `kind: <KIND>`
-   in its frontmatter from its first commit. A file declaring the spec under a kind this
-   section does not define MUST be reported as violating this rule; one declaring the spec
+   in its frontmatter from its first commit. A file declaring the spec under a kind §2
+   does not define MUST be reported as violating this rule; one declaring the spec
    and no kind is not an artifact instance.
 2. **Unknown keys.** A consumer MUST NOT error on an unrecognised frontmatter key; `x-`
    keys are silent by design, others SHOULD warn.
 3. **Empty is not absent.** An absent required field MUST be reported as a violation; a
    present but empty field MUST NOT be reported as absent.
-4. **One shape, and the table binds.** Every kind below is written as purpose, rationale,
-   required fields, minimal example. Each table is normative: a field it
-   lists MUST be present and MUST meet the requirement beside it, except where that
-   requirement states when the field appears. Cite as `§2 DIRECTION, positions`.
+4. **One shape, and the table binds.** Every kind below is purpose, rationale, required
+   fields, minimal example. Each table is normative: a listed field MUST
+   be present and MUST meet the requirement beside it, except where that requirement states
+   when it appears. Cite as `§2 DIRECTION, positions`.
 5. **Canonical frontmatter.** Frontmatter is the block between a file's first `---` line
    and the next. It is UTF-8 and uses only this subset, which every example below obeys.
 
@@ -109,7 +112,7 @@ With no checker the doctrine binds and findings are written by hand in the same 
 
 What is designed, and the axes on which directions must differ.
 
-The axes are G1's input, and each declared position is checked against them.
+The axes are G1's input; each declared position is checked against them.
 
 | Field | Requirement |
 |---|---|
@@ -136,8 +139,8 @@ decider: human:tomas
 
 One participant's complete, self-consistent proposal for the visual world.
 
-Selection needs whole alternatives, not fragments: these positions feed G1 and the winner
-becomes the contract.
+Selection needs whole alternatives: these positions feed G1, and the winner becomes the
+contract.
 
 | Field | Requirement |
 |---|---|
@@ -146,7 +149,7 @@ becomes the contract.
 | `positions` | One declared position per brief axis. |
 | `assigned` | The position §4 rule 2 gave this proposer, verbatim. |
 | `declined` | Only where the proposer declined: one line saying why (§4 rule 3); `positions` still records the choice. |
-| `tokens` | This direction's token file, in DTCG `2025.10`. |
+| `tokens` | This direction's own token file, in DTCG `2025.10`; named as §1 rule 3 requires. |
 | `states` / `effects` | States defined; decorative devices used. |
 
 ```yaml
@@ -156,7 +159,7 @@ handle: ledger
 signature: "Every surface is a table; alignment carries hierarchy."
 positions: {density: dense, structure: flat}
 assigned: flat
-tokens: round-01/codex-1.tokens.json
+tokens: codex-1.tokens.json
 states: [rest, hover, focus, pressed, disabled]
 effects: [rule-lines]
 ```
@@ -193,7 +196,7 @@ Averaging two visual systems yields a third nobody designed.
 |---|---|
 | `outcome` | Exactly one `winner: <handle>` or `abstain: <reason>`; never a ranking. |
 | `grafts` | Zero to three, each as §4 rule 6 requires. |
-| `tokens-digest` | The winner's token file as ratified: the first twelve hex characters of sha256 over it, which §3 G2 compares it against. |
+| `tokens-digest` | The winner's token file as ratified: the first twelve hex characters of sha256 over it, compared by §3 G2. |
 | `answers` | Every open critique against the winner: accepted, rejected with a reason, or waived against a waiver-file entry. |
 | `dissent` | Recorded verbatim, never summarised away. |
 | `decided-by` | The Decider of §4 rule 7. |
@@ -213,7 +216,7 @@ decided-by: human:tomas
 
 The binding design commitment implementers build against, in `FINAL.md`.
 
-Phase 5 needs something falsifiable to obey, so review can ask whether the build matches it.
+Phase 5 needs something falsifiable to obey, so review can ask whether the build matches.
 
 | Field | Requirement |
 |---|---|
@@ -239,8 +242,8 @@ level: L3
 
 A description of the system that shipped, written from the built code.
 
-The next contributor needs the truth, not the intention; as a description the built system
-wins, as an authorisation never.
+The next contributor needs the truth, not the intention: as description the built system
+wins, as authorisation never.
 
 | Field | Requirement |
 |---|---|
@@ -308,7 +311,7 @@ entries:
 
 A gate is a rule with a recorded outcome, not a phase. The strings below are canonical
 message shapes, not literal output: a tool MAY prefix its finding id and fill in values;
-with no tool a participant writes the shape by hand.
+with no tool a participant writes it by hand.
 
 1. **G1 DISTINCTNESS.** Between round-01 and round-02; facilitator-computed, no model call.
    MUST fail if any pair of directions differs on fewer than two of the brief's axes, if two
@@ -329,8 +332,8 @@ with no tool a participant writes the shape by hand.
    re-expressed in the winner's tokens, if grafts exceed three, or if a `VIOLATION` against
    the winner is unanswered. Modification is decided by re-reading the winner's token file
    and comparing it with the VERDICT's `tokens-digest`; any difference fails the gate, and a
-   `waived` answer resolving to no valid waiver entry (§8) is an unanswered violation. It
-   fails the graft, never the winner.
+   `waived` answer resolving to no valid waiver entry (§8) is unanswered. It fails the
+   graft, never the winner.
 
    ```text
    G2 COHERENCE — graft '<n>' from '<handle>' modifies the winner's token file. Re-express it in an existing winner token, or drop the graft.
@@ -341,8 +344,8 @@ with no tool a participant writes the shape by hand.
    alias cycle, an alias against its document's declared direction, a colour token without
    `colorSpace` or not computable to a displayable value, and a token declared-but-unused or
    used-but-undeclared. Direction is declared by group name: where a document names a group
-   `primitive`, `semantic` or `component`, a reference points down that order and a primitive
-   holds a value, never another primitive. Naming none of them declares none, and that
+   `primitive`, `semantic` or `component`, a reference points strictly down that order and a
+   primitive holds a value, never another primitive. Naming none declares none, and that
    conjunct is vacuous.
 
    ```text
@@ -365,12 +368,12 @@ with no tool a participant writes the shape by hand.
    brief's primary axis by
    `assignment = rotate(sorted(primary_positions), uint32(sha256("PDS/1" || run_id)[0:8]))`
    mapped to sorted participant ids. `run_id` is the brief's `run-id` (§2) as UTF-8 bytes;
-   `[0:8]` is the digest's first eight hex characters read big-endian, and the list rotates
-   by that value modulo the position count. Proposer ids sort by codepoint and the rotated
-   list maps to them in order. Each DIRECTION MUST record what it was given as `assigned`,
+   `[0:8]` is the digest's first eight hex characters big-endian, and the list rotates by
+   that modulo the position count. Ids sort by codepoint, and the rotated list maps to them
+   in order. Each DIRECTION MUST record what it was given as `assigned`,
    so the mapping recomputes from the brief and the directions alone. The brief MUST
    enumerate at least as many materially distinct primary positions as there are proposers,
-   and MUST NOT list one of them twice, or the full route MUST NOT start.
+   and MUST NOT list one twice, or the full route MUST NOT start.
 3. **The decline valve.** An assigned proposer MAY decline its position by recording a
    one-line reason as `declined` in its DIRECTION. Declining does not relax G1.
 4. **Exactly one critique round.** A second round needs an explicit Decider instruction and
@@ -384,20 +387,20 @@ with no tool a participant writes the shape by hand.
 7. **Unattended runs stop.** An unattended full run MUST record `ABSTAIN` and stop before
    CONTRACT and Phase 5 until the named human Decider selects a direction. No
    agent-selected winner, even labelled provisional, MAY authorise implementation. A
-   pre-registered non-proposer, non-critic agent Decider named in the brief stays permitted.
+   pre-registered non-proposer, non-critic agent Decider in the brief stays permitted.
 8. **The fast path runs outside Parley.** Work inside a ratified system introducing no new
    token family, foundation or visual direction MAY run the invariants and the checker with
    one agent. That run is not a Parley workflow — `COOPERATION.md` §1 makes multi-agent
-   execution mandatory, and §0.3 rule 2 gives it the process — so it MUST NOT claim Parley
+   execution mandatory; §0.3 rule 2 gives it the process — so it MUST NOT claim Parley
    verification, nor a level above L1. Greenfield work MUST NOT use the fast path.
 
 ## §5 Roles and invariants
 
 1. **Roles.** Proposer, Critic, Facilitator, Decider. One participant MAY hold several
-   roles except where forbidden below.
-2. **Recusal.** A Proposer MUST NOT critique, rank, score or decide its own direction, and
-   MUST NOT draft the VERDICT. A self-assessment is discarded, never down-weighted.
-3. **No score, no ranking at DECIDE.** No numeric aesthetic score is produced at any point;
+   roles except as forbidden below.
+2. **Recusal.** A Proposer MUST NOT critique, rank, score or decide its own direction, nor
+   draft the VERDICT. A self-assessment is discarded, never down-weighted.
+3. **No score, no ranking at DECIDE.** No numeric aesthetic score is produced;
    the Decider receives a typed findings ledger.
 4. **Anonymisation is SHOULD, not MUST.** Recusal is the enforceable mechanism; a
    claimed-but-ineffective blind is worse than an open one.
@@ -407,7 +410,7 @@ with no tool a participant writes the shape by hand.
    tier MUST record `UNJUDGEABLE` with the reason.
 7. **Design System authorship.** `DESIGN-SYSTEM.md` MUST be written by the Phase-6 design
    reviewer — a participant that neither proposed the winning direction nor implemented it.
-   With no distinct reviewer, the Decider MUST name the author and the artifact MUST record
+   With no such reviewer the Decider MUST name the author and the artifact MUST record
    self-authorship as a declared degradation.
 
 ## §6 Evidence tiers and verdicts
@@ -422,8 +425,8 @@ with no tool a participant writes the shape by hand.
 1. **Ordinal, and spelled in full.** Tiers are ordered `T0 < T1 < T2 < T3` and MUST be
    written in prose as number and word together, so "below `T2 RENDERED`" is checkable.
 2. **Minimum tier binds.** A finding originated below its rule's minimum tier MUST be
-   recorded `UNJUDGEABLE` — never `PASS`, never `VIOLATION`.
-3. **Engine names are out of scope here.** The mapping from tier to parser, browser or
+   recorded `UNJUDGEABLE`, never `PASS`, never `VIOLATION`.
+3. **Engine names are out of scope.** The mapping from tier to parser, browser or
    raster tool is target-specific and lives in an annex.
 4. **Verdicts.** `PASS`, `VIOLATION`, `NEEDS_REVIEW`, `UNJUDGEABLE`. `UNJUDGEABLE` is a
    verdict, not a tier, and MUST NOT be reported as a pass. Provenance is the registry's
@@ -445,9 +448,9 @@ with no tool a participant writes the shape by hand.
    predating the contract MUST be recorded `UNJUDGEABLE`.
 4. **System-blind rules.** A rule marked `system-blind` MUST NOT be satisfied by widening
    the ratified system.
-5. **Severity.** Severity is `0`–`4`. Only `4`, and optionally `3`, MAY block.
+5. **Severity.** `0`–`4`. Only `4`, and optionally `3`, MAY block.
 6. **Re-classification bumps the spec.** Changing a rule's class or authority requires a
-   spec version bump, and every review cites the registry version.
+   spec version bump; every review cites the registry version.
 
 ## §8 Waivers
 
@@ -456,13 +459,13 @@ with no tool a participant writes the shape by hand.
 2. **Required fields.** Rule id, narrowest scope, reason, expiry, the granting participant,
    and a counter-signature by a participant who is neither the grantor nor an author of the
    waived work. An author is read from §1's naming: a round file belongs to the agent id it
-   names, and work §1 gives no owner has none to exclude. A signer no artifact records but its
+   names; work §1 gives no owner has none to exclude. A signer no artifact records but its
    own is not independent. Where independence cannot be established the waiver MUST NOT
    suppress its finding.
 3. **No wildcards.** A waiver naming more than one rule id, or a scope broader than the
    work it excuses, MUST be rejected.
 4. **No widening.** A `system-blind` rule MUST NOT be waived by widening the ratified
-   system; it can only be waived explicitly, with the same fields as any other waiver.
+   system; only explicitly, with the same fields as any other waiver.
 5. **Expiry is absolute.** An expired waiver MUST be treated as absent and its finding
    returns to the ledger unchanged.
 
@@ -476,7 +479,7 @@ with no tool a participant writes the shape by hand.
 | L4 | L3, plus applied UI passing the rendered-tier `quality` rules. | A browser. |
 
 1. **Declare, then verify.** A project MUST declare the level it claims in its brief and
-   contract; a checker verifies the claim and never infers it.
+   contract; a checker verifies the claim, never infers it.
 2. **Levels are cumulative.** A claim at one level asserts every level below it.
 3. **An unreachable claim fails.** Claiming a level whose evidence tier was unavailable is
    a conformance failure, not a warning; the AUDIT reports the level verified.
@@ -497,11 +500,11 @@ with no tool a participant writes the shape by hand.
 
 1. **Spec version on every artifact.** As §2 rule 1, from the first commit.
 2. **The registry versions independently.** `registry: core-rules/<semver>` moves on its own
-   cadence, and a tool declares `implements: PDS/1.0` separately from its own version.
+   cadence; a tool declares `implements: PDS/1.0` separately from its own version.
 3. **Digest maintenance.** `registry-digest` is the first twelve hex characters of sha256
    over the registry file. It MUST be recomputed in the same commit as any registry edit,
-   and a report whose recomputed digest differs from the declared one MUST report a registry
-   mismatch, never accept it in silence.
+   and a report whose recomputed digest differs from the declared one MUST report a mismatch,
+   never accept it in silence.
 4. **Ids are append-only.** A rule id MUST NOT change meaning and MUST NOT be reused after
    retirement.
 5. **Deprecation window.** A deprecated rule MUST keep validating for at least one minor
@@ -514,5 +517,5 @@ with no tool a participant writes the shape by hand.
 - Initial spec, §0–§11 as published; `T3 PIXEL` declared, not shipped, so rules needing
   it report `UNJUDGEABLE`.
 - Defines G1's ban list and banned-slop signature, the canonical frontmatter subset, the
-  brief's `run-id`, alias direction, §8's authorship test, and the Phase-6 reviewer as
+  brief's `run-id`, the token sidecar, alias direction, §8's authorship test, and the Phase-6 reviewer as
   `DESIGN-SYSTEM.md`'s author.

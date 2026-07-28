@@ -63,10 +63,11 @@ are walked, and hidden directories, `node_modules` and build output are skipped.
 Findings are not errors. A finding is a result the run produced successfully, which is why
 it has its own code, and why a failed run does not hide behind an empty ledger.
 
-Exit 0 is reserved for `PASS`. A run over files this checker cannot read judges nothing, and
-a level claim whose evidence the run did not carry is a conformance failure rather than a
-warning (PDS §9 rule 3) — both exit 4. CI gates on the process code, never on a later
-reading of the JSON, so "the checker checked nothing" must not leave a green tick behind.
+Exit 0 is reserved for `PASS`. A run over files this checker cannot read judges nothing, a
+source it could not tokenise is a file it did not read (see below), and a level claim whose
+evidence the run did not carry is a conformance failure rather than a warning (PDS §9 rule 3)
+— all three exit 4. CI gates on the process code, never on a later reading of the JSON, so
+"the checker checked nothing" must not leave a green tick behind.
 
 ## What it reads
 
@@ -80,6 +81,30 @@ reading of the JSON, so "the checker checked nothing" must not leave a green tic
 Anything else is listed in the report under `not-inspected` with the reason. A file the
 checker did not read is never counted as a file that passed.
 
+### The stylesheet scanner, and the file it could not read
+
+One requirement runs through the scanner: the file the browser applies and the file the
+checker reads have to be one file, or a declaration below the defect ships unjudged. Five
+constructs have broken it so far, each found by a probe and each read as text now rather than
+as structure — a brace inside a quoted string (`content: "}"`), an unterminated string (ended
+at the newline, as CSS Syntax §4.3.5 ends it), a brace inside an unquoted `url()` token
+(§4.3.6), a comment delimiter inside one (§4.3.2 consumes no comment inside a url token), and
+an escaped brace in an ident (`font-family: A\}B`, `.a\}`, §4.3.7).
+
+A hand-rolled scanner has no upper bound on that family, so the scanner also reports what it
+could not read. A comment, string or url token still open at end of input; a brace that closes
+no block, or a block never closed; a declaration whose parentheses do not balance; text inside
+a rule it had to discard — any of these makes the file **unreadable**, and then:
+
+- the file is listed in the report under `inputs.unreadable`, with the reason and the line;
+- every rule whose detector reads stylesheets is `UNJUDGEABLE` against that file, so none of
+  them can report a pass over it, and a `system` rule among them leaves an L3 claim unverified;
+- the run does not roll up to `PASS`: exit 4, whatever the detectors found elsewhere.
+
+The detectors still run, because what the scanner did read is still evidence and a violation
+in the readable part is a real one. What it cannot do is come back clean. That is the part
+that does not need the next construct to be found first.
+
 A markdown file that declares `spec: PDS/1.0` and whose frontmatter is outside the canonical
 subset (PDS §2 rule 5) is a candidate artifact that did not parse. It is reported as
 `pds-check:l1-frontmatter-parses`, with or without a level claim, and never demoted to
@@ -88,7 +113,12 @@ subset (PDS §2 rule 5) is a candidate artifact that did not parse. It is report
 A file declaring the spec and no kind at all is not an artifact instance — that is how PDS.md
 and RULES.md declare the spec they define — and stays under `not-inspected`. The parser implements that subset
 exactly: one-line values, flow lists and flow maps, block lists of those, a flow collection
-holding flow collections holding scalars and no deeper, no tabs, no block mappings.
+holding flow collections holding scalars and no deeper, no tabs, no block mappings. The
+scalar lexer is held to the same line: an unquoted `,` `[` `]` `{` `}` or `#`, a trailing
+comment, an escape, a quote that opens without closing or closes without opening, and
+whitespace around a value are each refused with the reason. L1 claims the canonical subset,
+so a key the subset does not admit — an `x-` extension key included — is a violation of it
+rather than a construct the checker privately tolerates.
 
 ## The registry contract
 
@@ -125,7 +155,9 @@ with the reason:
   calibration from prose would put a second, rotting copy of it in a tool;
 - it is a `system` rule and no `CONTRACT` was given, since a system rule is meaningless
   before ratification;
-- the inputs a detector needs were not among the paths.
+- the inputs a detector needs were not among the paths;
+- a source it reads could not be tokenised, so the rule was decided on a partial reading of
+  the file.
 
 Rules belonging to another surface are listed as out of scope, which is not a pass either.
 
@@ -240,8 +272,8 @@ clean.
 | level | the obligations this checker holds a claim to |
 |---|---|
 | L1 | every candidate artifact parses, declares the spec version, names a kind PDS §2 defines, and carries the fields that kind requires |
-| L2 | L1, plus the mapping's artifact set and each artifact at the location §1 maps its step to, recusal decided from the artifact path, the §4 rule 2 assignment recomputed from the brief's `run-id` over its deduplicated primary positions, G1 (distinctness counted on the brief's declared axes with every position checked against the brief's enumeration, duplicate Signature, the banned-slop signatures and their sharing test, recorded and observed), G2 (one winner, bounded grafts that name tokens the winner already declares, the winner's token file digesting to the `tokens-digest` the VERDICT ratified, every violation against the winner answered and every `waived` answer resolving to a valid waiver entry scoped at the winner's work), a recorded outcome for every §3 transition the run crossed — recomputed for G3 and G4, so a `pass` beside an open finding the gate names sinks the obligation — and rule ids that resolve in the loaded registry |
-| L3 | L2, plus a DTCG token document with every token typed, aliases that resolve without a cycle and point down the tiers a document names (PDS §3 G3), a declared `colorSpace` on every colour, values that compute, and the registry's `system` rules decided against real source and clean |
+| L2 | L1, plus the mapping's artifact set and each artifact at the location §1 maps its step to, each DIRECTION resolving its `tokens` against its own directory to the adjacent `<agent>.tokens.json` §1 rule 3 names and no two DIRECTIONs to one file, recusal decided from the artifact path, the §4 rule 2 assignment recomputed from the brief's `run-id` over its deduplicated primary positions, G1 (distinctness counted on the brief's declared axes with every position checked against the brief's enumeration, duplicate Signature, the banned-slop signatures and their sharing test, recorded and observed), G2 (one winner, bounded grafts that name tokens the winner already declares, the winner's token file digesting to the `tokens-digest` the VERDICT ratified, every violation against the winner answered and every `waived` answer resolving to a valid waiver entry scoped at the winner's work), a recorded outcome for every §3 transition the run crossed — recomputed for G3 and G4, so a `pass` beside an open finding the gate names sinks the obligation — and rule ids that resolve in the loaded registry |
+| L3 | L2, plus a DTCG token document with every token typed, aliases that resolve without a cycle and point strictly down the tiers a document names, never sideways (PDS §3 G3), a declared `colorSpace` on every colour, values that compute, and the registry's `system` rules decided against real source and clean |
 | L4 | not verifiable here; reported `UNJUDGEABLE`, because it needs rendered evidence |
 
 Two honesty notes about L3. The `system` rules the registry marks checkable and this checker

@@ -5,7 +5,7 @@ handle: atrium
 signature: "One column holds every reading surface, so nothing sits beside anything and the sidebar is given up."
 positions: {density: sparse, structure: layered}
 assigned: layered
-tokens: ../tokens.json
+tokens: codex-1.tokens.json
 states: [rest, hover, focus, pressed, disabled]
 effects: []
 ---

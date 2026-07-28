@@ -14,9 +14,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { runCheck } = require("../lib/engine.js");
+const { loadDetectors, runCheck } = require("../lib/engine.js");
 const { parseYamlSubset } = require("../lib/registry.js");
-const { parseStylesheet } = require("../lib/css.js");
+const { parseStylesheet, scanStylesheet, stripComments } = require("../lib/css.js");
 
 const ADDON_ROOT = path.resolve(__dirname, "..");
 const DETECTORS_DIR = path.join(ADDON_ROOT, "lib", "detectors");
@@ -476,7 +476,7 @@ test("a waiver scoped at the token file the winner names answers the finding", (
     {
       file: "WAIVERS.md",
       write: waiverFile(
-        '{rule-id: core:interaction-states-incomplete, scope: tokens.json, expiry: 2099-01-01, reason: "the record list never waits: it is rendered from data already held", granted-by: claude-1, counter-signed-by: codex-1}'
+        '{rule-id: core:interaction-states-incomplete, scope: round-01/claude-1.tokens.json, expiry: 2099-01-01, reason: "the record list never waits: it is rendered from data already held", granted-by: claude-1, counter-signed-by: codex-1}'
       )
     }
   ]);
@@ -704,7 +704,7 @@ test("a graft that adds its token to the winner's file fails G2, re-expressible 
   // Before the digest comparison this run returned PASS, exit 0, verified L3, unmet [].
   const run = mutatedRun(t, [
     {
-      file: "tokens.json",
+      file: path.join("round-01", "claude-1.tokens.json"),
       from: '      "lg": { "$value": "24px" }',
       to: '      "lg": { "$value": "24px" },\n      "xxl": { "$value": "48px" }'
     },
@@ -758,7 +758,10 @@ test("an empty path field is a field that names no file, not a crash", (t) => {
   assert.equal(empty.exit, 0, "a contract declaring no waiver file failed the run");
   assert.deepEqual(empty["waiver-errors"], []);
   assert.deepEqual(empty["waivers-applied"], []);
-  const tokens = check(mutatedRun(t, [{ file: "FINAL.md", from: "tokens: tokens.json", to: 'tokens: ""' }]), { level: "L2" });
+  const tokens = check(
+    mutatedRun(t, [{ file: "FINAL.md", from: "tokens: round-01/claude-1.tokens.json", to: 'tokens: ""' }]),
+    { level: "L2" }
+  );
   assert.notEqual(tokens.exit, 2, "an empty tokens field failed the run rather than being read as naming no file");
 });
 
@@ -780,6 +783,30 @@ test("an alias that points up the tiers, or sideways at the floor, fails L3", ()
   assert.equal(report.level.verified, null);
 });
 
+test("an alias pointing sideways at its own tier fails L3, at every tier", () => {
+  // Round-03 codex-1. Cycle 4 rejected upward aliases and the primitive floor, so
+  // `semantic.medium -> {semantic.small}` and `component.card -> {component.panel}` resolved,
+  // reported the alias obligation met and certified a run at L3 with PASS and exit 0. §3 G3
+  // has a reference descend the declared primitive, semantic, component order, and a same-tier
+  // edge descends nothing while leaving a cycle inside one tier structurally possible.
+  const report = check(path.join(FIXTURES, "conformance", "alias-same-tier"), { level: "L3" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l3-alias-direction");
+  assert.ok(
+    raised.some((entry) => /semantic\.medium is a semantic and aliases the semantic semantic\.small/.test(entry.violation)),
+    `alias-direction findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(
+    raised.some((entry) => /component\.card is a component and aliases the component component\.panel/.test(entry.violation)),
+    "a component aliasing another component was accepted"
+  );
+  // The fixture also carries semantic.small -> primitive.step and component.panel ->
+  // semantic.medium, both descending. Exactly the two sideways edges are reported.
+  assert.equal(raised.length, 2, `alias-direction findings: ${raised.map((entry) => entry.violation).join(" | ")}`);
+  assert.ok(unmet(report).includes("pds-check:l3-alias-direction"));
+  assert.equal(report.level.verified, null);
+  assert.notEqual(report.exit, 0);
+});
+
 test("an alias pointing down the tiers, and a document naming none, are both clean", (t) => {
   // The conjunct is vacuous where a document names no tier group — the sound run's tokens.json
   // is grouped by `color` and `space` — and satisfied where the tiers run the right way.
@@ -799,7 +826,11 @@ test("an alias pointing down the tiers, and a document naming none, are both cle
 
 test("a colour token with a plain-string value fails L3: computable is not declared", (t) => {
   const run = mutatedRun(t, [
-    { file: "tokens.json", from: '{ "colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff" }', to: '"#ffffff"' }
+    {
+      file: path.join("round-01", "claude-1.tokens.json"),
+      from: '{ "colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff" }',
+      to: '"#ffffff"'
+    }
   ]);
   const report = check(run, { level: "L3" });
   assert.ok(unmet(report).includes("pds-check:l3-colour-space"));
@@ -927,6 +958,90 @@ test("swapping round-01 and round-02 fails process order", (t) => {
   assert.equal(report.level.verified, null);
 });
 
+/* ------------------------------- §1's token sidecar, one per proposer */
+
+// Round-03 codex-1. §1 maps DIVERGE to two files per proposer — `round-01/<agent>.md` and
+// `<agent>.tokens.json` — and the process-home check read only the markdown. The shipped sound
+// run itself had both DIRECTIONs naming one root-level `../tokens.json` and still certified L3
+// with PASS and exit 0, so a run could replace two independently authored token proposals with
+// one file and collect a process-conformance certificate for it. These four probe the sidecar
+// shared, misnamed, cross-owned and missing.
+
+test("two DIRECTIONs resolving their tokens to one file fail process order", (t) => {
+  const run = mutatedRun(t, [
+    { file: path.join("round-01", "claude-1.md"), from: "tokens: claude-1.tokens.json", to: "tokens: ../tokens.json" },
+    { file: path.join("round-01", "codex-1.md"), from: "tokens: codex-1.tokens.json", to: "tokens: ../tokens.json" }
+  ]);
+  fs.cpSync(path.join(run, "round-01", "claude-1.tokens.json"), path.join(run, "tokens.json"));
+  const report = check(run, { level: "L3" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-process-order");
+  assert.ok(
+    raised.some((entry) => /the DIRECTIONs filed as 'claude-1' and 'codex-1' resolve their token files to one path/.test(entry.violation)),
+    `process-order findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(unmet(report).includes("pds-check:l2-process-order"));
+  assert.equal(report.level.verified, null);
+  assert.notEqual(report.exit, 0);
+});
+
+test("a DIRECTION whose sidecar is not the adjacent one §1 names fails process order", (t) => {
+  const run = mutatedRun(t, [
+    { file: path.join("round-01", "codex-1.md"), from: "tokens: codex-1.tokens.json", to: "tokens: ../atrium.tokens.json" }
+  ]);
+  fs.renameSync(path.join(run, "round-01", "codex-1.tokens.json"), path.join(run, "atrium.tokens.json"));
+  const report = check(run, { level: "L3" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-process-order");
+  assert.ok(
+    raised.some((entry) =>
+      /the DIRECTION filed as 'codex-1' names the token file \.\.\/atrium\.tokens\.json, and §1 maps its sidecar to codex-1\.tokens\.json beside it/.test(
+        entry.violation
+      )
+    ),
+    `process-order findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(
+    !raised.some((entry) => /resolve their token files to one path/.test(entry.violation)),
+    "two distinct paths were reported as one shared file"
+  );
+  assert.equal(report.level.verified, null);
+});
+
+test("a DIRECTION naming another proposer's sidecar fails process order", (t) => {
+  const run = mutatedRun(t, [
+    { file: path.join("round-01", "codex-1.md"), from: "tokens: codex-1.tokens.json", to: "tokens: claude-1.tokens.json" }
+  ]);
+  const report = check(run, { level: "L3" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-process-order");
+  assert.ok(
+    raised.some((entry) =>
+      /the DIRECTION filed as 'codex-1' names the token file claude-1\.tokens\.json, and §1 maps its sidecar to codex-1\.tokens\.json beside it/.test(
+        entry.violation
+      )
+    ),
+    `process-order findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(
+    raised.some((entry) => /resolve their token files to one path/.test(entry.violation)),
+    "a proposer taking another proposer's sidecar still read as two token proposals"
+  );
+  assert.equal(report.level.verified, null);
+});
+
+test("a DIRECTION whose token sidecar is absent fails process order", (t) => {
+  const run = mutatedRun(t, [{ file: path.join("round-01", "codex-1.tokens.json"), remove: true }]);
+  const report = check(run, { level: "L3" });
+  assert.ok(
+    report["findings-detail"].some(
+      (entry) =>
+        entry.rule === "pds-check:l2-process-order" &&
+        /the DIRECTION filed as 'codex-1' names codex-1\.tokens\.json and this run could read no file there/.test(entry.violation)
+    ),
+    "a DIRECTION whose token half was never committed verified anyway"
+  );
+  assert.ok(unmet(report).includes("pds-check:l2-process-order"));
+  assert.equal(report.level.verified, null);
+});
+
 test("a brief filed under any other name fails process order", (t) => {
   const run = mutatedRun(t, []);
   fs.renameSync(path.join(run, "DESIGN-BRIEF.md"), path.join(run, "brief.md"));
@@ -1012,6 +1127,354 @@ test("a quoted brace is text, and the declarations after it are still read", () 
   );
 });
 
+test("an unterminated string ends at the newline, and the rules after it are still read", () => {
+  /*
+   * Round-03 kimi-1. Cycle 4 made the scanner quote-aware, which closed `content: "}"`. An
+   * unterminated quote is the same hole reached from the other side: the scanner read
+   * everything after the opening quote as string content to the end of the file, while CSS
+   * Syntax §4.3.5 ends the string at the newline and a browser goes on applying the rules
+   * that follow. Before this, the raw colour and radius in the ordinary rule below were
+   * invisible to every detector and the run over the fixture directory never saw them.
+   */
+  const source = '.c::before { content: "unterminated\n color: #ff0000; }\n.hint { color: #ff0000; }\n';
+  const blocks = parseStylesheet(source);
+  assert.equal(blocks.length, 2, "the rule after an unterminated string was read as string content");
+  assert.deepEqual(blocks[1].selectors, [".hint"]);
+  assert.deepEqual(blocks[1].declarations.map((declaration) => declaration.prop), ["color"]);
+  assert.equal(blocks[1].declarations[0].line, 3, "the line count did not survive the recovery");
+
+  // stripComments carries the same rule, or a comment after the bad string is never stripped
+  // and its body is scanned as stylesheet.
+  const withComment = '.a { content: "oops\n}\n/* a hidden comment */\n.b { color: #ff0000; }\n';
+  const stripped = stripComments(withComment);
+  assert.ok(!stripped.includes("hidden"), "a comment after an unterminated string was left in place");
+  assert.equal(stripped.length, withComment.length, "stripping moved the offsets the line numbers rest on");
+
+  const report = check(path.join(FIXTURES, "literal-outside-tokens", "fail"));
+  const hidden = report["findings-detail"].filter(
+    (entry) => entry.rule === "core:literal-outside-token-layer" && /unterminated-string\.css/.test(entry.path || "")
+  );
+  assert.ok(
+    hidden.some((entry) => /sets color to the colour literal #ff0000/.test(entry.violation)),
+    `a raw colour hidden behind an unterminated string was not found: ${report.findings.join(" | ")}`
+  );
+  assert.ok(
+    hidden.some((entry) => /sets border-radius to the size literal 11px/.test(entry.violation)),
+    "only part of the rule an unterminated string hid came back into scope"
+  );
+
+  // The cycle-4 case is untouched: a quoted brace is still text, not structure.
+  const quotedBrace = parseStylesheet('.trap::before { content: "}"; color: #ff0000; }');
+  assert.equal(quotedBrace.length, 1, "a quoted brace opened or closed a block");
+  assert.deepEqual(quotedBrace[0].declarations.map((declaration) => declaration.prop), ["content", "color"]);
+});
+
+test("a brace inside an unquoted url() is text, and the declarations after it are still read", () => {
+  /*
+   * Round-03. The quoted-brace fix (cycle 4) and the unterminated-string fix read strings
+   * correctly, but an unquoted url() is not a string: CSS Syntax §4.3.6 ends the token at `)`
+   * and reads `{`, `}`, `;` and `:` inside it as ordinary code points, so a browser applies
+   * every declaration after `url(a}b)`. The scanner read that brace as a block terminator and
+   * dropped the rest of the rule, which is the same false-clean hole as the two before it: a
+   * raw colour that ships is a declaration no detector can see.
+   */
+  const blocks = parseStylesheet(".a { background: url(a}b); color: #ff0000; }");
+  assert.equal(blocks.length, 1, "a brace inside an unquoted url() opened or closed a block");
+  assert.deepEqual(
+    blocks[0].declarations.map((declaration) => declaration.prop),
+    ["background", "color"],
+    "a declaration after a brace inside an unquoted url() was lost"
+  );
+  assert.equal(blocks[0].declarations[0].value, "url(a}b)", "the url token was cut short");
+
+  // The token ends at `)` and nowhere else: a `;` or `:` inside it is not a declaration edge,
+  // and the quoted form is a string the existing quote handling already reads.
+  assert.deepEqual(
+    parseStylesheet(".a { background: url(a;b); color: #ff0000; }")[0].declarations.map((d) => d.prop),
+    ["background", "color"]
+  );
+  assert.deepEqual(
+    parseStylesheet(".a { background: url(https://example.test/i.png); color: #ff0000; }")[0].declarations.map(
+      (d) => d.value
+    ),
+    ["url(https://example.test/i.png)", "#ff0000"]
+  );
+  assert.deepEqual(
+    parseStylesheet('.a { background: url("a}b"); color: #ff0000; }')[0].declarations.map((d) => d.prop),
+    ["background", "color"]
+  );
+  // Only a bare `url` ident opens the token; `myurl(` is an ordinary function.
+  assert.deepEqual(
+    parseStylesheet(".a { background: myurl(a); color: #ff0000; }")[0].declarations.map((d) => d.prop),
+    ["background", "color"]
+  );
+  // A newline inside the token is whitespace, not a terminator, and the line count survives it.
+  const wrapped = parseStylesheet(".a { background: url(a\nb); color: #ff0000; }");
+  assert.equal(wrapped[0].declarations[1].line, 2, "the line count did not survive a wrapped url token");
+
+  const report = check(path.join(FIXTURES, "literal-outside-tokens", "fail"));
+  const hidden = report["findings-detail"].filter(
+    (entry) => entry.rule === "core:literal-outside-token-layer" && /url-brace\.css/.test(entry.path || "")
+  );
+  assert.ok(
+    hidden.some((entry) => /sets color to the colour literal #ff0000/.test(entry.violation)),
+    `a raw colour hidden behind a url() brace was not found: ${report.findings.join(" | ")}`
+  );
+  assert.ok(
+    hidden.some((entry) => /sets border-radius to the size literal 11px/.test(entry.violation)),
+    "only part of the rule a url() brace hid came back into scope"
+  );
+
+  // Neither sibling fix moves: a quoted brace is still text, and an unterminated string still
+  // recovers at the newline.
+  const quotedBrace = parseStylesheet('.trap::before { content: "}"; color: #ff0000; }');
+  assert.equal(quotedBrace.length, 1, "a quoted brace opened or closed a block");
+  assert.deepEqual(quotedBrace[0].declarations.map((declaration) => declaration.prop), ["content", "color"]);
+  const badString = parseStylesheet('.c::before { content: "unterminated\n color: #ff0000; }\n.hint { color: #ff0000; }\n');
+  assert.equal(badString.length, 2, "the rule after an unterminated string was read as string content");
+  assert.deepEqual(badString[1].selectors, [".hint"]);
+});
+
+/*
+ * The fail-safe, and then the two constructs it was built beside.
+ *
+ * A hidden declaration is the whole failure mode of this family: the scanner returns fewer
+ * declarations than the browser applies, every detector reports nothing against the ones it
+ * never saw, and the file is certified clean. Five members have now been found one at a time,
+ * each by a probe, so the sixth is a matter of when and not whether. `HIDDEN_BY_A_CONSTRUCT`
+ * is one this scanner still reads wrong: CSS consumes `(` as a simple block, so the `}` inside
+ * it is part of the value and `color: #ff0000` is a declaration a browser applies, while the
+ * scanner ends the declaration at the brace, leaves the rule, and drops the literal. The
+ * checker must not report that file as clean — not because it knows this construct, but
+ * because it knows it could not tokenise the file.
+ */
+const HIDDEN_BY_A_CONSTRUCT = [".tile {", "  background: image-set(a} b);", "  color: #ff0000;", "}", ""].join("\n");
+
+test("a stylesheet the scanner cannot tokenise is reported unreadable, and no rule that read it can pass", (t) => {
+  // The control first: the same directory without the untokenisable file is a clean pass, so
+  // what follows is the fail-safe firing and not a checker that never passes anything.
+  const control = check(path.join(FIXTURES, "literal-outside-tokens", "pass"));
+  assert.equal(control.verdict, "PASS");
+  assert.equal(control.exit, 0);
+  assert.deepEqual(control.inputs.unreadable, []);
+
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "pds-check-"));
+  t.after(() => fs.rmSync(target, { recursive: true, force: true }));
+  fs.cpSync(path.join(FIXTURES, "literal-outside-tokens", "pass"), target, { recursive: true });
+  fs.writeFileSync(path.join(target, "hidden.css"), HIDDEN_BY_A_CONSTRUCT);
+  const report = check(target);
+
+  // Nothing found the hidden literal: that is the point. The file is reported unreadable, with
+  // the reason, rather than passing on the declarations the scanner did manage to read.
+  assert.ok(
+    !report["findings-detail"].some((finding) => /hidden\.css/.test(finding.path || "")),
+    "the probe construct is no longer hiding its literal, so this test no longer proves the fail-safe"
+  );
+  assert.equal(report.inputs.unreadable.length, 1, `unreadable: ${JSON.stringify(report.inputs.unreadable)}`);
+  assert.match(report.inputs.unreadable[0], /hidden\.css/);
+  assert.match(report.inputs.unreadable[0], /does not balance its parentheses/);
+
+  const styleDetectors = loadDetectors(DETECTORS_DIR).filter((detector) => detector.inputs.includes("styles"));
+  assert.ok(styleDetectors.length > 0, "no detector reads styles, so this test proves nothing");
+  for (const detector of styleDetectors) {
+    const entry = report.unjudgeable.find(
+      (candidate) => candidate.rule === detector.rule && /hidden\.css/.test(candidate.violation)
+    );
+    assert.ok(entry, `${detector.rule} read a file the scanner could not tokenise and was not reported UNJUDGEABLE`);
+    assert.match(entry.violation, /could not be tokenised/);
+    assert.ok(
+      !report["findings-detail"].some((finding) => finding.rule === detector.rule && finding.verdict === "PASS"),
+      `${detector.rule} passed over a file the scanner could not read`
+    );
+  }
+  // The process exit is what CI gates on, so the unreadable input reaches it.
+  assert.equal(report.verdict, "UNJUDGEABLE");
+  assert.equal(report.exit, 4);
+  const text = cli([target]);
+  assert.equal(text.status, 4);
+  assert.match(text.stdout, /unreadable\s+.*hidden\.css/);
+  assert.match(text.stdout, /does not balance its parentheses/);
+});
+
+test("each construct the scanner cannot tokenise is named, and one sinks a level claim", (t) => {
+  // One signal per line of the fail-safe. The reasons are prose a reader can act on, so they
+  // are asserted as such: a fail-safe nobody can read is a fail-safe nobody acts on.
+  const signals = [
+    [".a { color: var(--x); }\n/* opened and never closed\n.b { color: #ff0000; }\n", /a comment opened at line 2 is never closed/],
+    ['.a { content: "oops', /the string opened at line 1 is still open at end of file/],
+    [".a { background: url(sprite.svg", /an unquoted url\(\) token opened at line 1 is still open at end of file/],
+    [".a { color: var(--x);\n", /1 block opened and never closed, the outermost at line 1/],
+    [".a { color: var(--x); } }\n", /the closing brace at line 1 closes no block/],
+    [".a { background: linear-gradient(90deg, red; }\n", /does not balance its parentheses/],
+    [".a { color var(--x); }\n", /is not a declaration this scanner can read/]
+  ];
+  for (const [source, expected] of signals) {
+    const reasons = scanStylesheet(source).unreadable;
+    assert.match(reasons.join(" | "), expected, `a construct the scanner could not read was reported as readable: ${source}`);
+  }
+  // And the other side of it: an ordinary stylesheet reports nothing, or every file is
+  // unreadable and the fail-safe means nothing.
+  for (const source of [
+    ".a { color: var(--x); }\n",
+    '.a::before { content: "}"; color: var(--x); }\n',
+    ".a { background: url(a}b); color: var(--x); }\n",
+    ".a { background: url(a/*b); color: var(--x); }\n",
+    ".a { font-family: A\\}B; color: var(--x); }\n",
+    "@media (prefers-reduced-motion: reduce) {\n  * { animation: none; }\n}\n"
+  ]) {
+    assert.deepEqual(scanStylesheet(source).unreadable, [], `an ordinary stylesheet was reported unreadable: ${source}`);
+  }
+
+  /*
+   * End to end, on the run that verifies: the sound run gains one rule carrying the same
+   * construct, its raw colour is invisible to every detector, and before the fail-safe the
+   * document certified L3 with PASS and exit 0 over a file the checker had not read.
+   */
+  const run = mutatedRun(t, [
+    { file: "panel.css", from: ".record__code {", to: `${HIDDEN_BY_A_CONSTRUCT}\n.record__code {` }
+  ]);
+  const report = check(run, { level: "L3" });
+  assert.ok(
+    report.inputs.unreadable.some((entry) => /panel\.css/.test(entry)),
+    `the mutated stylesheet was read as tokenisable: ${JSON.stringify(report.inputs.unreadable)}`
+  );
+  assert.equal(report.level.verified, null, "a level verified over a file the scanner could not read");
+  assert.ok(unmet(report).includes("pds-check:l3-system-rules"), `unmet: ${unmet(report).join(", ")}`);
+  assert.notEqual(report.exit, 0, "a run over an unreadable source exited clean");
+});
+
+test("a comment delimiter inside an unquoted url() is text, and the declarations after it are still read", () => {
+  /*
+   * Round-03, named and left unfixed by the pass before this one. Comments are consumed by the
+   * top-level tokenizer and never inside a url token (§4.3.2, §4.3.6), so the delimiter in
+   * `url(a/*b)` is two ordinary code points and a browser applies every declaration after it.
+   * The comment stripper ran first and knew nothing about url tokens: it opened a comment there
+   * and blanked the rest of the file, so the rule came back with no declarations at all and the
+   * raw colour in it was judged by nothing. Same family, same false clean, one layer earlier.
+   */
+  const source = ".a { background: url(a/*b); color: #ff0000; }";
+  const blocks = parseStylesheet(source);
+  assert.equal(blocks.length, 1, "a comment delimiter inside an unquoted url() opened or closed a block");
+  assert.deepEqual(
+    blocks[0].declarations.map((declaration) => declaration.prop),
+    ["background", "color"],
+    "a declaration after a comment delimiter inside an unquoted url() was lost"
+  );
+  assert.equal(blocks[0].declarations[0].value, "url(a/*b)", "the url token was cut short at the delimiter");
+  // The stripper leaves the delimiter where the url token carries it, and moves no offset.
+  assert.equal(stripComments(source), source, "a delimiter inside a url token was stripped as a comment");
+
+  // A genuine comment is still stripped, including one that mentions a url token: whichever
+  // construct opens first wins, which is the order the tokenizer reads them in.
+  const commented = "/* url(a */ .b { color: #ff0000; }";
+  const stripped = stripComments(commented);
+  assert.ok(!stripped.includes("url("), "a comment holding a url token was left in place");
+  assert.equal(stripped.length, commented.length, "stripping moved the offsets the line numbers rest on");
+  assert.deepEqual(
+    parseStylesheet(commented).map((block) => block.selector),
+    [".b"],
+    "a comment holding a url token was read as structure"
+  );
+
+  const report = check(path.join(FIXTURES, "literal-outside-tokens", "fail"));
+  const hidden = report["findings-detail"].filter(
+    (entry) => entry.rule === "core:literal-outside-token-layer" && /url-comment\.css/.test(entry.path || "")
+  );
+  assert.ok(
+    hidden.some((entry) => /sets color to the colour literal #ff0000/.test(entry.violation)),
+    `a raw colour hidden behind a delimiter inside a url token was not found: ${report.findings.join(" | ")}`
+  );
+  assert.ok(
+    hidden.some((entry) => /sets border-radius to the size literal 11px/.test(entry.violation)),
+    "only part of the rule a delimiter inside a url token hid came back into scope"
+  );
+});
+
+test("an escaped brace is part of the ident, and the declarations after it are still read", () => {
+  /*
+   * Round-03, the second construct named and left unfixed. §4.3.7 makes the escaped code point
+   * part of the ident that carries it, so `A\}B` is one value and `.a\}` is one selector; a
+   * browser applies the declarations after either. The scanner read the brace as structure,
+   * closed a block the stylesheet never closed, and every declaration after it fell outside any
+   * rule — the quoted-brace hole reached from a third side, with the same raw colour shipping
+   * unjudged.
+   */
+  const value = parseStylesheet(".a { font-family: A\\}B; color: #ff0000; }");
+  assert.equal(value.length, 1, "an escaped brace in a value opened or closed a block");
+  assert.deepEqual(
+    value[0].declarations.map((declaration) => declaration.prop),
+    ["font-family", "color"],
+    "a declaration after an escaped brace was lost"
+  );
+  assert.equal(value[0].declarations[0].value, "A\\}B", "the escape was cut out of the value");
+
+  const selector = parseStylesheet(".a\\} { color: #ff0000; }");
+  assert.equal(selector.length, 1, "an escaped brace in a selector opened or closed a block");
+  assert.deepEqual(selector[0].selectors, [".a\\}"], "the escape was cut out of the selector");
+  assert.deepEqual(selector[0].declarations.map((declaration) => declaration.prop), ["color"]);
+
+  // The same rule reaches the other code points that carry structure: an escaped colon divides
+  // no declaration, and an escaped quote opens no string.
+  assert.deepEqual(
+    parseStylesheet(".a { grid-area: a\\:b; color: #ff0000; }")[0].declarations.map((d) => `${d.prop}=${d.value}`),
+    ["grid-area=a\\:b", "color=#ff0000"]
+  );
+  assert.deepEqual(
+    parseStylesheet('.a { content: \\"; color: #ff0000; }')[0].declarations.map((d) => d.prop),
+    ["content", "color"]
+  );
+
+  const report = check(path.join(FIXTURES, "literal-outside-tokens", "fail"));
+  const hidden = report["findings-detail"].filter(
+    (entry) => entry.rule === "core:literal-outside-token-layer" && /escaped-brace\.css/.test(entry.path || "")
+  );
+  assert.ok(
+    hidden.some((entry) => /sets color to the colour literal #ff0000/.test(entry.violation)),
+    `a raw colour hidden behind an escaped brace was not found: ${report.findings.join(" | ")}`
+  );
+  assert.ok(
+    hidden.some((entry) => /sets border-radius to the size literal 11px/.test(entry.violation)),
+    "only part of the rule an escaped brace hid came back into scope"
+  );
+});
+
+test("the five constructs of this family are all still read, together", () => {
+  // Every member found so far, in one file: a fix for the newest must not cost an older one.
+  const source = [
+    '.one::before { content: "}"; color: #ff0000; }',
+    '.two::before { content: "unterminated',
+    " color: #ff0000; }",
+    ".three { background: url(a}b); color: #ff0000; }",
+    ".four { background: url(a/*b); color: #ff0000; }",
+    ".five { font-family: A\\}B; color: #ff0000; }"
+  ].join("\n");
+  const blocks = parseStylesheet(source);
+  assert.deepEqual(
+    blocks.map((block) => block.selector),
+    [".one::before", ".two::before", ".three", ".four", ".five"],
+    "one of the five constructs closed a block the stylesheet never closed"
+  );
+  for (const selector of [".one::before", ".three", ".four", ".five"]) {
+    const block = blocks.find((candidate) => candidate.selector === selector);
+    assert.ok(
+      block.declarations.some((declaration) => declaration.prop === "color" && declaration.value === "#ff0000"),
+      `${selector} lost the declaration after the construct`
+    );
+  }
+  assert.deepEqual(scanStylesheet(source).unreadable, [], "a readable stylesheet was reported unreadable");
+});
+
+test("a terminated string beside a token-resolved rule stays clean", () => {
+  // The passing-side control kimi-1 asked for: the fix must not turn ordinary quoted content
+  // into a parse error, and the rule after it must still resolve through the token layer.
+  const report = check(path.join(FIXTURES, "literal-outside-tokens", "pass"));
+  assert.deepEqual(
+    report["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+    [],
+    "the terminated-string control raised findings"
+  );
+});
+
 test("a file declaring the spec with a kind PDS does not define fails L1", (t) => {
   // Round-02 AF-1(f). The file was demoted to `not-inspected`, so L1 verified beside a
   // candidate artifact whose type nobody defines.
@@ -1025,6 +1488,28 @@ test("a file declaring the spec with a kind PDS does not define fails L1", (t) =
   assert.ok(unmet(report).includes("pds-check:l1-artifact-kind"));
   assert.equal(report.level.verified, null);
   assert.ok(!report.inputs["not-inspected"].some((entry) => /TYPO\.md/.test(entry)));
+});
+
+test("an extension key outside the canonical subset cannot leave L1 met", (t) => {
+  // Round-03 codex-1, end to end. §2 rule 2 keeps `x-` keys silent, which is not the same as
+  // keeping them unparsed: one added to an otherwise sound DESIGN-BRIEF with an unquoted `#`
+  // and a trailing comment left `l1-frontmatter-parses` met and certified the run at L3 with
+  // PASS and exit 0. §2 rule 6 reports such a file, and its level goes with it.
+  const run = mutatedRun(t, [
+    {
+      file: "DESIGN-BRIEF.md",
+      from: "decider: human:tomas",
+      to: "decider: human:tomas\nx-note: unquoted # trailing comments are forbidden"
+    }
+  ]);
+  const report = check(run, { level: "L3" });
+  const finding = report["findings-detail"].find((entry) => entry.rule === "pds-check:l1-frontmatter-parses");
+  assert.ok(finding, "a brief carrying a trailing comment raised nothing");
+  assert.match(finding.violation, /its frontmatter is outside the canonical subset/);
+  assert.match(finding.violation, /an unquoted "#"/);
+  assert.ok(unmet(report).includes("pds-check:l1-frontmatter-parses"));
+  assert.equal(report.level.verified, null);
+  assert.notEqual(report.exit, 0);
 });
 
 test("a markdown file declaring no spec is still uninspected rather than a finding", (t) => {

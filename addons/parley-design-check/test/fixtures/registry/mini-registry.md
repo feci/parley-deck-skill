@@ -40,7 +40,7 @@ added: 1.0.0
 status: stable
 system-blind: true
 sources: [WCAG-2.2-SC-1.4.3]
-x-local-note: ignored in silence, because the prefix reserves it
+x-local-note: "ignored in silence, because the prefix reserves it"
 ```
 
 A fence that is not directly under a rule heading is not part of the registry:

@@ -148,6 +148,47 @@ test("the yaml subset reads what the artifacts use and refuses the rest", () => 
   assert.throws(() => parseYamlSubset("key:\n\t- item", "test"), /a tab/);
 });
 
+test("the scalar lexer refuses every form §2 rule 5 puts outside the subset", () => {
+  /*
+   * Round-03 codex-1. §2 rule 5 quotes a scalar carrying `,` `[` `]` `{` `}` `#` or an edge
+   * space, quotes with `'` around `"`, defines no escape, and makes a comment a whole line and
+   * never a trailing one. The parser accepted all of those, so `x-note: unquoted # trailing
+   * comments are forbidden` in a DESIGN-BRIEF left `l1-frontmatter-parses` met and certified
+   * the whole run at L3 — L1 claims the canonical subset, not the checker's private grammar.
+   */
+  const refuses = (source, pattern) =>
+    assert.throws(() => parseYamlSubset(source, "test"), pattern, `accepted: ${JSON.stringify(source)}`);
+
+  refuses("key: a, b", /an unquoted ","/);
+  refuses("key: a [b", /an unquoted "\["/);
+  refuses("key: a] b", /an unquoted "\]"/);
+  refuses("key: a {b", /an unquoted "\{"/);
+  refuses("key: a} b", /an unquoted "\}"/);
+  refuses("key: a # b", /an unquoted "#"/);
+  refuses("key: plain value # a trailing comment", /an unquoted "#"/);
+  refuses('key: "quoted value" # a trailing comment', /content after the closing quote/);
+  refuses("key: value ", /whitespace around the value/);
+  refuses("key:  value", /whitespace around the value/);
+  refuses("key:\n  -  item", /whitespace around the value/);
+  refuses("key:\n  - item ", /whitespace around the value/);
+  refuses('key: "unterminated', /unterminated quote/);
+  refuses("key: 'unterminated", /unterminated quote/);
+  refuses('key: unopened"', /closed by a quote it never opens/);
+  refuses("key: unopened'", /closed by a quote it never opens/);
+  refuses('key: "an \\" escaped quote"', /an escape/);
+  refuses("key: a \\n b", /an escape/);
+
+  // The other side of the same line: what the subset does publish still parses, so the rules
+  // above narrow the grammar to §2 rule 5 rather than to something below it.
+  const parsed = parseYamlSubset(
+    ["# a whole-line comment", 'note: "a # inside quotes, with a comma"', "handle: ledger", "states: [rest, hover]"].join("\n"),
+    "test"
+  );
+  assert.equal(parsed.note, "a # inside quotes, with a comma");
+  assert.equal(parsed.handle, "ledger");
+  assert.deepEqual(parsed.states, ["rest", "hover"]);
+});
+
 test("an explicit registry path that does not exist is not silently replaced by another", () => {
   const missing = path.join(FIXTURES, "no-such-registry.md");
   const resolution = resolveRegistryPath({ explicit: missing, addonRoot: ADDON_ROOT, cwd: ADDON_ROOT });

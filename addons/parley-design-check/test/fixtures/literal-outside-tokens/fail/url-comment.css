@@ -1,0 +1,13 @@
+/*
+ * A comment delimiter inside an unquoted url() token. CSS Syntax §4.3.6 consumes a url token
+ * to its closing paren and never consumes a comment inside one, so the delimiter is two
+ * ordinary code points and a browser applies every declaration below it. A comment stripper
+ * that opens a comment there blanks the rest of the file before the stack machine ever runs:
+ * `.badge` comes back with no declarations at all, and the raw colour and radius it carries
+ * are judged by nothing while they ship.
+ */
+.badge {
+  background: url(sprite/*glyph.svg);
+  color: #ff0000;
+  border-radius: 11px;
+}

@@ -2,7 +2,7 @@
 spec: PDS/1.0
 kind: CONTRACT
 winner: ledger
-tokens: tokens.json
+tokens: round-01/claude-1.tokens.json
 named-rules: ["**The Alignment Rule.** Hierarchy is carried by alignment, never by shadow."]
 states: [rest, hover, focus, pressed, disabled]
 effect-budget: {surface: 3, element: 1}

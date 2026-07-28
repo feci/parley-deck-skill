@@ -16,7 +16,7 @@ const crypto = require("node:crypto");
 
 const { CheckError, loadRegistry, resolveRegistryPath, tierRank, tierWord } = require("./registry.js");
 const { ARTIFACT_KINDS, aliasTarget, readArtifact, readTokens, resolveValue, toSrgb } = require("./artifacts.js");
-const { parseStylesheet } = require("./css.js");
+const { scanStylesheet } = require("./css.js");
 
 const VERDICTS = ["PASS", "VIOLATION", "NEEDS_REVIEW", "UNJUDGEABLE"];
 const CAPABLE_TIERS = ["T0", "T1"];
@@ -113,7 +113,16 @@ function declaresSpec(text) {
 }
 
 function collectInputs(targets) {
-  const inputs = { artifacts: [], tokenDocs: [], styles: [], markup: [], notInspected: [], unparsable: [], untyped: [] };
+  const inputs = {
+    artifacts: [],
+    tokenDocs: [],
+    styles: [],
+    markup: [],
+    notInspected: [],
+    unparsable: [],
+    unreadable: [],
+    untyped: []
+  };
   const files = [];
   for (const target of targets) {
     const resolved = path.resolve(target);
@@ -172,8 +181,16 @@ function collectInputs(targets) {
       continue;
     }
     if (STYLE_EXTENSIONS.has(extension)) {
+      /*
+       * The readability fail-safe. A stylesheet the scanner could not tokenise is kept — what
+       * it did read is still evidence — and recorded as unreadable, because the alternative is
+       * the failure this whole family has: fewer declarations come back, every detector reports
+       * nothing against them, and the file is certified clean while a browser applies them.
+       */
       const text = fs.readFileSync(file, "utf8");
-      inputs.styles.push({ path: file, text, blocks: parseStylesheet(text) });
+      const scan = scanStylesheet(text);
+      inputs.styles.push({ path: file, text, blocks: scan.blocks, unreadable: scan.unreadable });
+      if (scan.unreadable.length > 0) inputs.unreadable.push({ path: file, reasons: scan.unreadable });
       continue;
     }
     if (MARKUP_EXTENSIONS.has(extension)) {
@@ -627,6 +644,8 @@ function checkL2(ledger, ctx) {
     }
   }
 
+  checkTokenSidecars(ledger, directions);
+
   // Recusal: a critique must not target the direction its own author proposed. The author is
   // read off the artifact path, never off the `agent` field: §1 names a round's files by
   // agent id, so the path is the one identity the run does not assert about itself, and a
@@ -753,6 +772,63 @@ function checkL2(ledger, ctx) {
       `the run cites ${ctx.unknownCitations.length} rule ids the loaded registry does not declare, each listed under UNJUDGEABLE`,
       "cite ids this registry declares, or load the registry that declares them (§10 rule 3)"
     );
+  }
+}
+
+/*
+ * §1's DIVERGE row maps a proposer to two files, not one: `round-01/<agent>.md` together with
+ * `<agent>.tokens.json`, and §1 rule 3 resolves the declared path against the directory the
+ * DIRECTION sits in. Reading the markdown locations alone left the token half unchecked, so
+ * two DIRECTIONs naming one root-level file passed process conformance — one input standing in
+ * for two independently authored token proposals, which is the divergence the level certifies.
+ * The sidecar is therefore resolved, held to the adjacent name §1 gives it, required to exist,
+ * and required to be owned by exactly one DIRECTION.
+ */
+function checkTokenSidecars(ledger, directions) {
+  const id = "pds-check:l2-process-order";
+  const owners = new Map();
+  for (const direction of directions) {
+    const agent = agentOf(direction);
+    const sidecar = `${agent}.tokens.json`;
+    const declared = direction.data.tokens === undefined ? "" : String(direction.data.tokens).trim();
+    if (declared === "") {
+      ledger.fail(
+        id,
+        `the DIRECTION filed as '${agent}' names no token file, and §1 maps its sidecar to ${sidecar} beside it`,
+        "name the proposer's own token document; a DIRECTION proposes a token layer as well as a prose one, and an unnamed sidecar is not an empty one",
+        direction.path
+      );
+      continue;
+    }
+    const home = path.dirname(direction.path);
+    const resolved = path.resolve(home, declared);
+    const owed = path.resolve(home, sidecar);
+    if (resolved !== owed) {
+      ledger.fail(
+        id,
+        `the DIRECTION filed as '${agent}' names the token file ${declared}, and §1 maps its sidecar to ${sidecar} beside it`,
+        "name the adjacent <agent>.tokens.json §1 gives the proposer; the path resolves against the DIRECTION's own directory, and one resolving anywhere else is a token layer this run cannot attribute",
+        direction.path
+      );
+    } else if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+      ledger.fail(
+        id,
+        `the DIRECTION filed as '${agent}' names ${declared} and this run could read no file there`,
+        "commit the proposer's token document beside its DIRECTION; §1 maps the pair together, and a level verified without the token half is verified on a file nobody read",
+        direction.path
+      );
+    }
+    const owner = owners.get(resolved);
+    if (owner !== undefined) {
+      ledger.fail(
+        id,
+        `the DIRECTIONs filed as '${owner}' and '${agent}' resolve their token files to one path`,
+        "give each proposer its own <agent>.tokens.json; one file standing for two proposals replaces two independently authored inputs with one, which is the convergence the divergence step exists to prevent",
+        direction.path
+      );
+      continue;
+    }
+    owners.set(resolved, agent);
   }
 }
 
@@ -1330,11 +1406,20 @@ function tokenProblems(tokenDocs) {
           "point the alias down the tiers §3 G3 names; a lower tier that reaches up inverts the layer the token file exists to have",
           token.file
         );
-      } else if (from === 0 && to === 0) {
+      } else if (from !== null && to !== null && to === from) {
+        /*
+         * §3 G3 orders references down `primitive`, `semantic`, `component`, and sideways is
+         * not down: a same-tier edge descends nothing and leaves a cycle inside one tier
+         * structurally possible. Only the primitive floor was tested before, so
+         * `semantic.medium -> {semantic.small}` resolved, reported the obligation met and
+         * certified L3. The requirement is `targetTier < sourceTier` at every tier.
+         */
         raise(
           "pds-check:l3-alias-direction",
-          `${token.path} is a primitive and aliases the primitive ${target}`,
-          "give the primitive its own value; a primitive is the floor of the token graph and never references another",
+          `${token.path} is a ${TIER_NAMES[from]} and aliases the ${TIER_NAMES[to]} ${target}`,
+          from === 0
+            ? "give the primitive its own value; a primitive is the floor of the token graph and never references another"
+            : `give the token its own value, or point it at a lower tier; §3 G3 has a reference descend the tier order, and one ${TIER_NAMES[from]} reaching another descends nothing`,
           token.file
         );
       }
@@ -1513,6 +1598,7 @@ function runCheck(options) {
       markup: inputs.markup.map((source) => relative(source.path, cwd)),
       "not-inspected": inputs.notInspected.map((entry) => `${relative(entry.path, cwd)} (${entry.reason})`),
       unparsable: inputs.unparsable.map((entry) => `${relative(entry.path, cwd)} (${entry.reason})`),
+      unreadable: inputs.unreadable.map((entry) => `${relative(entry.path, cwd)} (${entry.reasons.join("; ")})`),
       "invalid-kind": inputs.untyped.map((entry) => `${relative(entry.path, cwd)} (kind ${entry.kind})`)
     },
     contract: contract ? relative(contract.path, cwd) : null,
@@ -1616,6 +1702,21 @@ function runCheck(options) {
           `pass the ${missingInput} this rule is decided from`
         );
         continue;
+      }
+      /*
+       * A source the scanner could not tokenise is not a source this rule was decided against.
+       * The detector still runs — what was read is still evidence, and a violation found in the
+       * readable part is a real one — but the rule can no longer report a clean pass over the
+       * file, because the declarations the scanner lost are exactly the ones a hole in this
+       * family hides. This is the part that does not need the next construct to be found first.
+       */
+      if (detector.inputs.includes("styles")) {
+        for (const entry of inputs.unreadable) {
+          unjudgeable(
+            `${relative(entry.path, cwd)} could not be tokenised, so this rule was decided on a partial reading of it: ${entry.reasons.join("; ")}`,
+            "fix the source so it tokenises, or judge the rule by hand against the file as written; a file the scanner could not read is never reported as clean"
+          );
+        }
       }
       let results;
       try {
@@ -1923,10 +2024,18 @@ function runCheck(options) {
   // It cannot roll up to PASS even when every obligation that failed did so for want of
   // evidence rather than for a defect.
   const claimUnverified = Boolean(report.level && report.level.verified === null);
+  /*
+   * A run that could not read one of its own inputs never rolls up to PASS. The per-rule
+   * UNJUDGEABLE above already stops those rules certifying, and a green process exit over a
+   * file the scanner could not tokenise would put the same false clean back one level up:
+   * CI gates on the exit code, not on a later reading of the JSON.
+   */
+  const unreadableInputs = inputs.unreadable.length > 0;
   if (violations > 0) report.verdict = "VIOLATION";
   else if (needsReview > 0) report.verdict = "NEEDS_REVIEW";
-  else if (!registry || claimUnverified || judgedNothing(report, registry, byRule)) report.verdict = "UNJUDGEABLE";
-  else report.verdict = "PASS";
+  else if (!registry || claimUnverified || unreadableInputs || judgedNothing(report, registry, byRule)) {
+    report.verdict = "UNJUDGEABLE";
+  } else report.verdict = "PASS";
 
   // Exit 0 is reserved for PASS. Everything else has a code of its own, because CI gates on
   // the process code and never on a later reading of the JSON: a checker that inspected

@@ -1,0 +1,12 @@
+/* The same shape with every governed value resolved: consuming the url token must not swallow
+   the declarations after it, and an ordinary url must not become a finding of its own. */
+.mark {
+  background: url(sprite}glyph.svg);
+  color: var(--color-text-body);
+  border-radius: var(--radius-panel);
+}
+
+.mark::after {
+  background: url("quoted}glyph.svg");
+  color: var(--color-text-body);
+}

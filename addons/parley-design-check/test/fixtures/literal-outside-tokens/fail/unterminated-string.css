@@ -1,0 +1,13 @@
+/*
+ * An unterminated string. CSS Syntax §4.3.5 ends it at the newline and the parser recovers
+ * there; the declaration holding it is dropped, and the ordinary rule below is applied as
+ * written. A scanner that keeps the quote open to the end of the file reads that rule as
+ * string content and never judges the raw colour and radius it carries.
+ */
+.c::before { content: "unterminated
+ color: #ff0000; }
+
+.hint {
+  color: #ff0000;
+  border-radius: 11px;
+}

@@ -32,7 +32,12 @@ class CheckError extends Error {
 
 /* ------------------------------------------------------------ YAML subset */
 
-const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_.-]*):(?: +(.*))?$/;
+// §2 rule 5: a key at column zero, then ": ". The separator is captured rather than
+// swallowed, because a key followed by two spaces is a value the subset does not publish and
+// a parser that trims it has quietly widened the grammar L1 certifies.
+const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_.-]*):(?:( +)(.*))?$/;
+// The same, for the indented "- " items under a bare key.
+const ITEM_LINE = /^ +-( +)(.*)$/;
 // PDS §2 rule 5: "a flow collection may hold flow collections; those hold scalars only".
 // A collection reached at this depth is one level past what the spec publishes.
 const MAX_FLOW_DEPTH = 2;
@@ -73,12 +78,45 @@ function splitTopLevel(text, where) {
   return parts.map((part) => part.trim());
 }
 
+/*
+ * §2 rule 5's scalar line, lexed rather than hinted at:
+ *
+ *   scalar  quote with " around , [ ] { } # or an edge space, with ' around "; no escapes
+ *   comment a whole line whose first non-space character is #; never trailing
+ *
+ * A parser that accepts more than that makes its own private grammar the thing L1 certifies:
+ * `x-note: unquoted # trailing comments are forbidden` parsed, so a DESIGN-BRIEF carrying a
+ * construct §2 forbids left `l1-frontmatter-parses` met and the whole run certified. Every
+ * form below is refused with the reason, because an artifact that leaves the subset is
+ * reported under §2 rule 6, never read as if it had stayed inside it.
+ */
+const FORBIDDEN_PLAIN = /[,[\]{}#]/;
+
 function parseScalar(raw, where) {
   const text = raw.trim();
   if (text === "") throw new CheckError(`${where}: empty value`);
-  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
-    if (text.length < 2) throw new CheckError(`${where}: unterminated quote in ${JSON.stringify(text)}`);
+  if (text.includes("\\")) {
+    throw new CheckError(`${where}: an escape, which the canonical subset does not define: ${JSON.stringify(text)}`);
+  }
+  const opening = text.charAt(0);
+  if (opening === '"' || opening === "'") {
+    const closing = text.indexOf(opening, 1);
+    if (closing < 0) throw new CheckError(`${where}: unterminated quote in ${JSON.stringify(text)}`);
+    if (closing !== text.length - 1) {
+      throw new CheckError(
+        `${where}: content after the closing quote in ${JSON.stringify(text)}: the subset has no trailing comment and no escape`
+      );
+    }
     return text.slice(1, -1);
+  }
+  if (text.endsWith('"') || text.endsWith("'")) {
+    throw new CheckError(`${where}: a scalar closed by a quote it never opens: ${JSON.stringify(text)}`);
+  }
+  const forbidden = FORBIDDEN_PLAIN.exec(text);
+  if (forbidden) {
+    throw new CheckError(
+      `${where}: an unquoted ${JSON.stringify(forbidden[0])} in ${JSON.stringify(text)}: quote a scalar carrying , [ ] { } or #, and write a comment as a whole line, never a trailing one`
+    );
   }
   if (text === "true") return true;
   if (text === "false") return false;
@@ -117,9 +155,9 @@ function parseInline(raw, where, depth = 0) {
     }
     return out;
   }
-  if (text.includes("[") || text.includes("]") || text.includes("{") || text.includes("}")) {
-    throw new CheckError(`${where}: value mixes flow syntax with plain text: ${JSON.stringify(text)}`);
-  }
+  // Anything left is a scalar, and a scalar carrying flow punctuation is refused there: §2
+  // rule 5's scalar line is implemented in exactly one place, so a value cannot be legal as a
+  // list item and illegal as a key's value.
   return parseScalar(text, where);
 }
 
@@ -139,6 +177,21 @@ function findKeySeparator(text) {
     else if (ch === ":" && depth === 0) return i;
   }
   return -1;
+}
+
+/*
+ * The separator §2 rule 5 publishes is one space, after `:` and after `-` alike, and a value
+ * whose own edge is a space is quoted. Trimming either away would let a run write a scalar the
+ * subset does not publish and still be told its frontmatter parses, so both edges are read
+ * here and the value is returned only when it needed no normalising.
+ */
+function edged(separator, value, at) {
+  if (separator !== " " || value !== value.trimEnd()) {
+    throw new CheckError(
+      `${at}: whitespace around the value the canonical subset does not use: a key or a list dash is followed by exactly one space, and a value whose own edge is a space is quoted`
+    );
+  }
+  return value;
 }
 
 /**
@@ -162,7 +215,7 @@ function parseYamlSubset(text, where, { flatOnly = false } = {}) {
     const match = KEY_LINE.exec(line);
     if (!match) throw new CheckError(`${at}: not a key/value line: ${JSON.stringify(line)}`);
     const key = match[1];
-    const inlineValue = match[2] === undefined ? "" : match[2].trim();
+    const inlineValue = match[3] === undefined ? "" : edged(match[2], match[3], at);
     if (Object.prototype.hasOwnProperty.call(out, key)) {
       throw new CheckError(`${at}: duplicate key ${JSON.stringify(key)}`);
     }
@@ -192,11 +245,12 @@ function parseYamlSubset(text, where, { flatOnly = false } = {}) {
         continue;
       }
       if (!/^ /.test(itemLine)) break;
-      const itemMatch = /^ +- +(.*)$/.exec(itemLine);
+      const itemMatch = ITEM_LINE.exec(itemLine);
       if (!itemMatch) {
         throw new CheckError(`${where} line ${index + 1}: expected an indented "- " item under ${JSON.stringify(key)}`);
       }
-      items.push(parseInline(itemMatch[1], `${where} line ${index + 1}`));
+      const itemAt = `${where} line ${index + 1}`;
+      items.push(parseInline(edged(itemMatch[1], itemMatch[2], itemAt), itemAt));
       index += 1;
     }
     if (items.length === 0) throw new CheckError(`${at}: key ${JSON.stringify(key)} has no value`);
