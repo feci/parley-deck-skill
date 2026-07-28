@@ -8,6 +8,8 @@
  * including faces that arrive through a dependency's defaults.
  */
 
+const { asWritten } = require("../css.js");
+
 const GENERIC = new Set([
   "serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif",
   "ui-sans-serif", "ui-monospace", "ui-rounded", "math", "emoji", "fangsong", "inherit",
@@ -56,7 +58,7 @@ module.exports = {
               verdict: "VIOLATION",
               path: style.path,
               line: declaration.line,
-              violation: `${block.selector} uses the unratified face "${family}"`,
+              violation: `${block.selector} uses the unratified face "${family}"${asWritten(declaration)}`,
               remedy: "add the face to the contract's allowlist with its role, or remove it; a face arriving through a dependency is still unratified"
             });
           }

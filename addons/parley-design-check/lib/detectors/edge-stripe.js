@@ -9,6 +9,8 @@
  * the reviewer, and the remedy says so.
  */
 
+const { asWritten } = require("../css.js");
+
 const SIDE_BORDER = /^border-(top|right|bottom|left)(-width)?$/;
 const THICK = /(^|[^\d.])([3-9]|[1-9]\d+)(\.\d+)?px\b/;
 const ABSENT = /^\s*(none|0(px)?|hidden)\s*$/i;
@@ -38,7 +40,7 @@ module.exports = {
           verdict: "VIOLATION",
           path: style.path,
           line: stripe.line,
-          violation: `${block.selector} rounds its corners and carries one thick edge (${stripe.prop})`,
+          violation: `${block.selector} rounds its corners and carries one thick edge (${stripe.prop})${asWritten(stripe)}`,
           remedy: "remove it, or make the edge carry a variable declared in the contract (a status, a category, an owner), so it distinguishes something"
         });
       }

@@ -10,6 +10,8 @@
  * control reads as the control disagreeing with the user.
  */
 
+const { asWritten } = require("../css.js");
+
 const LAYOUT_PROPS = new Set([
   "width", "height", "min-width", "min-height", "max-width", "max-height",
   "top", "right", "bottom", "left", "inset", "margin", "margin-top", "margin-right",
@@ -72,7 +74,7 @@ module.exports = {
                 verdict: "VIOLATION",
                 path: style.path,
                 line: declaration.line,
-                violation: `a keyframe changes ${declaration.prop}, which forces layout on every frame`,
+                violation: `a keyframe changes ${declaration.prop}, which forces layout on every frame${asWritten(declaration)}`,
                 remedy: "move the keyframe onto a transform or an opacity"
               });
             }
@@ -83,7 +85,7 @@ module.exports = {
               verdict: "VIOLATION",
               path: style.path,
               line: declaration.line,
-              violation: `${block.selector} eases with ${curve}, which passes its end value and returns`,
+              violation: `${block.selector} eases with ${curve}, which passes its end value and returns${asWritten(declaration)}`,
               remedy: "reserve overshoot for something meant to feel physical; an interface control should stop where the user put it"
             });
           }

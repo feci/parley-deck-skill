@@ -84,17 +84,35 @@ checker did not read is never counted as a file that passed.
 ### The stylesheet scanner, and the file it could not read
 
 One requirement runs through the scanner: the file the browser applies and the file the
-checker reads have to be one file, or a declaration below the defect ships unjudged. Five
+checker reads have to be one file, or a declaration below the defect ships unjudged. Seven
 constructs have broken it so far, each found by a probe and each read as text now rather than
 as structure — a brace inside a quoted string (`content: "}"`), an unterminated string (ended
 at the newline, as CSS Syntax §4.3.5 ends it), a brace inside an unquoted `url()` token
-(§4.3.6), a comment delimiter inside one (§4.3.2 consumes no comment inside a url token), and
-an escaped brace in an ident (`font-family: A\}B`, `.a\}`, §4.3.7).
+(§4.3.6), a comment delimiter inside one (§4.3.2 consumes no comment inside a url token), an
+escaped brace in an ident (`font-family: A\}B`, `.a\}`, §4.3.7), an escaped spelling of the
+`url` ident (`u\72l(`, `\75 rl(` — §4.3.4 decides a token's class on what its ident spells),
+and a brace inside any `(…)` or `[…]` (`background: fn(}y)`, ordinary CSS needing no escape).
+
+**The block model the scanner claims (§5.4).** `(`, `[` and `{` each open a matched simple
+block; a closer pops only the innermost open block, and one that matches nothing is an
+ordinary component value, as a browser reads it. `{` opens a rule, `}` closes one and `;` ends
+a declaration only where the innermost open block is a rule — inside `(…)` or `[…]` all three
+are content.
+
+**What a declaration means, against how it is written (§4.3.7).** A browser reads a
+declaration by what its tokens spell, so `col\6fr` is `color`, `#\66 f0000` is `#ff0000` and
+`11p\78` is `11px`. Every detector matches the spelled form; every message names the written
+one beside it. Ident sequences and loose escapes are decoded. A url token's contents are kept
+verbatim — no rule reads a name or a length out of one. A string's contents are decoded only
+where the escape spells an ident code point or a space (`"\49 nter"` is the face `Inter`); an
+escape spelling a quote, a comma or a backslash would corrupt the value for whatever splits it
+on those, so the string is left as written and the file goes to the fail-safe below.
 
 A hand-rolled scanner has no upper bound on that family, so the scanner also reports what it
 could not read. A comment, string or url token still open at end of input; a brace that closes
-no block, or a block never closed; a declaration whose parentheses do not balance; text inside
-a rule it had to discard — any of these makes the file **unreadable**, and then:
+no block, or a block never closed; a declaration whose parentheses do not balance; an escape
+it will not decode; text inside a rule it had to discard — any of these makes the file
+**unreadable**, and then:
 
 - the file is listed in the report under `inputs.unreadable`, with the reason and the line;
 - every rule whose detector reads stylesheets is `UNJUDGEABLE` against that file, so none of

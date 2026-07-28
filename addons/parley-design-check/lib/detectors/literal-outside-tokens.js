@@ -7,7 +7,14 @@
  * a literal where it bypasses the layer. The governed set is deliberately narrow — colour,
  * the spacing family, type size and radius — because a rule that fires on every hairline
  * border teaches a reader to stop reading it.
+ *
+ * The property and the value are matched as the declaration spells them, never as the file
+ * writes them: `col\6fr: #ff0000`, `color: #\66 f0000`, `color: \72 ed` and
+ * `border-radius: 11p\78` are all values a browser applies and all invisible to a regular
+ * expression over the raw text. The message carries the written spelling beside the spelled
+ * value, because that is what a reader has to search the file for.
  */
+const { asWritten } = require("../css.js");
 
 const COLOUR_PROPS = /^(color|background|background-color|border(-(top|right|bottom|left))?-color|outline-color|fill|stroke|caret-color|text-decoration-color|box-shadow|accent-color)$/;
 const SPACE_PROPS = /^(margin|padding)(-(top|right|bottom|left|inline|block)(-(start|end))?)?$|^(gap|row-gap|column-gap|inset)$/;
@@ -54,7 +61,7 @@ module.exports = {
             verdict: "VIOLATION",
             path: style.path,
             line: declaration.line,
-            violation: `${block.selector} sets ${declaration.prop} to the ${kind} literal ${literal}`,
+            violation: `${block.selector} sets ${declaration.prop} to the ${kind} literal ${literal}${asWritten(declaration)}`,
             remedy: "reference an existing token, or add the step to the contract and reference that; a literal leaves no trace for any other check to read"
           });
         }

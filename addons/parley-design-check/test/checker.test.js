@@ -16,7 +16,7 @@ const path = require("node:path");
 
 const { loadDetectors, runCheck } = require("../lib/engine.js");
 const { parseYamlSubset } = require("../lib/registry.js");
-const { parseStylesheet, scanStylesheet, stripComments } = require("../lib/css.js");
+const { parseStylesheet, scanStylesheet, stripComments, varUses } = require("../lib/css.js");
 
 const ADDON_ROOT = path.resolve(__dirname, "..");
 const DETECTORS_DIR = path.join(ADDON_ROOT, "lib", "detectors");
@@ -1236,19 +1236,24 @@ test("a brace inside an unquoted url() is text, and the declarations after it ar
 });
 
 /*
- * The fail-safe, and then the two constructs it was built beside.
+ * The fail-safe, and then the constructs it was built beside.
  *
  * A hidden declaration is the whole failure mode of this family: the scanner returns fewer
  * declarations than the browser applies, every detector reports nothing against the ones it
- * never saw, and the file is certified clean. Five members have now been found one at a time,
- * each by a probe, so the sixth is a matter of when and not whether. `HIDDEN_BY_A_CONSTRUCT`
- * is one this scanner still reads wrong: CSS consumes `(` as a simple block, so the `}` inside
- * it is part of the value and `color: #ff0000` is a declaration a browser applies, while the
- * scanner ends the declaration at the brace, leaves the rule, and drops the literal. The
- * checker must not report that file as clean — not because it knows this construct, but
- * because it knows it could not tokenise the file.
+ * never saw, and the file is certified clean. Seven members have now been found one at a time,
+ * each by a probe, so the eighth is a matter of when and not whether — which is what the
+ * fail-safe is for, and what this test holds it to.
+ *
+ * `HIDDEN_BY_A_CONSTRUCT` is a file the scanner and a browser read differently and the scanner
+ * can tell: the second `)` closes nothing, so a browser throws the whole declaration away
+ * (css-syntax-3 §2.2 seeks the next `;`) while the scanner reads it as a declaration whose
+ * value ends where it guessed. Neither reading is the other's, and the checker must not report
+ * that file as clean — not because it knows this construct, but because it knows it could not
+ * tokenise the file. The brace inside the function is no longer part of what it cannot read:
+ * `image-set(a} b)` is one value now (see the matched-bracket test below), and it is left in
+ * here so a regression in that reading would show up as a second unreadable reason.
  */
-const HIDDEN_BY_A_CONSTRUCT = [".tile {", "  background: image-set(a} b);", "  color: #ff0000;", "}", ""].join("\n");
+const HIDDEN_BY_A_CONSTRUCT = [".tile {", "  grid-area: image-set(a} b));", "  --stripe: #ff0000;", "}", ""].join("\n");
 
 test("a stylesheet the scanner cannot tokenise is reported unreadable, and no rule that read it can pass", (t) => {
   // The control first: the same directory without the untokenisable file is a clean pass, so
@@ -1305,8 +1310,19 @@ test("each construct the scanner cannot tokenise is named, and one sinks a level
     [".a { background: url(sprite.svg", /an unquoted url\(\) token opened at line 1 is still open at end of file/],
     [".a { color: var(--x);\n", /1 block opened and never closed, the outermost at line 1/],
     [".a { color: var(--x); } }\n", /the closing brace at line 1 closes no block/],
-    [".a { background: linear-gradient(90deg, red; }\n", /does not balance its parentheses/],
-    [".a { color var(--x); }\n", /is not a declaration this scanner can read/]
+    // A function opened and never closed is a block open at end of input, which is what the
+    // matched-bracket stack makes of it — a browser ends it at end of input too, and applies
+    // nothing after it (§5.4.7). Everything from the `(` on is text no detector ever saw.
+    [".a { background: linear-gradient(90deg, red; }\n", /2 blocks opened and never closed, the outermost at line 1/],
+    // A closer that matches no opener is a component value to a browser, which then throws the
+    // whole declaration away; the scanner keeps it, so the two readings of the file differ and
+    // the difference is reported rather than certified over.
+    [".a { background: rgb(0, 0, 0)); }\n", /does not balance its parentheses/],
+    [".a { color var(--x); }\n", /is not a declaration this scanner can read/],
+    // The two escapes this scanner will not decode: one it cannot classify (§4.3.8) and one
+    // inside a string that spells a code point the consumers of a value split on.
+    [".a { color: var(--x)\\\n; }\n", /escapes nothing this scanner can read/],
+    ['.a { font-family: "Foo\\2c Bar"; }\n', /carries a string escape spelling ",", which this scanner will not decode/]
   ];
   for (const [source, expected] of signals) {
     const reasons = scanStylesheet(source).unreadable;
@@ -1406,7 +1422,10 @@ test("an escaped brace is part of the ident, and the declarations after it are s
     ["font-family", "color"],
     "a declaration after an escaped brace was lost"
   );
-  assert.equal(value[0].declarations[0].value, "A\\}B", "the escape was cut out of the value");
+  // Both spellings survive: the file's, so a reader can find it, and the browser's, so every
+  // detector matches what is applied rather than what is typed.
+  assert.equal(value[0].declarations[0].rawValue, "A\\}B", "the escape was cut out of the value");
+  assert.equal(value[0].declarations[0].value, "A}B", "the escape was not decoded into what it spells");
 
   const selector = parseStylesheet(".a\\} { color: #ff0000; }");
   assert.equal(selector.length, 1, "an escaped brace in a selector opened or closed a block");
@@ -1416,8 +1435,12 @@ test("an escaped brace is part of the ident, and the declarations after it are s
   // The same rule reaches the other code points that carry structure: an escaped colon divides
   // no declaration, and an escaped quote opens no string.
   assert.deepEqual(
-    parseStylesheet(".a { grid-area: a\\:b; color: #ff0000; }")[0].declarations.map((d) => `${d.prop}=${d.value}`),
+    parseStylesheet(".a { grid-area: a\\:b; color: #ff0000; }")[0].declarations.map((d) => `${d.rawProp}=${d.rawValue}`),
     ["grid-area=a\\:b", "color=#ff0000"]
+  );
+  assert.deepEqual(
+    parseStylesheet(".a { grid-area: a\\:b; color: #ff0000; }")[0].declarations.map((d) => `${d.prop}=${d.value}`),
+    ["grid-area=a:b", "color=#ff0000"]
   );
   assert.deepEqual(
     parseStylesheet('.a { content: \\"; color: #ff0000; }')[0].declarations.map((d) => d.prop),
@@ -1438,7 +1461,345 @@ test("an escaped brace is part of the ident, and the declarations after it are s
   );
 });
 
-test("the five constructs of this family are all still read, together", () => {
+/*
+ * Round-04 codex-1, filed exactly as the probe was filed: the sixth member of the family, and
+ * the first to get past the fail-safe as well as past the scanner.
+ *
+ * CSS decodes an ident's escapes before it decides what token the ident opens (§4.3.7, §4.3.4),
+ * so `u\72l(` is the `url` ident and everything after its `(` is url content up to the closing
+ * `)` (§4.3.6). Chromium closed the url at that paren and applied `color: #ff0000`; the comment
+ * stripper recognised only a literal `url(`, opened a comment at the delimiter inside the url
+ * token, blanked through the closing delimiter that came after the colour, and deleted the
+ * declaration. What was left balanced its parentheses and braces, so the scanner recorded no
+ * reason it could not read the file: `check --level L3 --json` returned verdict PASS, exit 0,
+ * verified L3, an empty unreadable list and no raw-literal finding, over a stylesheet whose
+ * CSSOM was `.probe { background: url("a/*"); color: rgb(255, 0, 0); }`.
+ */
+const ESCAPED_URL_IDENT = [".probe {", "  background: u\\72l(a/*) ; color: #ff0000; */b);", "}", ""].join("\n");
+
+// The passing control the counter-proposal asks for beside it: ordinary escaped selectors are
+// not this construct, and decoding escapes must not turn a utility class into a finding.
+const ESCAPED_SELECTORS = [
+  "/* Escaped selectors of the kind a utility framework emits, and one escaped ident that",
+  "   spells something other than url. Every governed value resolves through the token layer. */",
+  ".md\\:flex { display: flex; }",
+  ".w-\\[10px\\] { color: var(--color-text-body); }",
+  ".\\32 xl\\:block { display: block; }",
+  ".u\\72 lish { background-color: var(--color-surface-page); }",
+  ".panel { grid-template: fn(a, {b: c}); padding: var(--space-gap-md); }",
+  ""
+].join("\n");
+
+test("an escaped spelling of the url ident opens the same token, and hides nothing", (t) => {
+  // The scanner half. An escaped `url` opens a url token, so a brace inside that token is
+  // ordinary text and the declaration after it is still read.
+  const blocks = parseStylesheet(".a { background: u\\72l(a}b); color: #ff0000; }");
+  assert.equal(blocks.length, 1, "an escaped url ident let a brace inside the token close a block");
+  assert.deepEqual(
+    blocks[0].declarations.map((declaration) => declaration.prop),
+    ["background", "color"],
+    "a declaration after an escaped url ident was lost"
+  );
+  assert.equal(blocks[0].declarations[0].rawValue, "u\\72l(a}b)", "the url token was cut short");
+  // §4.3.4 decides the token's class on what the ident spells, and so does every detector now.
+  assert.equal(blocks[0].declarations[0].value, "url(a}b)", "the escaped url ident was not decoded");
+
+  // §4.3.7: a hex escape takes up to six digits and one trailing whitespace with it, and the
+  // token test is on what the ident spells — case-insensitively — never on how it is written.
+  for (const spelling of ["\\75 rl", "U\\52 L", "\\75\\72\\6c"]) {
+    assert.deepEqual(
+      parseStylesheet(`.a { background: ${spelling}(a}b); color: #ff0000; }`)[0].declarations.map((d) => d.prop),
+      ["background", "color"],
+      `${spelling} was not read as the url ident`
+    );
+  }
+  // And an escaped ident that spells something else opens no url token, exactly as `myurl(`
+  // does not: the escape is read, and then it is read as what it says.
+  assert.deepEqual(
+    parseStylesheet(".a { background: my\\75 rl(a); color: #ff0000; }")[0].declarations.map((d) => `${d.rawProp}=${d.rawValue}`),
+    ["background=my\\75 rl(a)", "color=#ff0000"]
+  );
+  assert.deepEqual(
+    parseStylesheet(".a { background: my\\75 rl(a); color: #ff0000; }")[0].declarations.map((d) => `${d.prop}=${d.value}`),
+    ["background=myurl(a)", "color=#ff0000"]
+  );
+
+  /*
+   * End to end, on the run that verifies, with codex-1's probe byte for byte. Its counter-
+   * proposal fixes what the run must produce: the raw-literal violation, or unreadable and
+   * UNJUDGEABLE with exit 4. A clean pass is the failure this test exists to catch.
+   */
+  const run = mutatedRun(t, [{ file: "probe.css", write: ESCAPED_URL_IDENT }]);
+  const report = check(run, { level: "L3" });
+  const raw = report["findings-detail"].filter(
+    (entry) => entry.rule === "core:literal-outside-token-layer" && /probe\.css/.test(entry.path || "")
+  );
+  const unreadable = report.inputs.unreadable.filter((entry) => /probe\.css/.test(entry));
+  assert.ok(
+    raw.length > 0 || unreadable.length > 0,
+    `the escaped url ident hid its colour from the detectors and from the fail-safe both: ${JSON.stringify(report)}`
+  );
+  assert.ok(
+    raw.some((entry) => /\.probe sets color to the colour literal #ff0000/.test(entry.violation)),
+    `the colour a browser applies to .probe was not reported: ${report.findings.join(" | ")}`
+  );
+  assert.notEqual(report.verdict, "PASS", "a stylesheet hiding an applied colour was certified clean");
+  assert.notEqual(report.exit, 0, "a run over a hidden applied colour exited clean");
+  assert.equal(report.level.verified, null, "L3 was verified over a declaration no detector saw");
+  // The process exit is what CI gates on, so the refusal has to reach it.
+  assert.notEqual(cli(["--level", "L3", run]).status, 0, "the CLI exited clean over the probe");
+
+  // The control: reading escapes properly must not manufacture findings against ordinary CSS.
+  const control = mutatedRun(t, [{ file: "escaped-selectors.css", write: ESCAPED_SELECTORS }]);
+  const clean = check(control, { level: "L3" });
+  assert.deepEqual(clean.inputs.unreadable, [], "an ordinary escaped selector was reported unreadable");
+  assert.deepEqual(
+    clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+    [],
+    "an ordinary escaped selector raised a finding"
+  );
+  assert.equal(clean.verdict, "PASS");
+  assert.equal(clean.exit, 0);
+  assert.equal(clean.level.verified, "L3");
+});
+
+/*
+ * Round-04 kimi-1, CRITICAL, filed with its three reproducers.
+ *
+ * css-syntax-3 §5.4 makes `(`, `[` and `{` matched simple blocks: a brace inside a function or a
+ * bracket is a component value, never rule structure. The scanner read `{` and `}` as structure
+ * wherever they appeared, so any function carrying a brace closed the rule early, everything
+ * between there and the next `{` was dropped as top-level text, and that `{` opened a phantom
+ * block. One re-balancing brace left every residue check quiet — each flushed fragment balanced
+ * its own parentheses while the structure between flushes was wrong — so all three of these
+ * returned `verified L3`, PASS, exit 0 and `unreadable: []` while a browser applied the colour.
+ * ev2 needs no escape and no malformed input: it is ordinary CSS any minifier can emit.
+ */
+const BRACE_IN_A_BLOCK = {
+  "ev1 an escaped url ident": ".a { background: x) \\75 rl(}y); color: #ff0000; dummy: z) \\75 rl({w: (1); }\n",
+  "ev2 an ordinary function": ".a { background: x) fn(}y); color: #ff0000; dummy: z) fn({w: (1); }\n",
+  "ev3 url and a space": ".a { background: x) url (}y); color: #ff0000; dummy: z) url ({w: (1); }\n"
+};
+
+test("a brace inside a function or a bracket is content, and the declaration after it is still read", (t) => {
+  // The scanner half, on all three reproducers: one rule, and the colour a browser applies is
+  // in it. Before the matched-bracket stack each of these returned two blocks — `.a` without
+  // its colour, and a phantom whose selector was the text the scanner had dropped.
+  for (const [name, source] of Object.entries(BRACE_IN_A_BLOCK)) {
+    const blocks = parseStylesheet(source);
+    assert.deepEqual(blocks.map((block) => block.selector), [".a"], `${name} opened or closed a block`);
+    assert.ok(
+      blocks[0].declarations.some((d) => d.prop === "color" && d.value === "#ff0000"),
+      `${name} hid the colour a browser applies: ${JSON.stringify(blocks[0].declarations)}`
+    );
+  }
+
+  // The same shape without the re-balancing brace, and the bracket form of it. A `[` opens a
+  // simple block too, so a brace inside an attribute selector or a track list is content.
+  for (const source of [
+    ".a { background: image-set(a} b); color: #ff0000; }",
+    ".a { background: linear-gradient(to top, red } blue); color: #ff0000; }",
+    ".a { grid-template-columns: [a}b] 1fr; color: #ff0000; }",
+    ".a { background: u\\72l/*x*/(a}b); color: #ff0000; }"
+  ]) {
+    const blocks = parseStylesheet(source);
+    assert.equal(blocks.length, 1, `a brace inside a block opened or closed a rule: ${source}`);
+    assert.ok(
+      blocks[0].declarations.some((d) => d.prop === "color" && d.value === "#ff0000"),
+      `a declaration after a brace inside a block was lost: ${source}`
+    );
+  }
+
+  // The seventh construct beside the six the combined test carries, so a fix for it cannot cost
+  // one of them: every rule below is read, and none of them is reported unreadable.
+  const together = [
+    '.one::before { content: "}"; color: #ff0000; }',
+    ".three { background: url(a}b); color: #ff0000; }",
+    ".five { font-family: A\\}B; color: #ff0000; }",
+    ".six { background: u\\72l(a}b); color: #ff0000; }",
+    ".seven { background: fn(a}b); color: #ff0000; }"
+  ].join("\n");
+  const scan = scanStylesheet(together);
+  assert.deepEqual(
+    scan.blocks.map((block) => block.selector),
+    [".one::before", ".three", ".five", ".six", ".seven"],
+    "one of the seven constructs closed a block the stylesheet never closed"
+  );
+  assert.deepEqual(scan.unreadable, [], "a readable stylesheet was reported unreadable");
+
+  /*
+   * The passing side kimi-1 asks for beside them. A `{…}` inside a function is a value, a `;`
+   * inside one is a preserved token and not a declaration edge, and a closer that matches no
+   * opener is a component value a browser hands to the declaration and then throws away — the
+   * scanner keeps reading the file at all three, and reports nothing it did not have to.
+   */
+  const control = scanStylesheet(".a { grid-template: var(--x, {a: b}); transition: fn(1;2); color: var(--y); }\n");
+  assert.deepEqual(control.blocks.map((block) => block.selector), [".a"]);
+  assert.deepEqual(
+    control.blocks[0].declarations.map((d) => d.prop),
+    ["grid-template", "transition", "color"],
+    "a brace or a semicolon inside a function was read as structure"
+  );
+  assert.deepEqual(control.unreadable, [], "an ordinary function value was reported unreadable");
+  assert.deepEqual(
+    parseStylesheet("@media (min-width: 40em) { .a[data-x] { color: var(--y); } }").map((b) => b.selector),
+    [".a[data-x]"],
+    "the bracket stack swallowed an at-rule prelude or an attribute selector"
+  );
+
+  /*
+   * End to end, on the run that verifies. kimi-1's counter-proposal fixes what each must
+   * produce: the finding, or unreadable and UNJUDGEABLE. A clean pass is the failure.
+   */
+  for (const [name, source] of Object.entries(BRACE_IN_A_BLOCK)) {
+    const run = mutatedRun(t, [{ file: "probe.css", write: source }]);
+    const report = check(run, { level: "L3" });
+    const raw = report["findings-detail"].filter(
+      (entry) => entry.rule === "core:literal-outside-token-layer" && /probe\.css/.test(entry.path || "")
+    );
+    const unreadable = report.inputs.unreadable.filter((entry) => /probe\.css/.test(entry));
+    assert.ok(
+      raw.length > 0 || unreadable.length > 0,
+      `${name} hid its colour from the detectors and from the fail-safe both: ${JSON.stringify(report)}`
+    );
+    assert.ok(
+      raw.some((entry) => /\.a sets color to the colour literal #ff0000/.test(entry.violation)),
+      `${name}: the colour a browser applies to .a was not reported: ${report.findings.join(" | ")}`
+    );
+    assert.notEqual(report.verdict, "PASS", `${name} certified a stylesheet hiding an applied colour`);
+    assert.notEqual(report.exit, 0, `${name} exited clean over a hidden applied colour`);
+    assert.equal(report.level.verified, null, `${name} verified L3 over a declaration no detector saw`);
+    // The process exit is what CI gates on, so the refusal has to reach it.
+    assert.notEqual(cli(["--level", "L3", run]).status, 0, `${name}: the CLI exited clean over the probe`);
+  }
+});
+
+/*
+ * Round-04, found while closing the escaped-url evasion and verified against headless Chromium.
+ *
+ * The scanner tokenises escapes correctly and the fail-safe correctly stays quiet — and the
+ * certificate was still false one layer up, because every detector matched the RAW text of a
+ * declaration while a browser matches the DECODED one. `literal-outside-tokens` regexes
+ * `#[0-9a-fA-F]{3,8}` and never sees `#\66 f0000`; the governed-property test never sees
+ * `col\6fr` as `color`. Each of the four below, dropped beside the sound run at `--level L3`,
+ * returned PASS, exit 0, verified L3, an empty unreadable list and zero findings while Chromium
+ * computed the value in the second column. This is generic to all eighteen detectors.
+ */
+const SPELLED_NOT_WRITTEN = [
+  ["an escaped hex colour", "color: #\\66 f0000", /sets color to the colour literal #ff0000/, "rgb(255, 0, 0)"],
+  ["an escaped property name", "col\\6fr: #ff0000", /sets color to the colour literal #ff0000/, "rgb(255, 0, 0)"],
+  ["an escaped named colour", "color: \\72 ed", /sets color to the colour literal red/, "red"],
+  ["an escaped unit", "border-radius: 11p\\78", /sets border-radius to the size literal 11px/, "11px"]
+];
+
+test("a declaration is matched as it spells, not as it is written", (t) => {
+  // The scanner half: both spellings come back, and the spelled one is what a browser computes.
+  const decoded = (source) => parseStylesheet(`.probe { ${source}; }`)[0].declarations[0];
+  assert.equal(decoded("color: #\\66 f0000").value, "#ff0000");
+  assert.equal(decoded("color: #\\66 f0000").rawValue, "#\\66 f0000");
+  assert.equal(decoded("col\\6fr: #ff0000").prop, "color");
+  assert.equal(decoded("col\\6fr: #ff0000").rawProp, "col\\6fr");
+  assert.equal(decoded("color: \\72 ed").value, "red");
+  assert.equal(decoded("border-radius: 11p\\78").value, "11px");
+  // Case-insensitively, in every escape form §4.3.7 allows, and on the custom-property prefix
+  // the token layer is recognised by.
+  assert.equal(decoded("color: \\52 \\45 D").value, "RED");
+  assert.equal(decoded("\\2d\\2d brand: #ff0000").prop, "--brand");
+  // A hex escape takes up to six digits, so the digits of the next word are its digits too:
+  // `\2d\2dbrand` spells `-˛rand` in a browser and has to spell it here.
+  assert.equal(decoded("\\2d\\2dbrand: #ff0000").prop, "-˛rand");
+
+  /*
+   * A string's contents are decoded only as far as they can be decoded safely. `"\49 nter"` is
+   * `Inter` to a browser, and the face rules have to read it as `Inter` or no allowlist and no
+   * annex will ever match it. An escape spelling a code point the consumers of a value split on
+   * — a comma, a quote, a backslash — would corrupt the value instead, so the string is left as
+   * written and the file goes to the fail-safe rather than to a detector that cannot trust it.
+   */
+  assert.equal(decoded('font-family: "\\49 nter"').value, '"Inter"');
+  assert.deepEqual(scanStylesheet('.a { font-family: "\\49 nter"; }').unreadable, []);
+  const corrupting = scanStylesheet('.a { font-family: "Foo\\2c Bar"; }');
+  assert.equal(corrupting.blocks[0].declarations[0].value, '"Foo\\2c Bar"', "a comma was decoded into a value");
+  assert.match(corrupting.unreadable.join(" | "), /string escape spelling ","/);
+  // And a url token's contents stay as written, so a decoded `\29` cannot put a `)` in a value.
+  assert.equal(decoded("background: u\\72l(a\\29 b)").value, "url(a\\29 b)");
+
+  /*
+   * The same defect one layer out, found while closing the four above: `var()` references were
+   * matched by a regular expression over the raw line. Chromium resolves `\76 ar(--nope)` and
+   * `var(\2d\2d nope)` alike — the fallback in `.probe { grid-area: \76 ar(--nope, #ff0000) }`
+   * computes to `rgb(255, 0, 0)` — while `core:token-used-undeclared` reported nothing and the
+   * run certified L3 with PASS and exit 0. The fail-safe never sees this one: the file
+   * tokenises, so `unreadable` is correctly empty.
+   */
+  assert.deepEqual(
+    varUses(".probe { grid-area: \\76 ar(--nope); }").map((use) => use.name),
+    ["--nope"],
+    "an escaped var ident hid a reference to an undeclared token"
+  );
+  assert.deepEqual(
+    varUses(".probe { grid-area: var(\\2d\\2d nope); }").map((use) => use.name),
+    ["--nope"],
+    "an escaped custom-property name hid a reference to an undeclared token"
+  );
+  // And the line numbers, and the ordinary lines beside them, survive the decoding.
+  assert.deepEqual(
+    varUses(".md\\:flex { color: var(--a); }\n.b { color: var(--c); }").map((use) => `${use.name}@${use.line}`),
+    ["--a@1", "--c@2"]
+  );
+  for (const source of ["grid-area: \\76 ar(--nope);", "grid-area: var(\\2d\\2d nope);"]) {
+    const run = mutatedRun(t, [{ file: "probe.css", write: `.probe {\n  ${source}\n}\n` }]);
+    const report = check(run, { level: "L3" });
+    assert.ok(
+      report["findings-detail"].some(
+        (entry) => entry.rule === "core:token-used-undeclared" && /references --nope/.test(entry.violation)
+      ),
+      `${source}: the reference a browser resolves was not reported: ${report.findings.join(" | ")}`
+    );
+    assert.notEqual(report.verdict, "PASS", `${source} certified a reference to an undeclared token`);
+    assert.equal(report.level.verified, null, `${source} verified L3 over a reference no rule saw`);
+  }
+
+  /*
+   * End to end, on the run that verifies, one file per reproducer. Each must produce the
+   * finding, or unreadable and UNJUDGEABLE; a clean pass is the failure this test exists to
+   * catch. The message names the value a browser applies and the spelling the file carries,
+   * because the second is what a reader has to search for.
+   */
+  for (const [name, source, expected] of SPELLED_NOT_WRITTEN) {
+    const run = mutatedRun(t, [{ file: "probe.css", write: `.probe {\n  ${source};\n}\n` }]);
+    const report = check(run, { level: "L3" });
+    const found = report["findings-detail"].filter((entry) => /probe\.css/.test(entry.path || ""));
+    const unreadable = report.inputs.unreadable.filter((entry) => /probe\.css/.test(entry));
+    assert.ok(
+      found.length > 0 || unreadable.length > 0,
+      `${name} was invisible to every detector and to the fail-safe both: ${JSON.stringify(report)}`
+    );
+    assert.ok(
+      found.some((entry) => entry.rule === "core:literal-outside-token-layer" && expected.test(entry.violation)),
+      `${name}: the value a browser applies was not reported: ${report.findings.join(" | ")}`
+    );
+    assert.ok(
+      found.some((entry) => entry.violation.includes(`(written \`${source}\`)`)),
+      `${name}: the finding did not name the spelling the file carries: ${report.findings.join(" | ")}`
+    );
+    assert.notEqual(report.verdict, "PASS", `${name} certified a stylesheet carrying an applied literal`);
+    assert.notEqual(report.exit, 0, `${name} exited clean over an applied literal`);
+    assert.equal(report.level.verified, null, `${name} verified L3 over a literal no detector saw`);
+    assert.notEqual(cli(["--level", "L3", run]).status, 0, `${name}: the CLI exited clean over the probe`);
+  }
+
+  // The control, once: decoding must not manufacture a finding out of ordinary escaped CSS.
+  const control = mutatedRun(t, [{ file: "escaped-selectors.css", write: ESCAPED_SELECTORS }]);
+  const clean = check(control, { level: "L3" });
+  assert.deepEqual(clean.inputs.unreadable, [], "an ordinary escaped selector was reported unreadable");
+  assert.deepEqual(clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`), []);
+  assert.equal(clean.verdict, "PASS");
+  assert.equal(clean.exit, 0);
+  assert.equal(clean.level.verified, "L3");
+});
+
+test("the six constructs of this family are all still read, together", () => {
   // Every member found so far, in one file: a fix for the newest must not cost an older one.
   const source = [
     '.one::before { content: "}"; color: #ff0000; }',
@@ -1446,15 +1807,16 @@ test("the five constructs of this family are all still read, together", () => {
     " color: #ff0000; }",
     ".three { background: url(a}b); color: #ff0000; }",
     ".four { background: url(a/*b); color: #ff0000; }",
-    ".five { font-family: A\\}B; color: #ff0000; }"
+    ".five { font-family: A\\}B; color: #ff0000; }",
+    ".six { background: u\\72l(a}b); color: #ff0000; }"
   ].join("\n");
   const blocks = parseStylesheet(source);
   assert.deepEqual(
     blocks.map((block) => block.selector),
-    [".one::before", ".two::before", ".three", ".four", ".five"],
-    "one of the five constructs closed a block the stylesheet never closed"
+    [".one::before", ".two::before", ".three", ".four", ".five", ".six"],
+    "one of the six constructs closed a block the stylesheet never closed"
   );
-  for (const selector of [".one::before", ".three", ".four", ".five"]) {
+  for (const selector of [".one::before", ".three", ".four", ".five", ".six"]) {
     const block = blocks.find((candidate) => candidate.selector === selector);
     assert.ok(
       block.declarations.some((declaration) => declaration.prop === "color" && declaration.value === "#ff0000"),

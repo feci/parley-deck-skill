@@ -14,7 +14,7 @@
  * whether it reaches this element is a cascade question, and the cascade is above this tier.
  */
 
-const { selectorBase } = require("../css.js");
+const { asWritten, selectorBase } = require("../css.js");
 
 const INDICATOR = new Set(["outline", "outline-color", "outline-width", "outline-style", "outline-offset", "box-shadow"]);
 const REPLACEMENT = new Set(["box-shadow", "border", "border-color", "border-width", "border-bottom", "outline", "outline-width", "outline-color", "background-color", "text-decoration"]);
@@ -109,7 +109,7 @@ module.exports = {
             verdict: "VIOLATION",
             path: style.path,
             line: indicator.line,
-            violation: `${block.selector} gives the focus indicator (${indicator.prop}) a transition or an animation`,
+            violation: `${block.selector} gives the focus indicator (${indicator.prop}) a transition or an animation${asWritten(indicator)}`,
             remedy: "let focus indication appear in the same frame focus moves; exclude it from the element's transition list"
           });
         }

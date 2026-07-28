@@ -10,6 +10,7 @@
  */
 
 const fs = require("node:fs");
+const { asWritten } = require("../css.js");
 
 const SEPARATOR = "·";
 
@@ -88,7 +89,7 @@ module.exports = {
             verdict: "VIOLATION",
             path: style.path,
             line: declaration.line,
-            violation: `${block.selector} takes "${face}" as its primary face, which the annex records as an unprompted default`,
+            violation: `${block.selector} takes "${face}" as its primary face, which the annex records as an unprompted default${asWritten(declaration)}`,
             remedy: "record in the contract why this face and not its nearest alternative; the record satisfies the rule, the name does not"
           });
         }
