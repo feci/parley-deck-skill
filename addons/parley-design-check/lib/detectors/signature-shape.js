@@ -67,6 +67,8 @@ module.exports = {
           verdict: "VIOLATION",
           path: direction.path,
           line: 0,
+          // The declared value G1's sharing test is defined over: the Signature phrase.
+          evidence: signature,
           violation: `the Signature is a mood and cannot be violated: "${signature}"`,
           remedy: "rewrite it as a commitment with a cost, so at least one otherwise attractive option is closed"
         });

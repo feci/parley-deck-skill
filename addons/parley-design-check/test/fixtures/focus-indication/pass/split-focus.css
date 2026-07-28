@@ -1,0 +1,12 @@
+/*
+ * The conforming idiom: the default outline is removed on the element and the replacement
+ * is declared in that element's own focus rule, one block further down the file.
+ */
+button {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}

@@ -51,6 +51,8 @@ module.exports = {
           verdict: "VIOLATION",
           path: artifact.path,
           line: 0,
+          // The declared value G1's sharing test is defined over: the effects entry itself.
+          evidence: name,
           violation: `declares the device "${name || "(unnamed)"}" with no anchor`,
           remedy: "state what it refers to and what changes about it when the content changes, or remove the device"
         });

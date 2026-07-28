@@ -26,7 +26,9 @@ because the intellectual debt is real and worth stating.
 ## Standards referenced
 
 - [W3C Design Tokens Community Group format](https://tr.designtokens.org/format/) — the
-  token interchange format the design add-on adopts.
+  token interchange format the design add-on adopts. `DTCG 2025.10`, as the doctrine pins
+  it, names that editor's draft as of October 2025; the DTCG has published no formal
+  versioned release, so the string is a date pin, not a W3C Recommendation.
 - [W3C WCAG 2.2](https://www.w3.org/TR/WCAG22/) — the accessibility thresholds treated as
   blocking in the web annex.
 - [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) / [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)

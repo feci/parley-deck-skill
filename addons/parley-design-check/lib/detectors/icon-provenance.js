@@ -6,20 +6,25 @@
  * Sources are read off imports, sprite references and icon-font class prefixes. An emoji
  * counts only where it is the whole content of an element — an emoji inside a sentence is
  * copy, an emoji alone in a span is a drawing the reader's platform supplies.
+ *
+ * Each import canonicalises to exactly one source id: the named recognisers are tried
+ * against the imported specifier first, and the generic fallback only names a package no
+ * recogniser knows. One Heroicons import is one source, not a mixture of two.
  */
 
 const { eachLine } = require("../css.js");
 
-const SOURCES = [
-  { name: "imported icon package", test: /from\s+["']([@\w./-]*icons?[\w./-]*)["']/i, capture: 1 },
+const NAMED = [
   { name: "lucide", test: /\blucide(-react|-vue|-svelte)?\b/ },
   { name: "heroicons", test: /@heroicons\// },
   { name: "phosphor", test: /@phosphor-icons\// },
   { name: "font-awesome", test: /\bfa[srlbd]?-[a-z0-9-]+\b|@fortawesome\// },
   { name: "bootstrap-icons", test: /\bbi-[a-z0-9-]+\b/ },
-  { name: "material-icons", test: /\bmaterial-icons\b|@mui\/icons/ },
-  { name: "svg sprite", test: /<use\s[^>]*(xlink:)?href=["']([^"'#]*#?[\w./-]+)["']/i }
+  { name: "material-icons", test: /\bmaterial-icons\b|@mui\/icons/ }
 ];
+
+const IMPORT = /from\s+["']([@\w./-]*icons?[\w./-]*)["']/i;
+const SPRITE = /<use\s[^>]*(xlink:)?href=["']([^"'#]*#?[\w./-]+)["']/i;
 
 const EMOJI_ALONE = /<(span|i|div|p|em|strong)\b[^>]*>\s*(\p{Extended_Pictographic}[\uFE0F\u200D\p{Extended_Pictographic}]*)\s*<\/\1>/u;
 
@@ -33,12 +38,22 @@ module.exports = {
     const results = [];
     for (const source of ctx.markup) {
       eachLine(source.text, (content, line) => {
-        for (const candidate of SOURCES) {
-          const match = candidate.test.exec(content);
-          if (!match) continue;
-          const key = candidate.capture ? `${candidate.name}:${match[candidate.capture]}` : candidate.name;
+        const record = (key) => {
           if (!found.has(key)) found.set(key, { path: source.path, line });
+        };
+        const imported = IMPORT.exec(content);
+        // The specifier decides which source it is; only a package no recogniser knows
+        // falls through to the generic id, so one import never counts twice.
+        const named = NAMED.filter((candidate) => candidate.test.test(imported ? imported[1] : ""));
+        if (imported) {
+          if (named.length > 0) named.forEach((candidate) => record(candidate.name));
+          else record(`imported icon package:${imported[1]}`);
         }
+        for (const candidate of NAMED) {
+          const rest = imported ? content.replace(imported[0], " ") : content;
+          if (candidate.test.test(rest)) record(candidate.name);
+        }
+        if (SPRITE.test(content)) record("svg sprite");
         const emoji = EMOJI_ALONE.exec(content);
         if (emoji) {
           if (!found.has("emoji")) found.set("emoji", { path: source.path, line });

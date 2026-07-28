@@ -8,10 +8,13 @@
  * and it carries no copy of their content: nothing here knows a rule id, a threshold or a
  * face name. If the registry is absent, this module reports that; it never substitutes.
  *
- * The YAML subset below is deliberately tiny. A `pds-rule` block is flat key/value, and a
- * PDS artifact's frontmatter adds inline lists, inline maps and block lists of those. Any
- * construct outside that subset raises — a parser that guesses at YAML it does not
- * implement is how a registry silently loses a rule.
+ * The YAML subset below is not this parser's invention: it is the canonical frontmatter
+ * subset PDS §2 rule 5 ratifies, implemented line for line. A `pds-rule` block is the flat
+ * part of it; a PDS artifact's frontmatter adds flow lists, flow maps and block lists of
+ * those, nested no deeper than a flow collection holding flow collections holding scalars.
+ * Any construct outside that subset raises — a parser that guesses at YAML it does not
+ * implement is how a registry silently loses a rule, and a parser that accepts more than
+ * the spec publishes is how the published examples stop being the contract.
  *
  * Node built-ins only. No network, at read time or any other time.
  */
@@ -29,8 +32,10 @@ class CheckError extends Error {
 
 /* ------------------------------------------------------------ YAML subset */
 
-const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_.-]*):(?:[ \t]+(.*))?$/;
-const MAX_INLINE_DEPTH = 3;
+const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_.-]*):(?: +(.*))?$/;
+// PDS §2 rule 5: "a flow collection may hold flow collections; those hold scalars only".
+// A collection reached at this depth is one level past what the spec publishes.
+const MAX_FLOW_DEPTH = 2;
 
 // Split on commas that are not inside quotes or brackets. Used for both inline
 // lists and inline maps, so an unbalanced bracket fails here rather than later.
@@ -84,7 +89,11 @@ function parseScalar(raw, where) {
 
 function parseInline(raw, where, depth = 0) {
   const text = raw.trim();
-  if (depth > MAX_INLINE_DEPTH) throw new CheckError(`${where}: nesting deeper than this parser accepts`);
+  if ((text.startsWith("[") || text.startsWith("{")) && depth >= MAX_FLOW_DEPTH) {
+    throw new CheckError(
+      `${where}: nesting deeper than the canonical frontmatter subset allows: ${JSON.stringify(text)}`
+    );
+  }
   if (text.startsWith("[")) {
     if (!text.endsWith("]")) throw new CheckError(`${where}: list is not closed: ${JSON.stringify(text)}`);
     const inner = text.slice(1, -1).trim();
@@ -144,6 +153,7 @@ function parseYamlSubset(text, where, { flatOnly = false } = {}) {
   while (index < lines.length) {
     const line = lines[index];
     const at = `${where} line ${index + 1}`;
+    if (line.includes("\t")) throw new CheckError(`${at}: a tab, which the canonical subset never uses`);
     if (line.trim() === "" || /^\s*#/.test(line)) {
       index += 1;
       continue;
@@ -174,12 +184,15 @@ function parseYamlSubset(text, where, { flatOnly = false } = {}) {
     index += 1;
     while (index < lines.length) {
       const itemLine = lines[index];
+      if (itemLine.includes("\t")) {
+        throw new CheckError(`${where} line ${index + 1}: a tab, which the canonical subset never uses`);
+      }
       if (itemLine.trim() === "" || /^\s*#/.test(itemLine)) {
         index += 1;
         continue;
       }
-      if (!/^\s/.test(itemLine)) break;
-      const itemMatch = /^\s+-\s+(.*)$/.exec(itemLine);
+      if (!/^ /.test(itemLine)) break;
+      const itemMatch = /^ +- +(.*)$/.exec(itemLine);
       if (!itemMatch) {
         throw new CheckError(`${where} line ${index + 1}: expected an indented "- " item under ${JSON.stringify(key)}`);
       }

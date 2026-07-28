@@ -136,6 +136,16 @@ test("the yaml subset reads what the artifacts use and refuses the rest", () => 
   assert.throws(() => parseYamlSubset("key: a\nkey: b", "test"), /duplicate key/);
   assert.throws(() => parseYamlSubset("key: [a, b", "test"), /list is not closed|unbalanced/);
   assert.throws(() => parseYamlSubset("key:", "test"), /has no value/);
+
+  // PDS §2 rule 5 stops at a flow collection holding flow collections holding scalars, and
+  // never uses a tab. The parser accepts the subset the spec publishes and not one construct
+  // more: a parser that reads further makes the published examples stop being the contract.
+  assert.deepEqual(parseYamlSubset("gates:\n  - {id: G1, at: [round-01, round-02]}", "test").gates, [
+    { id: "G1", at: ["round-01", "round-02"] }
+  ]);
+  assert.throws(() => parseYamlSubset("key: {a: {b: [c]}}", "test"), /nesting deeper than the canonical/);
+  assert.throws(() => parseYamlSubset("key:\tvalue", "test"), /a tab/);
+  assert.throws(() => parseYamlSubset("key:\n\t- item", "test"), /a tab/);
 });
 
 test("an explicit registry path that does not exist is not silently replaced by another", () => {

@@ -81,7 +81,7 @@ target profile is web.
 |---|---|
 | BRIEF (Phase 0) | SKILL.md + PDS §0–§2 |
 | DIVERGE (round-01) | SKILL.md + PDS §2 §4 §5 §6 + RULES.md `class: slop` + WEB |
-| G1 DISTINCTNESS (facilitator, between rounds) | PDS §3 §4 |
+| G1 DISTINCTNESS (facilitator, between rounds) | PDS §3 §4 + RULES.md `class: slop` |
 | CRITIQUE (round-02) | SKILL.md + PDS §2 §5 §6 §7 + RULES.md (all) + WEB |
 | DECIDE + GRAFT (consensus.md) | PDS §2 §3 §4 §5 §7 |
 | CONTRACT (FINAL.md) | PDS §2 §9 §11 |

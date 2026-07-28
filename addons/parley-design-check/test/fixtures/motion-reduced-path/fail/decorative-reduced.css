@@ -1,0 +1,13 @@
+/*
+ * A prefers-reduced-motion block that changes something unrelated. The query is present,
+ * the selector is universal, and every element the preference exists for is still moving.
+ */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    color: red;
+  }
+}
+
+.spinner {
+  animation: spin 1s infinite;
+}

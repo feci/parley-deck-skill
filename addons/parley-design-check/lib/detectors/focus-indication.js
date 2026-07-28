@@ -6,6 +6,12 @@
  * Two shapes are visible in source: an outline switched off with nothing put in its place,
  * and an indicator that transitions in. A user tabbing at speed outruns an animated
  * indicator and loses their place, which is the failure the indicator exists to prevent.
+ *
+ * The replacement is looked for across the whole stylesheet rather than inside the block
+ * that removed the outline, because `button { outline: none }` beside
+ * `button:focus-visible { outline: 2px solid }` is the conforming idiom, not a defect. Where
+ * a focus rule supplies an indicator for some other selector the result is NEEDS_REVIEW:
+ * whether it reaches this element is a cascade question, and the cascade is above this tier.
  */
 
 const { selectorBase } = require("../css.js");
@@ -22,6 +28,12 @@ function transitionProperties(declaration) {
     return declaration.value.split(",").map((part) => part.trim().split(/\s+/)[0].toLowerCase());
   }
   return [];
+}
+
+function declaresIndicator(declaration) {
+  if (!REPLACEMENT.has(declaration.prop)) return false;
+  if (removesOutline(declaration)) return false;
+  return !/^\s*(none|0(px)?)\s*$/i.test(declaration.value);
 }
 
 function removesOutline(declaration) {
@@ -49,19 +61,31 @@ module.exports = {
           for (const prop of props) transitionsByBase.get(base).add(prop);
         }
       }
+      // Every element for which some focus rule in this file declares a real indicator.
+      const indicatedBases = new Set();
+      for (const block of style.blocks) {
+        if (!block.selectors.some((selector) => FOCUS.test(selector))) continue;
+        if (!block.declarations.some(declaresIndicator)) continue;
+        for (const selector of block.selectors) {
+          if (FOCUS.test(selector)) indicatedBases.add(selectorBase(selector));
+        }
+      }
       for (const block of style.blocks) {
         const removal = block.declarations.find(removesOutline);
         if (removal) {
-          const replaced = block.declarations.some(
-            (declaration) => REPLACEMENT.has(declaration.prop) && !removesOutline(declaration) && !/^\s*(none|0(px)?)\s*$/i.test(declaration.value)
-          );
-          if (!replaced) {
+          const replaced = block.declarations.some(declaresIndicator);
+          const bases = block.selectors.map(selectorBase);
+          const elsewhere = bases.filter((base) => indicatedBases.has(base));
+          if (!replaced && elsewhere.length === 0) {
             results.push({
-              verdict: "VIOLATION",
+              verdict: indicatedBases.size > 0 ? "NEEDS_REVIEW" : "VIOLATION",
               path: style.path,
               line: removal.line,
-              violation: `${block.selector} removes the outline and declares no replacement indicator`,
-              remedy: "keep the outline, or declare a visible indicator in the same rule that cannot be obscured by anything drawn over it"
+              violation:
+                indicatedBases.size > 0
+                  ? `${block.selector} removes the outline and the file's focus indication is declared for other selectors`
+                  : `${block.selector} removes the outline and no focus rule in the file declares a replacement indicator`,
+              remedy: "keep the outline, or declare a visible indicator in a focus rule for the same element that cannot be obscured by anything drawn over it"
             });
           }
         }

@@ -10,13 +10,18 @@ const checkRoot = path.join(root, "addons", "parley-design-check");
 // Consensus C3: four doctrine files, hard ceiling 64 KiB, enforced by a test rather than by a
 // comment. A doctrine that quietly grows costs every participant on every run.
 //
-// The per-file split is rebalanced from the one FINAL.md sketches (8/20/24/12): PDS.md does
-// not fit 20 KiB while carrying every section with the identical four-part artifact shape
-// intact, and breaking that shape would damage the thing the spec exists to be. C3 makes the
-// 64 KiB TOTAL binding, so the total is what is held. See IMPLEMENTATION.md deviation D-1.
+// The 64 KiB TOTAL is the binding constraint (C3, as resolved in review AF-10). The per-file
+// numbers below are early-warning thresholds, not a partition: they sum above the total on
+// purpose, so one file may take room another gave up without a test change, while the total
+// still catches the aggregate. Round-01 review AF-7/AF-8/AF-9 added ~3 KiB of ratified
+// normative text to PDS.md — G1's ban list and its two restored conjuncts, the canonical
+// frontmatter subset, the brief's run-id — against 139 bytes of slack, and paid for it by
+// cutting prose from all four files. PDS.md keeps every artifact kind in the identical
+// four-part shape, which is the property the spec exists to have. See IMPLEMENTATION.md
+// deviation D-1.
 const BUDGETS = [
-  ["SKILL.md", 8 * 1024],
-  [path.join("references", "PDS.md"), 22 * 1024],
+  ["SKILL.md", 7 * 1024],
+  [path.join("references", "PDS.md"), 25 * 1024],
   [path.join("references", "RULES.md"), 24 * 1024],
   [path.join("references", "WEB-ANNEX.md"), 11 * 1024],
 ];
@@ -39,17 +44,17 @@ test("parley-design ships exactly the four doctrine files", () => {
   );
 });
 
-test("each doctrine file is within its byte budget", () => {
+test("each doctrine file is within its early-warning threshold", () => {
   for (const [rel, budget] of BUDGETS) {
     const size = fs.statSync(path.join(designRoot, rel)).size;
     assert.ok(
       size <= budget,
-      `${rel} is ${size} bytes, over its ${budget}-byte budget by ${size - budget}`
+      `${rel} is ${size} bytes, over its ${budget}-byte threshold by ${size - budget}`
     );
   }
 });
 
-test("the doctrine total is within 64 KiB", () => {
+test("the doctrine total is within its binding 64 KiB ceiling", () => {
   const total = BUDGETS.reduce((sum, [rel]) => sum + fs.statSync(path.join(designRoot, rel)).size, 0);
   assert.ok(total <= TOTAL_BUDGET, `doctrine total is ${total} bytes, over the ${TOTAL_BUDGET}-byte ceiling`);
 });
@@ -125,6 +130,27 @@ test("the spec's declared registry-digest matches the registry it points at", ()
     computed,
     `PDS.md declares registry-digest ${declared} but RULES.md computes ${computed} — regenerate it`
   );
+});
+
+test("every rule id the doctrine cites is one the registry declares", () => {
+  // PDS §10 rule 3 turns an unknown id into UNJUDGEABLE, so a doctrine that cites an id the
+  // registry never declared teaches citations its own extension policy launders into
+  // non-findings. Round-01 found four of those in the spec's own examples (kimi-1).
+  const { loadRegistry } = require("../addons/parley-design-check/lib/registry.js");
+  const registry = loadRegistry(path.join(designRoot, "references", "RULES.md"));
+  const files = [
+    path.join(designRoot, "SKILL.md"),
+    path.join(designRoot, "references", "PDS.md"),
+    path.join(designRoot, "references", "RULES.md"),
+    path.join(designRoot, "references", "WEB-ANNEX.md"),
+  ];
+  const unknown = new Set();
+  for (const file of files) {
+    for (const match of fs.readFileSync(file, "utf8").matchAll(/\b(core|web):[a-z0-9][a-z0-9-]*/g)) {
+      if (!registry.rules.has(match[0])) unknown.add(`${path.basename(file)}: ${match[0]}`);
+    }
+  }
+  assert.deepEqual([...unknown].sort(), [], "the doctrine cites rule ids the registry does not declare");
 });
 
 test("the checker never bundles a copy of the rule registry", () => {

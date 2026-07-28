@@ -54,13 +54,19 @@ are walked, and hidden directories, `node_modules` and build output are skipped.
 
 | code | meaning |
 |---|---|
-| 0 | clean: no VIOLATION and no NEEDS_REVIEW |
+| 0 | `PASS`, and nothing else |
 | 1 | findings: at least one VIOLATION or NEEDS_REVIEW |
 | 2 | the run itself failed: bad usage, an unreadable input, a broken registry, a detector that threw |
 | 3 | rule checks refused: no registry was found |
+| 4 | `UNJUDGEABLE`: the run judged nothing it could report on, or a level claim went unverified |
 
 Findings are not errors. A finding is a result the run produced successfully, which is why
 it has its own code, and why a failed run does not hide behind an empty ledger.
+
+Exit 0 is reserved for `PASS`. A run over files this checker cannot read judges nothing, and
+a level claim whose evidence the run did not carry is a conformance failure rather than a
+warning (PDS §9 rule 3) — both exit 4. CI gates on the process code, never on a later
+reading of the JSON, so "the checker checked nothing" must not leave a green tick behind.
 
 ## What it reads
 
@@ -73,6 +79,13 @@ it has its own code, and why a failed run does not hide behind an empty ledger.
 
 Anything else is listed in the report under `not-inspected` with the reason. A file the
 checker did not read is never counted as a file that passed.
+
+A markdown file that declares `spec: PDS/1.0` and whose frontmatter is outside the canonical
+subset (PDS §2 rule 5) is a candidate artifact that did not parse. It is reported as
+`pds-check:l1-frontmatter-parses`, with or without a level claim, and never demoted to
+`not-inspected` while the artifacts beside it carry one. The parser implements that subset
+exactly: one-line values, flow lists and flow maps, block lists of those, a flow collection
+holding flow collections holding scalars and no deeper, no tabs, no block mappings.
 
 ## The registry contract
 
@@ -113,6 +126,49 @@ with the reason:
 
 Rules belonging to another surface are listed as out of scope, which is not a pass either.
 
+### What it will not take on trust, and what it still cannot bind
+
+A conformance certificate issued on a run's own say-so is worse than none, so where a gate
+condition rests on something the run declares about itself, the checker recomputes it:
+
+| condition | what it is decided from, rather than the claim |
+|---|---|
+| recusal (§5 rule 2) | the critique's **artifact path**, not its `agent` field; a declared agent that disagrees with the file it is written in fails on its own, and an id minted from a proposer's own fails where it critiques that proposer's direction |
+| G1's sharing test | the recorded `g1-signatures` **and** this run's own ban-list findings, read before waivers |
+| G2's "modifies the winner's token file" | the file re-read and digested, against the VERDICT's `tokens-digest` |
+| a `waived` answer to a winner VIOLATION | a valid, unexpired, independently counter-signed entry whose scope resolves to the winner's DIRECTION or the token file it names |
+| a waiver's independence | both ids present in the roster the run's artifacts name; no roster, no suppression |
+
+Three bindings this version does not claim to have, stated here rather than left implied:
+
+- **A self-chosen path defeats the identity anchor, and nothing beneath the file name is
+  checked.** Binding a critique to its path is stronger than believing its `agent` field,
+  because the protocol names a round's files by agent id. It is not a signature, and
+  impersonation is not the only way past it — it is the harder way. A process that writes
+  `round-02/hermes-1.md` while being `claude-1` is indistinguishable from `hermes-1` writing
+  it; a process that writes `round-02/wren-4.md` while being `claude-1` needs no collision
+  with anyone at all, and recusal, which compares that author against the DIRECTION authors,
+  then finds nothing to fire on. Two things narrow it. An id **minted** from a proposer's
+  own — the proposer id with a suffix across a non-alphanumeric boundary, `claude-1.critique`
+  from `claude-1` — fails recusal where it critiques that proposer's direction, since one
+  identity written two ways is still one identity. And every critique author no other
+  artifact of the run records is listed on the level as `recusal-not-anchored`, so a claim is
+  never read without the ids whose recusal rests on a name only they chose. What remains open
+  is the unrelated fresh id, which reads exactly like a genuine critic who proposed nothing:
+  PDS/1.0 defines no roster, so the artifacts cannot separate them. A facilitator-held roster
+  mapping ids to keys, or cryptographic authorship, is what would close it, and neither is in
+  scope here.
+- **A waiver's independence is roster membership, not disinterest.** Two participants a run
+  records, differing from each other and from the grantor, is what §8 rule 2 can be checked
+  to. That two agents were separately motivated is a judgement the ledger records and no
+  parser decides.
+- **`tokens-digest` detects drift from what the VERDICT ratified, not a re-ratification.** A
+  verdict that records the digest of an already-grafted file has re-ratified it, and the gate
+  then rests on the re-expression test alone. The digest is what makes a *later* edit
+  visible — including one made between DECIDE and CONTRACT, which is the window §3 puts G2
+  in. Pinning the file at round-01 instead, before any graft is proposed, would close the
+  remaining window and needs a field on DIRECTION that PDS/1.0 does not define.
+
 ## Conventions this checker needs
 
 These are the checker's, stated here because it has to look somewhere. They use extension
@@ -129,32 +185,75 @@ points the formats already define, and none of them changes the doctrine.
 - **Optional contract keys** the checker reads: `states`, `effect-budget`, `tokens`,
   `waivers`, and `faces` (each entry a name, or `{name, why}` where the reason is recorded).
 - **Gate outcomes** are read from a `gates` list on any artifact of the run, each entry
-  carrying an `id` and an `outcome`.
+  carrying an `id` and an `outcome`, where the outcome is `pass`, `fail` or `abstain`.
+- **G1's banned-slop signatures** are read from a `g1-signatures` list on any artifact of the
+  run: one entry per direction, `{direction: <handle>, fires: [...]}`, each fired id written
+  `rule-id=the declared value that evidenced it`. It is a flat list rather than a map inside
+  the gate entry because the canonical frontmatter subset stops one level above that. The
+  ban list is not configured here: it is derived from the registry, as `RULES.md` derives it.
+  The ledger is a self-report, so it is never taken alone: where this run's own detectors
+  raised ban-list findings against the direction artifacts, the sharing test is recomputed
+  from those findings too, and a recorded signature that omits an id the same run watched fire
+  fails the gate. Those findings are read before waivers are applied — G1 is a gate on what
+  two directions share, and a waiver scoped at one file is not an answer to that.
+- **A waiver's identities** are `granted-by` and `counter-signed-by`, both machine-readable
+  participant ids, and both are checked against the roster the run's own artifacts name — the
+  agents that filed a DIRECTION or a CRITIQUE, the Decider, the Design System's author. With
+  no participant-bearing artifact among the inputs there is no roster, so independence cannot
+  be established and the waiver does not suppress its finding (PDS §8 rule 2). Two ids
+  differing is distinctness, and distinctness is not independence. The rejection is printed as
+  a `waiver rejected:` line naming both ids, so no waiver is ever dropped silently: to waive a
+  finding, pass the run's design artifacts alongside the source.
 - **One stylesheet is one surface** for the effect budget. It is an approximation, and it is
   the one place this checker trades precision for something it can compute.
 
 ## Waivers
 
 Waivers are read from the file the contract names, or from `--waivers`. Each entry needs a
-rule id, a scope, a reason, an expiry and a counter-signature; a scope is a path, read
-relative to the waiver file or to the working directory. An entry is rejected, and its
-finding stays in the ledger, when it names more than one rule through a wildcard, scopes
-wider than a path, has expired, or carries no counter-signature. A rule the registry marks
-`system-blind` MUST NOT be waived by scoping the waiver at the ratified system: that is the
-widening the flag exists to forbid, and the checker rejects it.
+rule id, a scope, a reason, an expiry, a granting participant and a counter-signature; a
+scope is a path, read relative to the waiver file or to the working directory. The scope has
+to reach the work: a detector finding is suppressed only where the scope resolves to the file
+the finding is at, and a VERDICT's `waived` answer holds only where the scope resolves to the
+winner's DIRECTION or the token file that DIRECTION names. One path test decides both, so an
+entry cannot mean the narrowest scope in one place and any scope at all in the other. An
+entry is rejected, and its finding stays in the ledger, when it names more than one rule through a
+wildcard, scopes wider than a path, has expired, names no grantor, or carries a
+counter-signature whose independence the checker cannot establish — including the grantor's
+own signature, which is not a counter-signature, and any pair of ids in a run that names no
+participants to check them against. A rule the registry marks `system-blind`
+MUST NOT be waived by scoping the waiver at the ratified system: that is the widening the
+flag exists to forbid, and the checker rejects it.
 
 ## Conformance levels
 
-| level | what this checker verifies |
+A level is an obligation set. Each obligation is declared before it is tested, and the report
+carries the whole set with what each one owed and whether it was met — so a level cannot be
+verified by an obligation nobody declared. An obligation whose evidence the run did not carry
+is `unverified`, never met: the level then reports `not verified`, and the run does not exit
+clean.
+
+| level | the obligations this checker holds a claim to |
 |---|---|
-| L1 | every artifact carries the spec version and the fields its kind requires |
-| L2 | L1, plus the artifact set of the mapping, recusal, the distinctness and coherence gates recomputed where the artifacts allow it, and a recorded outcome for each |
-| L3 | L2, plus token integrity: aliases resolve, no cycles, colour tokens declare a space and compute to a displayable value |
+| L1 | every candidate artifact parses, declares the spec version, and carries the fields its kind requires |
+| L2 | L1, plus the mapping's artifact set, recusal decided from the artifact path, the §4 rule 2 assignment recomputed from the brief's `run-id`, G1 (distinctness, duplicate Signature, the banned-slop signatures and their sharing test, recorded and observed), G2 (one winner, bounded grafts that name tokens the winner already declares, the winner's token file digesting to the `tokens-digest` the VERDICT ratified, every violation against the winner answered and every `waived` answer resolving to a valid waiver entry scoped at the winner's work), a recorded outcome for every §3 transition the run crossed, and rule ids that resolve in the loaded registry |
+| L3 | L2, plus a DTCG token document with every token typed, aliases that resolve without a cycle, a declared `colorSpace` on every colour, values that compute, and the registry's `system` rules decided against real source and clean |
 | L4 | not verifiable here; reported `UNJUDGEABLE`, because it needs rendered evidence |
 
-A level whose evidence was unavailable is reported as not verified. Conformance results
-carry ids in this tool's own namespace, `pds-check:<slug>`, so they are never confused with
-registry rules.
+Two honesty notes about L3. The `system` rules the registry marks checkable and this checker
+has no detector for are listed on the level itself as `system-rules-not-decided`, so
+"verified L3" is never read without what was not decided. And a level's obligations are
+computed after waivers, so a finding a valid waiver suppressed is not an open one.
+
+One about L2. Every critique author no other artifact of the run records is listed on the
+level as `recusal-not-anchored` and printed as a `recusal` line, because that author's
+recusal rests on a file name the author chose. It is not a finding: a critic who proposed
+nothing is a legitimate participant, and the run carries nothing that separates it from a
+proposer filing under a fresh id.
+
+Conformance results carry ids in this tool's own namespace, `pds-check:<slug>`, so they are
+never confused with registry rules. A gate message spells its own clause with a colon where
+PDS §3 prints an em dash: the em dash is this tool's finding separator, and §3's strings are
+canonical message shapes rather than literal output.
 
 ## Adding a detector
 

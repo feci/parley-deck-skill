@@ -15,7 +15,8 @@
  *   check --level L1|L2|L3 <paths...>   verify a conformance claim as well
  *   check --json <paths...>             emit the report as JSON
  *
- * Exit codes: 0 clean, 1 findings, 2 the run itself failed, 3 rule checks refused.
+ * Exit codes: 0 PASS, 1 findings, 2 the run itself failed, 3 rule checks refused,
+ * 4 the run judged nothing it could report on, or a level claim went unverified.
  */
 
 const path = require("node:path");
@@ -47,10 +48,11 @@ Options:
   --version           the tool version
 
 Exit codes:
-  0  clean
+  0  PASS, and nothing else
   1  findings: at least one VIOLATION or NEEDS_REVIEW
   2  the run itself failed
-  3  rule checks refused: no registry was found`;
+  3  rule checks refused: no registry was found
+  4  UNJUDGEABLE: the run judged nothing, or a level claim went unverified`;
 
 const FLAGS_WITH_VALUE = new Set(["--registry", "--contract", "--waivers", "--surface", "--level"]);
 
@@ -104,6 +106,15 @@ function renderText(report) {
   if (report.level) {
     const verified = report.level.verified ? `verified ${report.level.verified}` : "not verified";
     lines.push(`level        claimed ${report.level.claimed}, ${verified}`);
+    // The obligation a level did not meet is the whole of why it did not verify, so it is
+    // in the text report and not only in the JSON.
+    if (report.level.unmet.length > 0) lines.push(`unmet        ${report.level.unmet.join(", ")}`);
+    // Recusal is decided from a path the run chooses for itself. Where no other artifact
+    // records the author, the level says so on its face rather than in a footnote nobody reads.
+    const unanchored = report.level["recusal-not-anchored"];
+    if (unanchored && unanchored.length > 0) {
+      lines.push(`recusal      not anchored for ${unanchored.join(", ")}: no other artifact of the run records the id`);
+    }
   }
   for (const note of report.notes) lines.push(`note         ${note}`);
   for (const error of report["waiver-errors"]) lines.push(`waiver       rejected: ${error}`);
