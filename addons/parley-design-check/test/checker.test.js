@@ -16,6 +16,7 @@ const path = require("node:path");
 
 const { runCheck } = require("../lib/engine.js");
 const { parseYamlSubset } = require("../lib/registry.js");
+const { parseStylesheet } = require("../lib/css.js");
 
 const ADDON_ROOT = path.resolve(__dirname, "..");
 const DETECTORS_DIR = path.join(ADDON_ROOT, "lib", "detectors");
@@ -747,6 +748,55 @@ test("L3 is not verified when no source was passed for the rules G3 names", (t) 
   assert.notEqual(report.exit, 0, "a level claim that rests on absent evidence exited clean");
 });
 
+test("an empty path field is a field that names no file, not a crash", (t) => {
+  // §2 rule 3 and §2 rule 5: `""` is a value the canonical frontmatter subset publishes, and a
+  // contract with no waivers is a legitimate state. Resolving it gave the contract's own
+  // directory, which fs.existsSync accepts and the reader crashes on — EISDIR, exit 2, "the run
+  // itself failed" reported against a valid input.
+  const empty = check(mutatedRun(t, [{ file: "FINAL.md", from: "waivers: WAIVERS.md", to: 'waivers: ""' }]), { level: "L2" });
+  assert.equal(empty.verdict, "PASS");
+  assert.equal(empty.exit, 0, "a contract declaring no waiver file failed the run");
+  assert.deepEqual(empty["waiver-errors"], []);
+  assert.deepEqual(empty["waivers-applied"], []);
+  const tokens = check(mutatedRun(t, [{ file: "FINAL.md", from: "tokens: tokens.json", to: 'tokens: ""' }]), { level: "L2" });
+  assert.notEqual(tokens.exit, 2, "an empty tokens field failed the run rather than being read as naming no file");
+});
+
+test("an alias that points up the tiers, or sideways at the floor, fails L3", () => {
+  // Round-02 hermes-1: FINAL.md binds alias direction into L3 token integrity, §3 G3 defines it,
+  // and nothing verified it. A primitive aliasing another primitive and a semantic aliasing a
+  // component both resolve without a cycle, so before this the document verified L3 clean.
+  const report = check(path.join(FIXTURES, "conformance", "alias-direction"), { level: "L3" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l3-alias-direction");
+  assert.ok(
+    raised.some((entry) => /primitive\.ink is a primitive and aliases the primitive primitive\.slate/.test(entry.violation)),
+    `alias-direction findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(
+    raised.some((entry) => /semantic\.border is a semantic and aliases component\.panel, which is a component/.test(entry.violation)),
+    "an alias pointing up the tiers was accepted"
+  );
+  assert.ok(unmet(report).includes("pds-check:l3-alias-direction"));
+  assert.equal(report.level.verified, null);
+});
+
+test("an alias pointing down the tiers, and a document naming none, are both clean", (t) => {
+  // The conjunct is vacuous where a document names no tier group — the sound run's tokens.json
+  // is grouped by `color` and `space` — and satisfied where the tiers run the right way.
+  const declared = check(path.join(FIXTURES, "conformance", "alias-direction"), { level: "L3" });
+  const raised = declared["findings-detail"].filter((entry) => entry.rule === "pds-check:l3-alias-direction");
+  // The fixture also carries semantic.text -> primitive.slate and component.panel ->
+  // semantic.text, both pointing down. Exactly the two offending aliases are reported.
+  assert.equal(raised.length, 2, `alias-direction findings: ${raised.map((entry) => entry.violation).join(" | ")}`);
+  const untiered = check(mutatedRun(t, []), { level: "L3" });
+  assert.deepEqual(
+    untiered["findings-detail"].filter((entry) => entry.rule === "pds-check:l3-alias-direction"),
+    [],
+    "a token document naming no tier group was held to a tier order it never declared"
+  );
+  assert.equal(untiered.level.verified, "L3");
+});
+
 test("a colour token with a plain-string value fails L3: computable is not declared", (t) => {
   const run = mutatedRun(t, [
     { file: "tokens.json", from: '{ "colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff" }', to: '"#ffffff"' }
@@ -762,6 +812,289 @@ test("an open system rule fails L3 rather than leaving the level verified", (t) 
   const report = check(run, { level: "L3" });
   assert.equal(report.level.verified, null);
   assert.ok(unmet(report).includes("pds-check:l3-system-rules"));
+  assert.ok(report["findings-detail"].some((entry) => entry.rule === "core:literal-outside-token-layer"));
+});
+
+/* ------------------------------- the level obligations, probed as certificates */
+
+test("an axis no brief declares is not a difference G1 counts", (t) => {
+  // Round-02 AF-1(a). Both directions agree on the brief's `density` axis and invent `mood` to
+  // differ on, so the union of supplied keys shows two differences and G1's two-axis test was
+  // satisfied by a word the brief never declared. Before this the run verified L2 with unmet [].
+  const run = mutatedRun(t, [
+    {
+      file: path.join("round-01", "claude-1.md"),
+      from: "positions: {density: dense, structure: flat}",
+      to: "positions: {density: dense, structure: flat, mood: calm}"
+    },
+    {
+      file: path.join("round-01", "codex-1.md"),
+      from: "positions: {density: sparse, structure: layered}",
+      to: "positions: {density: dense, structure: layered, mood: loud}"
+    }
+  ]);
+  const report = check(run, { level: "L2" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-gate-g1");
+  assert.ok(
+    raised.some((entry) => /declares a position on 'mood', which the brief does not declare as an axis/.test(entry.violation)),
+    `G1 findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(
+    raised.some((entry) => /differ on 1 declared axis; 2 are required/.test(entry.violation)),
+    "the invented axis was still counted as a difference"
+  );
+  assert.ok(unmet(report).includes("pds-check:l2-gate-g1"));
+  assert.equal(report.level.verified, null);
+});
+
+test("a position the brief does not enumerate fails G1", (t) => {
+  const run = mutatedRun(t, [
+    {
+      file: path.join("round-01", "codex-1.md"),
+      from: "positions: {density: sparse, structure: layered}",
+      to: "positions: {density: airy, structure: layered}"
+    }
+  ]);
+  const report = check(run, { level: "L2" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-gate-g1");
+  assert.ok(
+    raised.some((entry) => /takes 'airy' on 'density', which the brief does not enumerate/.test(entry.violation)),
+    `G1 findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.equal(report.level.verified, null);
+});
+
+test("a repeated primary position cannot assign two proposers the same one", (t) => {
+  // Round-02 AF-1(b). The rotation ran over the list as written, so `[flat, flat, layered]`
+  // handed `flat` to both proposers and both recorded what they were "given". Two other axes
+  // differ, so G1 is silent, and before this the run verified L2 with unmet [].
+  const run = mutatedRun(t, [
+    {
+      file: "DESIGN-BRIEF.md",
+      from: "axes: {density: [sparse, dense], structure: [flat, layered]}",
+      to: "axes: {density: [sparse, dense], weight: [light, heavy], structure: [flat, flat, layered]}"
+    },
+    {
+      file: path.join("round-01", "claude-1.md"),
+      from: "positions: {density: dense, structure: flat}",
+      to: "positions: {density: dense, weight: light, structure: flat}"
+    },
+    {
+      file: path.join("round-01", "codex-1.md"),
+      from: "positions: {density: sparse, structure: layered}",
+      to: "positions: {density: sparse, weight: heavy, structure: flat}"
+    },
+    { file: path.join("round-01", "codex-1.md"), from: "assigned: layered", to: "assigned: flat" }
+  ]);
+  const report = check(run, { level: "L2" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-assignment");
+  assert.ok(
+    raised.some((entry) => /enumerates 'structure' with a position it lists more than once/.test(entry.violation)),
+    `assignment findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(
+    raised.some((entry) => /codex-1 is assigned 'layered' by the seeded rotation and records 'flat'/.test(entry.violation)),
+    "the deduplicated rotation was not what the proposers were compared against"
+  );
+  assert.ok(unmet(report).includes("pds-check:l2-assignment"));
+  assert.equal(report.level.verified, null);
+});
+
+test("swapping round-01 and round-02 fails process order", (t) => {
+  // Round-02 AF-1(c). The obligation counted artifacts and never read §1's mapping, so a run
+  // with its directions filed in round-02 and its critique in round-01 satisfied every count
+  // and verified L2 with unmet []. The order is what L2 certifies.
+  const run = mutatedRun(t, []);
+  const move = (from, to) => {
+    fs.mkdirSync(path.dirname(path.join(run, to)), { recursive: true });
+    fs.renameSync(path.join(run, from), path.join(run, to));
+  };
+  move(path.join("round-02", "hermes-1.md"), path.join("round-02", "hermes-1.tmp"));
+  move(path.join("round-01", "claude-1.md"), path.join("round-02", "claude-1.md"));
+  move(path.join("round-01", "codex-1.md"), path.join("round-02", "codex-1.md"));
+  move(path.join("round-02", "hermes-1.tmp"), path.join("round-01", "hermes-1.md"));
+  const report = check(run, { level: "L2" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-process-order");
+  assert.ok(
+    raised.some((entry) => /the DIRECTION is filed outside §1's mapping, which names it round-01\/<agent>\.md/.test(entry.violation)),
+    `process-order findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(
+    raised.some((entry) => /the CRITIQUE is filed outside §1's mapping, which names it round-02\/<agent>\.md/.test(entry.violation)),
+    "a critique filed in round-01 was accepted as process order"
+  );
+  assert.ok(unmet(report).includes("pds-check:l2-process-order"));
+  assert.equal(report.level.verified, null);
+});
+
+test("a brief filed under any other name fails process order", (t) => {
+  const run = mutatedRun(t, []);
+  fs.renameSync(path.join(run, "DESIGN-BRIEF.md"), path.join(run, "brief.md"));
+  const report = check(run, { level: "L2" });
+  assert.ok(
+    report["findings-detail"].some(
+      (entry) => entry.rule === "pds-check:l2-process-order" && /names it DESIGN-BRIEF\.md/.test(entry.violation)
+    ),
+    "an artifact filed outside the name §1 gives it was accepted"
+  );
+  assert.equal(report.level.verified, null);
+});
+
+test("G3 recorded pass beside a raw literal cannot verify L2", (t) => {
+  // Round-02 AF-1(d). The gate check validated the recorded word and nothing else: the run
+  // raised core:literal-outside-token-layer, reported VIOLATION, and still certified
+  // "verified L2" with an empty unmet set beside a G3 its own findings refute.
+  const run = mutatedRun(t, [{ file: "panel.css", from: "color: var(--color-text-body);", to: "color: #1b1b1b;" }]);
+  const report = check(run, { level: "L2" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-gate-recorded");
+  assert.ok(
+    raised.some((entry) =>
+      /G3 is recorded pass and this run's own findings refute its conditions: core:literal-outside-token-layer/.test(entry.violation)
+    ),
+    `gate findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(unmet(report).includes("pds-check:l2-gate-recorded"));
+  assert.equal(report.level.verified, null);
+});
+
+test("G4 recorded pass beside an open quality violation cannot verify L2", (t) => {
+  const audit = [
+    "---",
+    "spec: PDS/1.0",
+    "kind: AUDIT",
+    "implements: PDS/1.0",
+    "registry-digest: 000000000000",
+    "tiers: {requested: [T0 ARTIFACT], executed: [T0 ARTIFACT], unavailable: [T2 RENDERED]}",
+    "findings: []",
+    "level: L2",
+    "gates:",
+    '  - {id: G4, outcome: pass, at: "at the audit, before a terminal state"}',
+    "---",
+    "",
+    "# Audit",
+    "",
+    "The audit records G4 as passing while a quality rule is open against the applied surface.",
+    ""
+  ].join("\n");
+  const run = mutatedRun(t, [
+    { file: "AUDIT.md", write: audit },
+    { file: "panel.css", from: ".record {", to: ".record {\n  animation: pulse 2s infinite;" }
+  ]);
+  const report = check(run, { level: "L2" });
+  const raised = report["findings-detail"].filter((entry) => entry.rule === "pds-check:l2-gate-recorded");
+  assert.ok(
+    raised.some((entry) =>
+      /G4 is recorded pass and this run's own findings refute its conditions: core:motion-without-reduced-path/.test(entry.violation)
+    ),
+    `gate findings: ${raised.map((entry) => entry.violation).join(" | ")}`
+  );
+  assert.ok(unmet(report).includes("pds-check:l2-gate-recorded"));
+  assert.equal(report.level.verified, null);
+});
+
+test("a quoted brace is text, and the declarations after it are still read", () => {
+  // Round-02 AF-1(e). The stack machine treated `{`, `}` and `;` inside a quoted string as
+  // structure, so `content: "}"` closed the block early and every later declaration — a raw
+  // colour among them — fell outside any rule and was never judged. L3 came back clean.
+  const blocks = parseStylesheet('.trap::before { content: "}"; color: #ff0000; }');
+  assert.equal(blocks.length, 1, "a quoted brace opened or closed a block");
+  assert.deepEqual(
+    blocks[0].declarations.map((declaration) => declaration.prop),
+    ["content", "color"],
+    "a declaration after a quoted brace was lost"
+  );
+  const report = check(path.join(FIXTURES, "literal-outside-tokens", "fail"));
+  assert.ok(
+    report["findings-detail"].some(
+      (entry) => entry.rule === "core:literal-outside-token-layer" && /quoted-brace\.css/.test(entry.path || "")
+    ),
+    `a raw colour hidden behind a quoted brace was not found: ${report.findings.join(" | ")}`
+  );
+});
+
+test("a file declaring the spec with a kind PDS does not define fails L1", (t) => {
+  // Round-02 AF-1(f). The file was demoted to `not-inspected`, so L1 verified beside a
+  // candidate artifact whose type nobody defines.
+  const run = mutatedRun(t, [
+    { file: "TYPO.md", write: ["---", "spec: PDS/1.0", "kind: TYPO-BRIEF", "---", "", "# Typo", ""].join("\n") }
+  ]);
+  const report = check(run, { level: "L1" });
+  const finding = report["findings-detail"].find((entry) => entry.rule === "pds-check:l1-artifact-kind");
+  assert.ok(finding, "a candidate artifact with an undefined kind raised nothing");
+  assert.match(finding.violation, /names the kind TYPO-BRIEF, which §2 does not define/);
+  assert.ok(unmet(report).includes("pds-check:l1-artifact-kind"));
+  assert.equal(report.level.verified, null);
+  assert.ok(!report.inputs["not-inspected"].some((entry) => /TYPO\.md/.test(entry)));
+});
+
+test("a markdown file declaring no spec is still uninspected rather than a finding", (t) => {
+  // The other side of the same line: the doctrine's own files declare the spec they define and
+  // name no kind, and a checker run over them must not manufacture findings against them.
+  const run = mutatedRun(t, [
+    { file: "SPEC.md", write: ["---", "spec: PDS/1.0", "status: stable", "---", "", "# A spec, not an artifact", ""].join("\n") },
+    { file: "NOTES.md", write: "# Notes\n\nOrdinary markdown, no frontmatter.\n" }
+  ]);
+  const report = check(run, { level: "L2" });
+  assert.deepEqual(report["findings-detail"].filter((entry) => entry.rule === "pds-check:l1-artifact-kind"), []);
+  assert.equal(report.level.verified, "L2");
+});
+
+/* ------------------------------------- waivers: independence of the counter-signer */
+
+test("the author of the waived work cannot counter-sign the waiver", (t) => {
+  // Round-02 AF-2. Grantor and signer were proved distinct and never compared against the
+  // ownership of the scoped work, so naming a colleague as grantor let an author approve its
+  // own exception: this waiver applied, the finding disappeared and the run exited 0.
+  const run = mutatedRun(t, [
+    {
+      file: path.join("round-01", "claude-1.md"),
+      from: 'effects: [{name: rule-line, anchor: "the boundary between two column groups; it disappears when a group has one column"}]',
+      to: "effects: [corner-numeral]"
+    },
+    {
+      file: "consensus.md",
+      from: "  - {direction: ledger, fires: []}",
+      to: '  - {direction: ledger, fires: ["core:decoration-unmotivated=corner-numeral"]}'
+    },
+    {
+      file: "WAIVERS.md",
+      write: waiverFile(
+        '{rule-id: core:decoration-unmotivated, scope: round-01/claude-1.md, expiry: 2099-01-01, reason: "the numeral ships with the launch surface", granted-by: codex-1, counter-signed-by: claude-1}'
+      )
+    }
+  ]);
+  const report = check(run, { level: "L2" });
+  assert.equal(report["waivers-applied"].length, 0, "an author counter-signed a waiver on its own work");
+  assert.ok(
+    report["waiver-errors"].some((entry) => /the counter-signer claude-1 authored the waived work/.test(entry)),
+    `waiver errors: ${report["waiver-errors"].join("; ")}`
+  );
+  assert.ok(
+    report["findings-detail"].some((entry) => entry.rule === "core:decoration-unmotivated"),
+    "the finding a self-approved waiver claimed to excuse left the ledger"
+  );
+  assert.notEqual(report.exit, 0);
+});
+
+test("a counter-signer no artifact but its own records establishes no independence", (t) => {
+  // The identity half of the same rule: a critique author appears nowhere except on the file it
+  // wrote, so a proposer filing one extra critique under a fresh id reads exactly like a
+  // genuine critic. §8 rule 2: independence that cannot be established suppresses nothing.
+  const run = mutatedRun(t, [
+    { file: "panel.css", from: "color: var(--color-text-body);", to: "color: #1b1b1b;" },
+    {
+      file: "WAIVERS.md",
+      write: waiverFile(
+        '{rule-id: core:literal-outside-token-layer, scope: panel.css, expiry: 2099-01-01, reason: "the legacy panel is replaced this quarter", granted-by: claude-1, counter-signed-by: hermes-1}'
+      )
+    }
+  ]);
+  const report = check(run, { level: "L2" });
+  assert.equal(report["waivers-applied"].length, 0);
+  assert.ok(
+    report["waiver-errors"].some((entry) => /counter-signer hermes-1 is recorded only by an artifact it authored itself/.test(entry)),
+    `waiver errors: ${report["waiver-errors"].join("; ")}`
+  );
   assert.ok(report["findings-detail"].some((entry) => entry.rule === "core:literal-outside-token-layer"));
 });
 

@@ -96,8 +96,36 @@ function parseStylesheet(text) {
     resetBuffer();
   };
 
+  // A quoted string is text, never structure. `content: "}"` is one declaration, and a
+  // scanner that reads the brace inside it closes a block the stylesheet never closed —
+  // every declaration after it then falls outside the rule and no detector ever sees it.
+  let quote = null;
+
   for (let index = 0; index < src.length; index += 1) {
     const ch = src[index];
+    if (quote) {
+      if (ch === "\\" && index + 1 < src.length) {
+        const next = src[index + 1];
+        if (next === "\n") line += 1;
+        push(ch);
+        push(next === "\n" ? " " : next);
+        index += 1;
+        continue;
+      }
+      if (ch === "\n") {
+        line += 1;
+        push(" ");
+        continue;
+      }
+      if (ch === quote) quote = null;
+      push(ch);
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      push(ch);
+      continue;
+    }
     if (ch === "\n") {
       line += 1;
       push(" ");

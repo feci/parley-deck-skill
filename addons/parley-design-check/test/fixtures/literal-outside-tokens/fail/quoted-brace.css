@@ -1,0 +1,14 @@
+/*
+ * A quoted brace is text, not structure. A scanner that reads the `}` inside the string
+ * closes `.trap` early, and every declaration after it — including the raw colour — falls
+ * outside any rule block and is never judged.
+ */
+.trap::before {
+  content: "}";
+  color: #ff0000;
+}
+
+.trap::after {
+  content: "a; b { c: d }";
+  border-radius: 11px;
+}

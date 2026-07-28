@@ -83,7 +83,10 @@ checker did not read is never counted as a file that passed.
 A markdown file that declares `spec: PDS/1.0` and whose frontmatter is outside the canonical
 subset (PDS §2 rule 5) is a candidate artifact that did not parse. It is reported as
 `pds-check:l1-frontmatter-parses`, with or without a level claim, and never demoted to
-`not-inspected` while the artifacts beside it carry one. The parser implements that subset
+`not-inspected` while the artifacts beside it carry one. One that parses and names a kind PDS
+§2 does not define is the same shape of defect and is reported as `pds-check:l1-artifact-kind`.
+A file declaring the spec and no kind at all is not an artifact instance — that is how PDS.md
+and RULES.md declare the spec they define — and stays under `not-inspected`. The parser implements that subset
 exactly: one-line values, flow lists and flow maps, block lists of those, a flow collection
 holding flow collections holding scalars and no deeper, no tabs, no block mappings.
 
@@ -219,8 +222,10 @@ entry cannot mean the narrowest scope in one place and any scope at all in the o
 entry is rejected, and its finding stays in the ledger, when it names more than one rule through a
 wildcard, scopes wider than a path, has expired, names no grantor, or carries a
 counter-signature whose independence the checker cannot establish — including the grantor's
-own signature, which is not a counter-signature, and any pair of ids in a run that names no
-participants to check them against. A rule the registry marks `system-blind`
+own signature, which is not a counter-signature; a signature by an author of the waived work,
+resolved from §1's naming, since a round file belongs to the agent id it names; a signer the
+run records only through an artifact that signer wrote itself; and any pair of ids in a run
+that names no participants to check them against. A rule the registry marks `system-blind`
 MUST NOT be waived by scoping the waiver at the ratified system: that is the widening the
 flag exists to forbid, and the checker rejects it.
 
@@ -234,9 +239,9 @@ clean.
 
 | level | the obligations this checker holds a claim to |
 |---|---|
-| L1 | every candidate artifact parses, declares the spec version, and carries the fields its kind requires |
-| L2 | L1, plus the mapping's artifact set, recusal decided from the artifact path, the §4 rule 2 assignment recomputed from the brief's `run-id`, G1 (distinctness, duplicate Signature, the banned-slop signatures and their sharing test, recorded and observed), G2 (one winner, bounded grafts that name tokens the winner already declares, the winner's token file digesting to the `tokens-digest` the VERDICT ratified, every violation against the winner answered and every `waived` answer resolving to a valid waiver entry scoped at the winner's work), a recorded outcome for every §3 transition the run crossed, and rule ids that resolve in the loaded registry |
-| L3 | L2, plus a DTCG token document with every token typed, aliases that resolve without a cycle, a declared `colorSpace` on every colour, values that compute, and the registry's `system` rules decided against real source and clean |
+| L1 | every candidate artifact parses, declares the spec version, names a kind PDS §2 defines, and carries the fields that kind requires |
+| L2 | L1, plus the mapping's artifact set and each artifact at the location §1 maps its step to, recusal decided from the artifact path, the §4 rule 2 assignment recomputed from the brief's `run-id` over its deduplicated primary positions, G1 (distinctness counted on the brief's declared axes with every position checked against the brief's enumeration, duplicate Signature, the banned-slop signatures and their sharing test, recorded and observed), G2 (one winner, bounded grafts that name tokens the winner already declares, the winner's token file digesting to the `tokens-digest` the VERDICT ratified, every violation against the winner answered and every `waived` answer resolving to a valid waiver entry scoped at the winner's work), a recorded outcome for every §3 transition the run crossed — recomputed for G3 and G4, so a `pass` beside an open finding the gate names sinks the obligation — and rule ids that resolve in the loaded registry |
+| L3 | L2, plus a DTCG token document with every token typed, aliases that resolve without a cycle and point down the tiers a document names (PDS §3 G3), a declared `colorSpace` on every colour, values that compute, and the registry's `system` rules decided against real source and clean |
 | L4 | not verifiable here; reported `UNJUDGEABLE`, because it needs rendered evidence |
 
 Two honesty notes about L3. The `system` rules the registry marks checkable and this checker

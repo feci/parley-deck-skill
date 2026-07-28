@@ -113,7 +113,7 @@ function declaresSpec(text) {
 }
 
 function collectInputs(targets) {
-  const inputs = { artifacts: [], tokenDocs: [], styles: [], markup: [], notInspected: [], unparsable: [] };
+  const inputs = { artifacts: [], tokenDocs: [], styles: [], markup: [], notInspected: [], unparsable: [], untyped: [] };
   const files = [];
   for (const target of targets) {
     const resolved = path.resolve(target);
@@ -141,9 +141,17 @@ function collectInputs(targets) {
       if (artifact && artifact.kind && ARTIFACT_KINDS.includes(artifact.kind)) {
         artifact.text = text;
         inputs.artifacts.push(artifact);
+      } else if (artifact && artifact.kind && String(artifact.kind).trim() !== "" && declaresSpec(text)) {
+        /*
+         * §2 rule 1: a file declaring the spec and naming a kind §2 does not define is a
+         * candidate artifact with a broken type, not a stranger. Demoting it to `not-inspected`
+         * let a typo'd kind stand beside a verified L1 while the artifact it was meant to be was
+         * missing from the run entirely. A file declaring the spec and no kind at all is not an
+         * artifact instance — that is how the spec and the registry declare the spec they define —
+         * and it stays uninspected rather than becoming a finding against the doctrine itself.
+         */
+        inputs.untyped.push({ path: file, kind: String(artifact.kind).trim() });
       } else {
-        // A file whose frontmatter parses and names no kind PDS defines is not a candidate
-        // artifact: the spec and the registry both declare the spec they implement.
         inputs.notInspected.push({
           path: file,
           reason: artifact ? "frontmatter carrying no kind PDS defines" : "markdown with no PDS artifact frontmatter"
@@ -225,6 +233,20 @@ function mintedFrom(derived, base) {
 }
 
 /**
+ * The protocol owner of a path, from §1's naming: a round directory holds one file per agent,
+ * named for the agent id — `round-01/<agent>.md`, `round-01/<agent>.tokens.json`. The owner is
+ * the basename up to its first dot, so a file minted from a proposer's id resolves to that
+ * proposer. A path outside a round directory names work §1 assigns no owner to, and returns
+ * the empty string: §8 rule 2 excludes the authors of the waived work, and where the run
+ * records no author there is none to exclude.
+ */
+function workOwner(target) {
+  if (!ROUND_DIR.test(path.basename(path.dirname(target)))) return "";
+  const id = path.basename(target).split(".")[0];
+  return PARTICIPANT_ID.test(id) ? normaliseIdentity(id) : "";
+}
+
+/**
  * Validate one waiver. Every field PDS requires, no wildcard, an unexpired date, an
  * independence that can be established rather than asserted, and, for a system-blind rule,
  * a scope that is not the ratified system itself, since waiving a system-blind rule at the
@@ -286,6 +308,27 @@ function waiverProblem(entry, rule, context) {
     if (!context.participants.has(normaliseIdentity(identity))) {
       return `the ${role} ${identity} is not a participant this run records, so independence cannot be established`;
     }
+  }
+  /*
+   * §8 rule 2's third conjunct, which distinctness does not reach: the counter-signer must not
+   * be an author of the waived work. Naming another participant as grantor costs nothing, so
+   * without this an author approves its own exception by asking a colleague to hold the pen.
+   * The scope resolves to a path, §1 names a round's files for their agent, and both readings
+   * of the scope are tested because either is where the waiver meant to point.
+   */
+  const signerId = normaliseIdentity(signer);
+  for (const resolved of scopePaths(scope, context)) {
+    if (signerId === "" || workOwner(resolved) !== signerId) continue;
+    return `the counter-signer ${signer} authored the waived work, which §1 names for its agent id, so this is a self-approval rather than a counter-signature`;
+  }
+  /*
+   * An identity the run records only through an artifact that identity wrote is a name the run
+   * cannot corroborate: a proposer filing one extra critique under a fresh id reads exactly
+   * like a genuine critic, and §8 rule 2 says a waiver whose independence cannot be established
+   * MUST NOT suppress its finding. The corroborated set is the one recusal already uses.
+   */
+  if (!context.corroborated.has(signerId)) {
+    return `the counter-signer ${signer} is recorded only by an artifact it authored itself, so its independence cannot be established; counter-sign with an id the run records elsewhere`;
   }
   return null;
 }
@@ -366,6 +409,27 @@ function rotateAssignment(runId, positions) {
   const shift = Number.parseInt(digest.slice(0, 8), 16) % sorted.length;
   return [...sorted.slice(shift), ...sorted.slice(0, shift)];
 }
+
+// §1's mapping, as a test over a path. The round directories carry the step; the three
+// single-file steps carry the artifact name §1 gives them. Case is folded because a
+// case-insensitive filesystem is not a second process.
+const ROUND_DIR = /^round-\d+$/i;
+
+function inRound(target, round) {
+  return path.basename(path.dirname(target)).toLowerCase() === round;
+}
+
+function named(target, file) {
+  return path.basename(target).toLowerCase() === file;
+}
+
+const PROCESS_HOMES = {
+  "DESIGN-BRIEF": { where: "DESIGN-BRIEF.md, alongside 00-prompt.md", test: (p) => named(p, "design-brief.md") },
+  DIRECTION: { where: "round-01/<agent>.md", test: (p) => inRound(p, "round-01") },
+  CRITIQUE: { where: "round-02/<agent>.md", test: (p) => inRound(p, "round-02") },
+  VERDICT: { where: "consensus.md", test: (p) => named(p, "consensus.md") },
+  CONTRACT: { where: "FINAL.md", test: (p) => named(p, "final.md") }
+};
 
 // Gate outcomes live on a `gates` list on any artifact of the run. The vocabulary is §3's:
 // a gate passes, fails, or returns ABSTAIN, and nothing else is an outcome a reader can act on.
@@ -451,7 +515,9 @@ function readTokenIndexFor(artifact, field, ctx) {
   const resolved = path.resolve(path.dirname(artifact.path), declaredPath);
   const known = ctx.inputs.tokenDocs.find((document_) => path.resolve(document_.path) === resolved);
   if (known) return { index: known.tokens, path: resolved };
-  if (!fs.existsSync(resolved)) return { error: `${declaredPath} is not a file this run could read` };
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    return { error: `${declaredPath} is not a file this run could read` };
+  }
   try {
     return { index: readTokens(resolved).tokens, path: resolved };
   } catch (error) {
@@ -472,10 +538,12 @@ function checkL1(ledger, ctx) {
   ledger.declare("pds-check:l1-artifacts-present", "L1", "the run carries the PDS artifacts a level claim is read from");
   ledger.declare("pds-check:l1-frontmatter-parses", "L1", "every file declaring the spec parses as the canonical frontmatter subset (§2 rule 5)");
   ledger.declare("pds-check:l1-spec-version", "L1", "every artifact declares spec PDS/1.0");
+  ledger.declare("pds-check:l1-artifact-kind", "L1", "every file declaring the spec names a kind §2 defines");
   ledger.declare("pds-check:l1-required-fields", "L1", "every artifact carries the fields its kind requires");
   // The findings themselves are raised whether or not a level was claimed; here they only
   // sink the obligation, because a run whose artifacts do not parse has not linted.
   if (ctx.inputs.unparsable.length > 0) ledger.failRecorded("pds-check:l1-frontmatter-parses");
+  if (ctx.inputs.untyped.length > 0) ledger.failRecorded("pds-check:l1-artifact-kind");
   if (artifacts.length === 0) {
     ledger.unverified(
       "pds-check:l1-artifacts-present",
@@ -540,6 +608,25 @@ function checkL2(ledger, ctx) {
     }
   }
 
+  /*
+   * §1 rule 1: each step is performed in the Parley phase named for it and produces the
+   * artifact named for it. A presence count says a critique exists; it says nothing about
+   * when it was written. A run with its rounds swapped — directions filed in round-02,
+   * critiques in round-01 — satisfies every count while inverting the order the level
+   * certifies, so the artifacts are read against §1's mapping and not merely tallied.
+   */
+  for (const [kind, home] of Object.entries(PROCESS_HOMES)) {
+    for (const artifact of byKind(artifacts, kind)) {
+      if (home.test(artifact.path)) continue;
+      ledger.fail(
+        "pds-check:l2-process-order",
+        `the ${kind} is filed outside §1's mapping, which names it ${home.where}`,
+        "file each artifact where §1 maps its step; process order is read from the mapping, never from the order the files happen to be passed in",
+        artifact.path
+      );
+    }
+  }
+
   // Recusal: a critique must not target the direction its own author proposed. The author is
   // read off the artifact path, never off the `agent` field: §1 names a round's files by
   // agent id, so the path is the one identity the run does not assert about itself, and a
@@ -588,7 +675,7 @@ function checkL2(ledger, ctx) {
   }
 
   checkAssignment(ledger, { briefs, directions });
-  checkG1(ledger, ctx, { directions, gates });
+  checkG1(ledger, ctx, { briefs, directions, gates });
   checkG2(ledger, ctx, { directions, critiques, verdicts });
 
   // A transition the run crossed carries a recorded gate; one it never reached does not.
@@ -614,6 +701,24 @@ function checkL2(ledger, ctx) {
         "pds-check:l2-gate-recorded",
         `${gate} records the outcome ${JSON.stringify(String(record.entry.outcome ?? ""))}, which is not pass, fail or abstain`,
         "record one of the three outcomes §3 gives a gate, so a reader can act on it",
+        record.path
+      );
+      continue;
+    }
+    /*
+     * A recorded outcome is a self-report. G1 and G2 are recomputed above; G3 and G4 are
+     * recomputed here from the conditions §3 gives them, so a gate recorded `pass` beside
+     * findings the same run raised sinks the obligation instead of certifying against them.
+     * Before this, `outcome: pass` was the whole of the test and a raw literal or an open
+     * quality violation left "verified L2" standing with an empty unmet set.
+     */
+    if (outcome !== "pass") continue;
+    const refuting = gateRefutations(gate, ctx);
+    if (refuting.length > 0) {
+      ledger.fail(
+        "pds-check:l2-gate-recorded",
+        `${gate} is recorded pass and this run's own findings refute its conditions: ${refuting.join(", ")}`,
+        "record the outcome the evidence supports, or resolve the findings; a gate recorded pass against evidence the same run raised certifies nothing",
         record.path
       );
     }
@@ -690,7 +795,23 @@ function checkAssignment(ledger, { briefs, directions }) {
       brief.path
     );
   }
-  const assignment = rotateAssignment(runId, enumerated);
+  /*
+   * §4 rule 2 gives each proposer a distinct position. Rotating the list as written hands the
+   * same position to two proposers as soon as it repeats one — `[flat, flat, layered]` assigns
+   * `flat` twice and both DIRECTIONs then record what they were "given", so the obligation
+   * reports met while the assignment did the one thing it exists to prevent. The repeat is a
+   * defect in the brief, and the rotation is computed over the deduplicated list so the
+   * mapping stays reproducible while the brief is fixed.
+   */
+  if (distinct.size < enumerated.length) {
+    ledger.fail(
+      id,
+      `the brief enumerates '${primaryAxis}' with a position it lists more than once, so the rotation gives one position to more than one proposer`,
+      "enumerate each primary position exactly once; §4 rule 2 assigns distinct positions and cannot do that from a list that repeats one",
+      brief.path
+    );
+  }
+  const assignment = rotateAssignment(runId, [...distinct]);
   proposers.forEach((proposer, index) => {
     const owed = assignment[index % assignment.length];
     const declared = proposer.direction.data.assigned;
@@ -726,14 +847,80 @@ function checkAssignment(ledger, { briefs, directions }) {
   });
 }
 
-function checkG1(ledger, ctx, { directions, gates }) {
+function checkG1(ledger, ctx, { briefs, directions, gates }) {
   const id = "pds-check:l2-gate-g1";
   const positioned = directions.filter((direction) => direction.data.positions && typeof direction.data.positions === "object");
+
+  /*
+   * §2 DESIGN-BRIEF: "The axes are G1's input, and each declared position is checked against
+   * them." Counting the union of whatever keys the DIRECTIONs happen to supply makes the
+   * proposers the authors of the gate's input: two directions that agree on every brief axis
+   * invent one nobody declared, differ on it, and G1's two-axis test is satisfied by a word.
+   * So the axes come from the brief, each position is checked against the brief's enumeration,
+   * and the difference count runs over the brief's axes alone.
+   */
+  const brief = briefs.length === 1 ? briefs[0] : null;
+  const declared =
+    brief && brief.data.axes && typeof brief.data.axes === "object" && !Array.isArray(brief.data.axes)
+      ? brief.data.axes
+      : null;
+  const briefAxes = declared ? Object.keys(declared) : null;
+  if (!briefAxes || briefAxes.length === 0) {
+    ledger.unverified(
+      id,
+      `the run carries ${briefs.length} DESIGN-BRIEF artifacts declaring axes, and G1 counts differences on the brief's declared axes alone`,
+      "carry exactly one brief enumerating the axes and their positions, so a direction's position can be checked against the set G1 is a gate on"
+    );
+  } else {
+    for (const direction of positioned) {
+      const positions = direction.data.positions;
+      const handle = String(direction.data.handle);
+      for (const axis of Object.keys(positions)) {
+        if (briefAxes.includes(axis)) continue;
+        ledger.fail(
+          id,
+          `G1 DISTINCTNESS: '${handle}' declares a position on '${axis}', which the brief does not declare as an axis`,
+          "declare positions on the brief's axes; an axis a proposer invents is not one G1 is a gate on, and a difference on it is not distinctness",
+          direction.path
+        );
+      }
+      for (const axis of briefAxes) {
+        const enumerated = Array.isArray(declared[axis]) ? declared[axis].map(String) : null;
+        if (positions[axis] === undefined) {
+          ledger.fail(
+            id,
+            `G1 DISTINCTNESS: '${handle}' declares no position on the brief axis '${axis}'`,
+            "declare one position per brief axis; an axis left blank is not a difference and cannot be counted as one",
+            direction.path
+          );
+          continue;
+        }
+        if (!enumerated) {
+          ledger.unverified(
+            id,
+            `the brief enumerates no positions on '${axis}', so '${handle}' declares a position nothing can be checked against`,
+            "enumerate each axis's positions in the brief; §2 DESIGN-BRIEF gives named axes with enumerated positions, never free text",
+            brief.path
+          );
+          continue;
+        }
+        if (!enumerated.includes(String(positions[axis]).trim())) {
+          ledger.fail(
+            id,
+            `G1 DISTINCTNESS: '${handle}' takes '${String(positions[axis]).trim()}' on '${axis}', which the brief does not enumerate`,
+            "take a position the brief enumerates, or amend the brief before the run diverges",
+            direction.path
+          );
+        }
+      }
+    }
+  }
+
   for (let i = 0; i < positioned.length; i += 1) {
     for (let j = i + 1; j < positioned.length; j += 1) {
       const first = positioned[i];
       const second = positioned[j];
-      const axes = new Set([...Object.keys(first.data.positions), ...Object.keys(second.data.positions)]);
+      const axes = briefAxes || new Set([...Object.keys(first.data.positions), ...Object.keys(second.data.positions)]);
       let differing = 0;
       for (const axis of axes) {
         if (String(first.data.positions[axis]) !== String(second.data.positions[axis])) differing += 1;
@@ -1087,9 +1274,124 @@ function checkG2(ledger, ctx, { directions, critiques, verdicts }) {
   }
 }
 
+/*
+ * §3 G3's token-integrity conjuncts over the merged token graph, returned as problems rather
+ * than written straight to a ledger: L3's obligations and the G3 gate recomputation are two
+ * readings of one list, and a gate that disagreed with the level about the same token file
+ * would be two answers to one question.
+ */
+
+/*
+ * Alias direction, as §3 G3 defines it. A token document that names its tiers by group states
+ * which way a reference may point: a component may reach a semantic, a semantic may reach a
+ * primitive, and a primitive is the floor — it holds a value, never another primitive.
+ * A document naming none of these groups declares no tiers and the conjunct is vacuous, which
+ * is why this reads the group name and never guesses a tier from the shape of a value.
+ */
+const TIER_GROUPS = { primitive: 0, primitives: 0, semantic: 1, semantics: 1, component: 2, components: 2 };
+const TIER_NAMES = ["primitive", "semantic", "component"];
+
+function tierOfToken(tokenPath) {
+  const head = String(tokenPath).split(".")[0].toLowerCase();
+  return Object.prototype.hasOwnProperty.call(TIER_GROUPS, head) ? TIER_GROUPS[head] : null;
+}
+
+function tokenProblems(tokenDocs) {
+  const problems = [];
+  const index = mergeTokens(tokenDocs);
+  const raise = (obligation, violation, remedy, site) => problems.push({ obligation, violation, remedy, site });
+  for (const token of [...index.values()].sort((a, b) => a.path.localeCompare(b.path))) {
+    if (typeof token.type !== "string" || token.type.trim() === "") {
+      raise(
+        "pds-check:l3-token-document",
+        `${token.path} declares no $type, directly or from its group`,
+        "type the token, or type the group it sits in; an untyped leaf is not a DTCG token",
+        token.file
+      );
+    }
+    const target = aliasTarget(token.value);
+    const resolved = resolveValue(index, token.path);
+    if (target && resolved.error) {
+      raise(
+        "pds-check:l3-alias-resolves",
+        `${token.path} aliases ${target}: ${resolved.error}`,
+        "point the alias at a declared token, and break any cycle by making one end a value",
+        token.file
+      );
+      continue;
+    }
+    if (target) {
+      const from = tierOfToken(token.path);
+      const to = tierOfToken(target);
+      if (from !== null && to !== null && to > from) {
+        raise(
+          "pds-check:l3-alias-direction",
+          `${token.path} is a ${TIER_NAMES[from]} and aliases ${target}, which is a ${TIER_NAMES[to]}`,
+          "point the alias down the tiers §3 G3 names; a lower tier that reaches up inverts the layer the token file exists to have",
+          token.file
+        );
+      } else if (from === 0 && to === 0) {
+        raise(
+          "pds-check:l3-alias-direction",
+          `${token.path} is a primitive and aliases the primitive ${target}`,
+          "give the primitive its own value; a primitive is the floor of the token graph and never references another",
+          token.file
+        );
+      }
+    }
+    if (token.type !== "color" || resolved.error) continue;
+    const value = resolved.value;
+    const space = value !== null && typeof value === "object" && !Array.isArray(value) ? value.colorSpace : undefined;
+    if (typeof space !== "string" || space.trim() === "") {
+      raise(
+        "pds-check:l3-colour-space",
+        `${token.path} declares no colorSpace on the value it resolves to`,
+        "declare the space the value is in; a bare literal is computable and states nothing about the space it was chosen in",
+        token.file
+      );
+    }
+    const srgb = toSrgb(value);
+    if (srgb.error) {
+      raise(
+        "pds-check:l3-colour-computable",
+        `${token.path}: ${srgb.error}`,
+        "give a value the target can display, in a space this checker can compute",
+        token.file
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * What this run's own findings say about a gate recorded `pass`. §3 G3 is the token layer's
+ * integrity — the system rules the level already reads it as, plus the token-graph conjuncts;
+ * §3 G4 is the absence of an unresolved `quality` violation, which is read after waivers
+ * because a validly waived finding is not an open one.
+ */
+function gateRefutations(gate, ctx) {
+  const refuting = [];
+  const openRules = (className) =>
+    [...ctx.registry.rules.values()]
+      .filter((rule) => rule.class === className)
+      .filter((rule) => rule.surface === "core" || rule.surface === ctx.surface)
+      .filter((rule) => ctx.outcomes.get(rule.id) === "VIOLATION")
+      .map((rule) => rule.id)
+      .sort(codepoint);
+  if (gate === "G3") {
+    if (ctx.registry) refuting.push(...openRules("system"));
+    if (ctx.inputs.tokenDocs.length > 0) {
+      refuting.push(...[...new Set(tokenProblems(ctx.inputs.tokenDocs).map((problem) => problem.obligation))].sort(codepoint));
+    }
+  }
+  if (gate === "G4" && ctx.registry) refuting.push(...openRules("quality"));
+  return refuting;
+}
+
 function checkL3(ledger, ctx) {
   ledger.declare("pds-check:l3-token-document", "L3", "the run carries a DTCG token document, every token typed");
   ledger.declare("pds-check:l3-alias-resolves", "L3", "every alias resolves to a declared token, with no cycle");
+  ledger.declare("pds-check:l3-alias-direction", "L3", "every alias points down the tiers a token document names");
   ledger.declare("pds-check:l3-colour-space", "L3", "every colour token declares the space its value is in");
   ledger.declare("pds-check:l3-colour-computable", "L3", "every colour token computes to a value the target can display");
   ledger.declare("pds-check:l3-system-rules", "L3", "the system rules G3 names were decided against real source, and came back clean");
@@ -1101,47 +1403,8 @@ function checkL3(ledger, ctx) {
       "pass the ratified token file to verify token integrity"
     );
   } else {
-    const index = mergeTokens(ctx.inputs.tokenDocs);
-    for (const token of [...index.values()].sort((a, b) => a.path.localeCompare(b.path))) {
-      if (typeof token.type !== "string" || token.type.trim() === "") {
-        ledger.fail(
-          "pds-check:l3-token-document",
-          `${token.path} declares no $type, directly or from its group`,
-          "type the token, or type the group it sits in; an untyped leaf is not a DTCG token",
-          token.file
-        );
-      }
-      const target = aliasTarget(token.value);
-      const resolved = resolveValue(index, token.path);
-      if (target && resolved.error) {
-        ledger.fail(
-          "pds-check:l3-alias-resolves",
-          `${token.path} aliases ${target}: ${resolved.error}`,
-          "point the alias at a declared token, and break any cycle by making one end a value",
-          token.file
-        );
-        continue;
-      }
-      if (token.type !== "color" || resolved.error) continue;
-      const value = resolved.value;
-      const space = value !== null && typeof value === "object" && !Array.isArray(value) ? value.colorSpace : undefined;
-      if (typeof space !== "string" || space.trim() === "") {
-        ledger.fail(
-          "pds-check:l3-colour-space",
-          `${token.path} declares no colorSpace on the value it resolves to`,
-          "declare the space the value is in; a bare literal is computable and states nothing about the space it was chosen in",
-          token.file
-        );
-      }
-      const srgb = toSrgb(value);
-      if (srgb.error) {
-        ledger.fail(
-          "pds-check:l3-colour-computable",
-          `${token.path}: ${srgb.error}`,
-          "give a value the target can display, in a space this checker can compute",
-          token.file
-        );
-      }
+    for (const problem of tokenProblems(ctx.inputs.tokenDocs)) {
+      ledger.fail(problem.obligation, problem.violation, problem.remedy, problem.site);
     }
   }
 
@@ -1219,10 +1482,13 @@ function runCheck(options) {
   }
   // A contract naming a token file pulls it in, so checking source alone still knows the
   // ratified set rather than reporting every reference as undeclared.
-  if (contract && typeof contract.data.tokens === "string") {
+  // The same empty-path reading as the waiver field below: `tokens: ""` resolves to the
+  // contract's own directory, and reading a directory as a token document is a crash, not a
+  // finding about the design.
+  if (contract && typeof contract.data.tokens === "string" && contract.data.tokens.trim() !== "") {
     const tokenPath = path.resolve(path.dirname(contract.path), contract.data.tokens);
     const known = inputs.tokenDocs.some((document_) => path.resolve(document_.path) === tokenPath);
-    if (!known && fs.existsSync(tokenPath)) inputs.tokenDocs.push(readTokens(tokenPath));
+    if (!known && fs.existsSync(tokenPath) && fs.statSync(tokenPath).isFile()) inputs.tokenDocs.push(readTokens(tokenPath));
   }
   const tokenIndex = mergeTokens(inputs.tokenDocs);
 
@@ -1246,7 +1512,8 @@ function runCheck(options) {
       styles: inputs.styles.map((style) => relative(style.path, cwd)),
       markup: inputs.markup.map((source) => relative(source.path, cwd)),
       "not-inspected": inputs.notInspected.map((entry) => `${relative(entry.path, cwd)} (${entry.reason})`),
-      unparsable: inputs.unparsable.map((entry) => `${relative(entry.path, cwd)} (${entry.reason})`)
+      unparsable: inputs.unparsable.map((entry) => `${relative(entry.path, cwd)} (${entry.reason})`),
+      "invalid-kind": inputs.untyped.map((entry) => `${relative(entry.path, cwd)} (kind ${entry.kind})`)
     },
     contract: contract ? relative(contract.path, cwd) : null,
     level: null,
@@ -1435,12 +1702,16 @@ function runCheck(options) {
   /* waivers, before conformance: a finding a valid waiver suppressed is not an open one */
   let waivers = null;
   let validWaivers = null;
-  const waiverPath =
-    options.waiversPath ||
-    (contract && typeof contract.data.waivers === "string"
+  // §2 rule 3: empty is not absent — and `waivers: ""` is a value the canonical frontmatter
+  // subset publishes. Resolving it gives the contract's own directory, which every existence
+  // test passes and every reader crashes on. An empty path names no file, so it is read as
+  // one: the field is present, it points nowhere, and the run continues.
+  const declaredWaivers =
+    contract && typeof contract.data.waivers === "string" && contract.data.waivers.trim() !== ""
       ? path.resolve(path.dirname(contract.path), contract.data.waivers)
-      : null);
-  if (waiverPath && fs.existsSync(waiverPath)) {
+      : null;
+  const waiverPath = options.waiversPath || declaredWaivers;
+  if (waiverPath && fs.existsSync(waiverPath) && fs.statSync(waiverPath).isFile()) {
     waivers = loadWaivers(waiverPath);
   } else if (options.waiversPath) {
     throw new CheckError(`no such waiver file: ${options.waiversPath}`);
@@ -1449,7 +1720,7 @@ function runCheck(options) {
     const systemPaths = [];
     if (contract) {
       systemPaths.push(contract.path);
-      if (typeof contract.data.tokens === "string") {
+      if (typeof contract.data.tokens === "string" && contract.data.tokens.trim() !== "") {
         systemPaths.push(path.resolve(path.dirname(contract.path), contract.data.tokens));
       }
     }
@@ -1458,7 +1729,8 @@ function runCheck(options) {
       systemPaths,
       cwd,
       waiverDir: path.dirname(waivers.path),
-      participants: runParticipants(inputs.artifacts)
+      participants: runParticipants(inputs.artifacts),
+      corroborated: corroboratedIdentities(inputs.artifacts)
     };
     const valid = [];
     for (const entry of waivers.entries) {
@@ -1507,6 +1779,23 @@ function runCheck(options) {
       line: 0,
       violation: `declares spec PDS/1.0 and its frontmatter is outside the canonical subset: ${entry.reason}`,
       remedy: "write the frontmatter in the subset §2 rule 5 publishes; a candidate artifact that does not parse is reported, never dropped"
+    });
+  }
+
+  /* a candidate whose kind PDS does not define is a broken artifact, never a stranger */
+  for (const entry of inputs.untyped) {
+    report["findings-detail"].push({
+      rule: "pds-check:l1-artifact-kind",
+      verdict: "VIOLATION",
+      class: "conformance",
+      severity: 4,
+      tier: tierWord("T0"),
+      "system-blind": false,
+      path: relative(entry.path, cwd),
+      absolutePath: entry.path,
+      line: 0,
+      violation: `declares spec PDS/1.0 and names the kind ${entry.kind}, which §2 does not define`,
+      remedy: `name one of the kinds §2 defines: ${ARTIFACT_KINDS.join(", ")}; a candidate artifact with a broken type is reported, never demoted to a file nobody inspected`
     });
   }
 
@@ -1727,7 +2016,13 @@ function citedRuleIds(artifacts) {
  * roster to tell them apart. The list is reported on the level rather than swallowed, so
  * "verified L2" is never read without the ids whose recusal rests on a self-chosen path.
  */
-function recusalNotAnchored(artifacts) {
+/**
+ * The identities some artifact of the run records other than the one that identity wrote: a
+ * DIRECTION author (which the brief's assignment, G1 and the VERDICT all bear on), the
+ * Decider, and a named DESIGN-SYSTEM author. A CRITIQUE author appears nowhere but on its own
+ * file, so it is not in this set — the run cannot tell it from an id minted for the occasion.
+ */
+function corroboratedIdentities(artifacts) {
   const corroborated = new Set();
   for (const artifact of artifacts) {
     if (artifact.kind === "DIRECTION") corroborated.add(normaliseIdentity(agentOf(artifact)));
@@ -1735,6 +2030,12 @@ function recusalNotAnchored(artifacts) {
     if (artifact.kind === "DESIGN-BRIEF") corroborated.add(normaliseIdentity(artifact.data.decider));
     if (artifact.kind === "DESIGN-SYSTEM") corroborated.add(normaliseIdentity(artifact.data.author));
   }
+  corroborated.delete("");
+  return corroborated;
+}
+
+function recusalNotAnchored(artifacts) {
+  const corroborated = corroboratedIdentities(artifacts);
   const unanchored = new Set();
   for (const artifact of artifacts) {
     if (artifact.kind !== "CRITIQUE") continue;

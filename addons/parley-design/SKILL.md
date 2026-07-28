@@ -6,16 +6,14 @@ description: "Produce a design system with several independent participants and 
 # parley-design
 
 An opt-in Parley Deck add-on for **collaborative design-system work**: diverging on
-directions, critiquing them, choosing one whole, binding it as a contract, applying it,
-and auditing what shipped against what was ratified.
+directions, critiquing them, choosing one whole, binding it as a contract, applying it, and
+auditing what shipped against what was ratified. It is doctrine plus a protocol (`PDS/1.0`,
+in `references/PDS.md`) — markdown only, no runtime, no network, no framework.
 
-It is doctrine plus a protocol (`PDS/1.0`, in `references/PDS.md`) — markdown only, no
-runtime, no network, no framework.
-
-Load it **alongside** `parley-deck`, never instead of it. `parley-deck/COOPERATION.md`
-owns phases, ownership, quorum and terminal states; this add-on is a **profile** over
-those phases. It adds design artifacts and gates that attach to existing transitions and
-introduces **no second phase cursor**.
+Load it **alongside** `parley-deck`, never instead of it. `parley-deck/COOPERATION.md` owns
+phases, ownership, quorum and terminal states; this add-on is a **profile** over those
+phases, adding design artifacts and gates that attach to existing transitions and
+introducing **no second phase cursor**.
 
 ## When to use this skill
 
@@ -25,10 +23,13 @@ Run the full ritual when any of these hold:
 - The work changes a ratified rule, foundation, or token family.
 - An existing interface must be audited against a contract rather than against opinion.
 
-Run the **fast path** (invariants plus the checker, one agent, no deliberation) when all
-of these hold: a ratified system exists, the change touches one surface inside it, and it
-introduces no new token family, foundation, or visual direction. Greenfield work can never
-use the fast path.
+Run the **fast path** (invariants plus the checker, one agent) when all of these hold: a
+ratified system exists, the change touches one surface inside it, and it introduces no new
+token family, foundation, or visual direction. Greenfield work can never use the fast path.
+
+**The fast path is not a Parley Deck run.** `COOPERATION.md` §1 makes multi-agent execution
+mandatory, so one agent alone never satisfies it: a fast-path run claims no Parley
+verification and no level above L1 (PDS §4 rule 8).
 
 ## When NOT to use this skill
 
@@ -88,7 +89,7 @@ target profile is web.
 | APPLY (Phase 5) | SKILL.md + PDS §2 §7 + RULES.md `class: quality` + `class: system` + WEB |
 | AUDIT (Phases 6–8) | SKILL.md + PDS §2 §3 §6 §7 §8 §9 + RULES.md (all) + WEB |
 | SYSTEM (after Phase 8) | PDS §2 §5 §10 §11 |
-| Fast path | SKILL.md + RULES.md `class: quality` + `class: system` + WEB |
+| Fast path (outside Parley, §4 rule 8) | SKILL.md + RULES.md `class: quality` + `class: system` + WEB |
 
 `references/RULES.md` is the single source of truth for rules: one `pds-rule` YAML fence
 per rule, with its rationale, counterexample and remedy in the same file. There is no
@@ -96,21 +97,10 @@ generated copy of it anywhere, including inside the checker.
 
 ## Enforcement is optional, and the doctrine is complete without it
 
-The companion `parley-design-check` add-on mechanises the checkable part: it reads the
-same `RULES.md`, runs detectors against files on disk, and emits findings as
-`rule-id — violation — remedy`.
+The companion `parley-design-check` add-on mechanises the checkable part: it reads the same
+`RULES.md`, runs detectors against files on disk, and emits `rule-id — violation — remedy`.
 
-**Every rule in this doctrine applies with no checker installed.** Participants read the
-same registry records and write the same three-part findings by hand; the checker only
-makes a subset of them cheaper, reproducible and diffable. What it cannot decide it
-reports `UNJUDGEABLE` rather than passing it, and if the registry is absent it refuses
-rule checks and says so instead of guessing from a bundled copy.
-
-## Files
-
-```text
-addons/parley-design/SKILL.md                 this file — invariants + dispatcher
-addons/parley-design/references/PDS.md        the protocol (PDS/1.0)
-addons/parley-design/references/RULES.md      the literate rule registry
-addons/parley-design/references/WEB-ANNEX.md  web-specific numbers, non-normative elsewhere
-```
+**Every rule here applies with no checker installed.** Participants read the same registry
+records and write the same three-part findings by hand; the checker only makes a subset of
+them cheaper and diffable. What it cannot decide it reports `UNJUDGEABLE` rather than
+passing, and with no registry it refuses rule checks instead of guessing from a bundled copy.
