@@ -80,6 +80,9 @@ module.exports = {
     const results = [];
     for (const style of ctx.styles) {
       for (const block of style.blocks) {
+        // The `font-family` of a `@font-face` is the name being defined, never a face this
+        // surface reached for, so it is not evidence for this rule either.
+        if (block.atBlock && block.atBlock.name === "font-face") continue;
         for (const declaration of block.declarations) {
           if (declaration.prop !== "font-family") continue;
           const face = primaryFamily(declaration.value);

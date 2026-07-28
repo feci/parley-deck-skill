@@ -9,7 +9,7 @@
  */
 
 const { aliasTarget, toCssVar } = require("../artifacts.js");
-const { varUses } = require("../css.js");
+const { declarationVarUses, markupVarUses } = require("../css.js");
 
 const EXTENSION = "org.parley.pds";
 
@@ -20,8 +20,14 @@ module.exports = {
   summary: "reports declared tokens that no source file and no other token references",
   run(ctx) {
     const used = new Set();
-    for (const source of [...ctx.styles, ...ctx.markup]) {
-      for (const use of varUses(source.text)) used.add(use.name);
+    // A reference site is a declaration value in a stylesheet and a line in markup: the same
+    // reading `core:token-used-undeclared` makes, so a token cannot be undeclared to one rule
+    // and used to the other.
+    for (const source of ctx.styles) {
+      for (const use of declarationVarUses(source.blocks)) used.add(use.name);
+    }
+    for (const source of ctx.markup) {
+      for (const use of markupVarUses(source.text)) used.add(use.name);
     }
     for (const token of ctx.tokenIndex.values()) {
       const target = aliasTarget(token.value);

@@ -49,6 +49,9 @@ module.exports = {
     const results = [];
     for (const style of ctx.styles) {
       for (const block of style.blocks) {
+        // `@font-face` names the face it is defining, not one it is using. Reading it as a use
+        // would report every project that self-hosts a ratified face against its own allowlist.
+        if (block.atBlock && block.atBlock.name === "font-face") continue;
         for (const declaration of block.declarations) {
           if (declaration.prop !== "font-family") continue;
           for (const family of families(declaration.value)) {

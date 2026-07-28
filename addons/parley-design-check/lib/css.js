@@ -26,22 +26,37 @@
  */
 
 /*
- * The block model (§5.4). `(`, `[` and `{` each open a matched simple block that ends only at
- * its own closing code point; every other code point inside one — braces included — is content.
- * A scanner that reads `{` and `}` as rule structure wherever they appear closes a rule the
- * stylesheet never closed at the first brace inside any function, drops every declaration
- * between there and the next `{` as top-level text, and opens a phantom block at that `{`. One
- * re-balancing brace is enough to leave every residue check quiet — each flushed fragment
- * balances its own parentheses while the structure between the flushes is wrong — so
- * `.a { background: x) fn(}y); color: #ff0000; dummy: z) fn({w: (1); }` certified L3 with PASS
- * and exit 0 while a browser applied the raw colour. No malformed input is needed: any ordinary
- * function with a brace in its arguments has this shape.
+ * The block model (§5.4.4, §5.4.7), and why it is a model rather than a list of constructs.
  *
- * So the open blocks are one stack. `(`, `[` and `{` push; a closer pops only when it matches
- * the innermost open block, because §5.4.7 returns a mismatched closer as an ordinary preserved
- * token, which is what a browser does with it. `{` opens a rule, `}` closes one, and `;` ends a
- * declaration only when the innermost open block is a rule — inside `(…)` or `[…]` all three are
- * content. A block still open at end of input is reported through the unreadable channel.
+ * `(`, `[` and `{` each open a matched simple block that ends only at its own closing code
+ * point; every other code point inside one — braces, semicolons and mismatched closers included
+ * — is content. Eight fix-up cycles closed members of one family one at a time, and each time a
+ * probe found the next, because each fix knew about the constructs already filed and nothing
+ * about the rule they are instances of. Two of those fixes read `{` and `}` as rule structure
+ * wherever they appeared; the third tracked `(` and `[` but let a `{` inside one of them stay
+ * mere content, so the stack no longer described the file. In
+ * `.a { background: fn({) }x); color: #ff0000; dummy: fn({) {y: (1); }` a browser keeps the `)`
+ * inside the `{…}`, closes that block at the `}`, and closes the function at the last `)`; a
+ * scanner that never pushed the `{` pops the function at that `)` instead, reads the `}` as the
+ * end of the rule, drops `color: #ff0000` as top-level text no rule owns, and opens a phantom
+ * rule at the later `{`. Every stack entry and every buffer then ends balanced, so no residue
+ * check fires: the run certified L3 with PASS and exit 0 while Chromium applied the raw colour.
+ *
+ * So the open blocks are one stack, and it is the only thing that decides what a brace means:
+ *
+ *   - `(`, `[` and `{` push. A `{` pushes a *rule* when the innermost open block is a rule or
+ *     there is none — the only place a stylesheet may open one — and a component-value block
+ *     otherwise, because a `{` inside `(…)`, `[…]` or another such block is part of a value.
+ *   - A closer pops only when it matches the innermost open block. §5.4.7 returns a mismatched
+ *     closer as an ordinary preserved token, which is what a browser does with it, so it stays
+ *     in the value here too and closes nothing.
+ *   - `}` closes a rule, and `;` ends a declaration, only when the innermost open block is a
+ *     rule or there is none. Inside any component-value block both are content.
+ *
+ * That is the whole rule; `url()`, strings, comments and escapes are tokens consumed before it
+ * runs, never special cases inside it. A block still open at end of input, a `}` that closes
+ * nothing, and a declaration whose parentheses do not balance are reported through the
+ * unreadable channel, so what the model cannot resolve costs a verdict instead of passing.
  */
 
 /*
@@ -493,6 +508,56 @@ function splitDeclaration(text) {
   return null;
 }
 
+/*
+ * What an at-rule's body holds. The block model says where a block begins and ends; it says
+ * nothing about whether the things inside one are rules or declarations, and that second
+ * question has its own arm of this family. A declaration directly inside an at-rule had no rule
+ * to be attributed to, so it was dropped — and dropped in silence, because dropping it is
+ * correct for `@media` at the top level, where a browser discards it too. It is not correct for
+ * `@scope`: Chromium applies `@scope (.probe) { color: #ff0000 }` to the scope root, and the
+ * checker read no such declaration, recorded no reason, and returned PASS with exit 0.
+ *
+ * So the two shapes are named. A body of declarations becomes a block of its own, so its
+ * declarations reach every detector exactly as a rule's do; a body of rules keeps the at-rule
+ * as context for the rules inside it, and a bare declaration there is discarded by the browser
+ * as well, so the silence is the two readings agreeing. What is in neither list is the shape
+ * the model cannot resolve — and there the scanner says so rather than guessing, which is the
+ * whole point of the fail-safe. Widening that to every discard is not available: it would
+ * report `@font-face` in nearly every real stylesheet, and a rule that fires everywhere is a
+ * rule that gets switched off.
+ */
+const DECLARATION_AT_RULES = new Set([
+  "font-face", "page", "property", "counter-style", "scope", "viewport",
+  "font-palette-values", "view-transition", "position-try",
+  // The margin boxes of `@page`.
+  "top-left-corner", "top-left", "top-center", "top-right", "top-right-corner",
+  "bottom-left-corner", "bottom-left", "bottom-center", "bottom-right", "bottom-right-corner",
+  "left-top", "left-middle", "left-bottom", "right-top", "right-middle", "right-bottom",
+  // The feature blocks of `@font-feature-values`.
+  "swash", "annotation", "ornaments", "stylistic", "styleset", "character-variant",
+  "historical-forms",
+  /*
+   * Build-time directives whose body is a list of declarations. A browser never sees these —
+   * the build turns them into ordinary rules — but this checker reads source, and a source
+   * stylesheet is where they live. `@theme` is the token layer of a Tailwind v4 project: over a
+   * corpus of 278 real stylesheets it was the one at-rule that reached the fail-safe below, in
+   * 32 files. Reporting those files unreadable would be the false alarm in every file that
+   * makes a gate get switched off, and reading them is what the token rules want anyway.
+   */
+  "theme", "utility", "variant", "custom-variant"
+]);
+
+const RULE_AT_RULES = new Set([
+  "media", "supports", "container", "layer", "document", "keyframes", "starting-style",
+  "font-feature-values"
+]);
+
+/** An at-rule's name without its vendor prefix, which is the name that decides its shape. */
+function atRuleName(prelude) {
+  const match = /^@(-[a-zA-Z]+-)?([a-zA-Z-]+)/.exec(prelude);
+  return match ? match[2].toLowerCase() : "";
+}
+
 /**
  * Parse a stylesheet into rule blocks and the reasons it could not be tokenised. Each block
  * records its selector list, the at-rule contexts it sits inside, and its declarations with
@@ -522,16 +587,46 @@ function scanStylesheet(text) {
     }
     return null;
   };
-  // The innermost open block, whose kind decides whether `{`, `}` and `;` are structure or
-  // content (§5.4). Inside a `(…)` or a `[…]` all three are content.
-  const inValueBlock = () => {
-    const top = stack[stack.length - 1];
-    return top !== undefined && (top.type === "paren" || top.type === "bracket");
+  /*
+   * The one question the block model answers, asked of the innermost open block (§5.4.4).
+   * `paren`, `bracket` and `curly` are component-value blocks: inside any of them `{`, `}` and
+   * `;` are content, and a `{` opens another component-value block rather than a rule. `rule`
+   * and `at` are rule bodies, and so is the top level of the stylesheet, where all three are
+   * structure. Nothing else may distinguish them, or the next construct in this family is a
+   * construct the stack does not describe.
+   */
+  const openBlock = () => stack[stack.length - 1];
+  const inComponentValue = () => {
+    const top = openBlock();
+    return top !== undefined && (top.type === "paren" || top.type === "bracket" || top.type === "curly");
+  };
+  /** The at-rule whose body is open, or null at the top level of the stylesheet. */
+  const enclosingAt = () => {
+    for (let i = stack.length - 1; i >= 0; i -= 1) {
+      if (stack[i].at) return stack[i].at;
+      if (stack[i].type === "rule") return null;
+    }
+    return null;
   };
   const flushDeclaration = () => {
     const rule = currentRule();
     const text_ = buffer.trim();
     const at = bufferLine || line;
+    if (!rule && text_ !== "") {
+      /*
+       * A declaration with no rule to hold it. At the top level, and inside an at-rule whose
+       * body is a list of rules, a browser discards it too, so the two readings agree and there
+       * is nothing to report. Inside an at-rule this scanner cannot classify they may not
+       * agree — `@scope` was exactly that, and Chromium applied what the scanner dropped — so
+       * that shape, and only that shape, goes to the fail-safe.
+       */
+      const enclosing = enclosingAt();
+      if (enclosing && !RULE_AT_RULES.has(enclosing.name) && splitDeclaration(text_)) {
+        log.note(
+          `the declaration at line ${at} sits directly inside @${enclosing.name}, whose body this scanner can read neither as rules nor as declarations`
+        );
+      }
+    }
     if (rule && text_ !== "") {
       const split = splitDeclaration(text_);
       if (split && split.prop !== "") {
@@ -660,40 +755,74 @@ function scanStylesheet(text) {
       continue;
     }
     if (ch === ")" || ch === "]") {
-      const top = stack[stack.length - 1];
+      const top = openBlock();
       if (top !== undefined && top.type === (ch === ")" ? "paren" : "bracket")) stack.pop();
       push(ch);
       continue;
     }
     if (ch === "{") {
-      if (inValueBlock()) {
+      /*
+       * A `{` inside a component-value block opens another one, and its contents stay in the
+       * value. Only the `{` this test lets through may open a rule, so the `)` in `fn({)` can
+       * no longer pop the function while a browser holds it inside the brace block.
+       */
+      if (inComponentValue()) {
+        stack.push({ type: "curly", line });
         push(ch);
         continue;
       }
       const prelude = buffer.trim();
+      /*
+       * A custom property's value may be a `{…}` block, and it is a value: Chromium's CSSOM for
+       * `.a { --x: { color: #ff0000 }; }` is that one declaration, and it applies the colour to
+       * nothing. Reading the brace as a nested rule put `color: #ff0000` in a phantom block and
+       * reported a raw colour no browser ever paints — a false finding, which costs a rule
+       * system its readers as surely as a false clean does. Only a custom property qualifies;
+       * `&:hover {` and `.b {` carry a colon and a name too, and both really do open a rule.
+       */
+      const started = splitDeclaration(prelude);
+      if (started && decodeDeclarationText(started.prop, () => {}).startsWith("--")) {
+        stack.push({ type: "curly", line });
+        push(ch);
+        continue;
+      }
       const startLine = bufferLine || line;
       resetBuffer();
-      if (prelude.startsWith("@")) {
-        const name = (/^@([a-zA-Z-]+)/.exec(prelude) || [null, ""])[1].toLowerCase();
-        stack.push({ type: "at", line: startLine, at: { name, prelude, line: startLine } });
-      } else {
-        const block = {
-          selector: prelude,
-          selectors: prelude
-            .split(",")
-            .map((part) => part.trim())
-            .filter(Boolean),
-          line: startLine,
-          atRules: stack.filter((entry) => entry.type === "at").map((entry) => entry.at),
-          declarations: []
-        };
-        blocks.push(block);
-        stack.push({ type: "rule", line: startLine, block });
+      // Every at-rule this block sits inside, whether that at-rule holds rules or declarations.
+      const context = stack.filter((entry) => entry.at).map((entry) => entry.at);
+      const at = prelude.startsWith("@") ? { name: atRuleName(prelude), prelude, line: startLine } : null;
+      if (at && !DECLARATION_AT_RULES.has(at.name)) {
+        stack.push({ type: "at", line: startLine, at });
+        continue;
       }
+      const block = {
+        selector: prelude,
+        selectors: prelude
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean),
+        line: startLine,
+        atRules: context,
+        // The at-rule this block *is* the body of, where it is one. A `@font-face` names a face
+        // it defines rather than one it uses, and the face rules have to be able to tell.
+        atBlock: at,
+        declarations: []
+      };
+      blocks.push(block);
+      stack.push({ type: "rule", line: startLine, at, block });
       continue;
     }
     if (ch === "}") {
-      if (inValueBlock()) {
+      const top = openBlock();
+      // A mismatched closer: `(` and `[` end at their own code point, so this one is content.
+      if (top !== undefined && (top.type === "paren" || top.type === "bracket")) {
+        push(ch);
+        continue;
+      }
+      // The matching closer of a component-value `{`: it ends a value block, not a rule, so
+      // the declaration carrying it goes on accumulating.
+      if (top !== undefined && top.type === "curly") {
+        stack.pop();
         push(ch);
         continue;
       }
@@ -705,7 +834,7 @@ function scanStylesheet(text) {
       continue;
     }
     if (ch === ";") {
-      if (inValueBlock()) {
+      if (inComponentValue()) {
         push(ch);
         continue;
       }
@@ -739,26 +868,72 @@ function parseStylesheet(text) {
   return scanStylesheet(text).blocks;
 }
 
+const VAR_REFERENCE = /var\(\s*(--[A-Za-z0-9_-]+)/g;
+
 /**
- * Every `var(--name)` reference in a text, with its line.
+ * Every `var(--name)` reference in a parsed stylesheet's declarations, with the line of the
+ * declaration that carries it.
  *
- * The same rule as the declarations, one layer out: a browser resolves a reference by what its
- * tokens spell, so `\76 ar(--brand)` and `var(\2d\2d brand)` are both `var(--brand)` and both
- * invisible to a regular expression over the raw line. Chromium resolves either — the fallback
- * in `.probe { grid-area: \76 ar(--nope, #ff0000) }` computes — while the reference to an
- * undeclared token went unreported and the run certified L3 with PASS and exit 0. Decoding is a
- * no-op on a line carrying no backslash, which is every line of an ordinary stylesheet.
+ * A browser resolves a reference by what its tokens spell, so `\76 ar(--brand)` and
+ * `var(\2d\2d brand)` are both `var(--brand)` and both invisible to a regular expression over
+ * the raw text. Chromium resolves either — the fallback in
+ * `.probe { grid-area: \76 ar(--nope, #ff0000) }` computes — while the reference to an
+ * undeclared token went unreported and the run certified L3 with PASS and exit 0.
+ *
+ * The decoding has to happen where the scanner already knows which bytes are a declaration
+ * value. Decoding whole lines instead made ordinary escaped selector text into references: a
+ * utility class such as `.supports-\[var\(--ghost\)\]` spells `.supports-[var(--ghost)]`, and
+ * `--ghost` was then reported as a reference to an undeclared token although the browser
+ * resolves nothing there and the rule's only value used a declared one. A false finding is as
+ * damaging as a false clean — it is what makes a gate get switched off — so the search runs
+ * over `declarations[].value` and never over selector, prelude or comment text.
  */
-function varUses(text) {
+function declarationVarUses(blocks) {
   const uses = [];
-  const lines = text.split(/\r?\n/);
-  const silent = () => {};
-  lines.forEach((content, index) => {
-    for (const match of decodeDeclarationText(content, silent).matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/g)) {
-      uses.push({ name: match[1], line: index + 1 });
+  for (const block of blocks) {
+    for (const declaration of block.declarations) {
+      for (const match of declaration.value.matchAll(VAR_REFERENCE)) {
+        uses.push({ name: match[1], line: declaration.line });
+      }
     }
-  });
+  }
   return uses;
+}
+
+/** Every `var(--name)` reference in a stylesheet text, with its line. */
+function varUses(text) {
+  return declarationVarUses(scanStylesheet(text).blocks);
+}
+
+/**
+ * Every `var(--name)` reference in markup, with its line.
+ *
+ * Markup is not CSS, so its bytes are read as written: a `class` attribute carrying an
+ * arbitrary utility value such as `text-[var(--color-text-muted)]` is a real reference site and
+ * carries no CSS escapes to decode. A `<style>` element is CSS, so its contents go through the
+ * stylesheet path — where an escaped spelling is decoded in a declaration value and nowhere
+ * else — and the two sets are merged per reference site.
+ */
+function markupVarUses(text) {
+  const uses = [];
+  const seen = new Set();
+  const add = (name, line) => {
+    const key = `${name}@${line}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    uses.push({ name, line });
+  };
+  text.split(/\r?\n/).forEach((content, index) => {
+    for (const match of content.matchAll(VAR_REFERENCE)) add(match[1], index + 1);
+  });
+  for (const match of text.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+    const before = text.slice(0, match.index + match[0].indexOf(match[1]));
+    const offset = before.split(/\r?\n/).length - 1;
+    for (const use of declarationVarUses(scanStylesheet(match[1]).blocks)) {
+      add(use.name, use.line + offset);
+    }
+  }
+  return uses.sort((a, b) => a.line - b.line || a.name.localeCompare(b.name));
 }
 
 /** Every `class`/`className` attribute value in markup, with its line. */
@@ -817,7 +992,9 @@ module.exports = {
   STATE_FORMS,
   asWritten,
   classAttributes,
+  declarationVarUses,
   eachLine,
+  markupVarUses,
   parseStylesheet,
   scanStylesheet,
   selectorBase,

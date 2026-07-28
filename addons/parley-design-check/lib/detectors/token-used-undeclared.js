@@ -8,7 +8,16 @@
  * reaches a reader, and a fallback in the reference is a literal wearing a token's clothes.
  */
 
-const { varUses } = require("../css.js");
+const { declarationVarUses, markupVarUses } = require("../css.js");
+
+/*
+ * A reference site is a declaration value in a stylesheet and a line in markup — never a
+ * selector, a prelude or a comment, which resolve nothing and whose escaped text read as a
+ * reference produced a finding against ordinary utility CSS.
+ */
+function references(source) {
+  return source.blocks ? declarationVarUses(source.blocks) : markupVarUses(source.text);
+}
 
 module.exports = {
   rule: "core:token-used-undeclared",
@@ -19,7 +28,7 @@ module.exports = {
     const declared = new Set([...ctx.tokenIndex.values()].map((token) => token.cssVar));
     const results = [];
     for (const source of [...ctx.styles, ...ctx.markup]) {
-      for (const use of varUses(source.text)) {
+      for (const use of references(source)) {
         if (declared.has(use.name)) continue;
         results.push({
           verdict: "VIOLATION",
