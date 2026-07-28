@@ -60,6 +60,29 @@
  */
 
 /*
+ * The token layer under the block model, and why it was enumerated rather than probed.
+ *
+ * A correct stack over the wrong token stream is not a correct scanner. Cycle 9 built the block
+ * model and the next probe went one level down: `#url(` and `@url(` reached the url branch of
+ * the ident-like token, consumed through the first `)`, and the parentheses that decide what the
+ * later braces mean never reached the stack — the applied colour fell out as top-level text, a
+ * phantom rule opened, everything balanced, and the run certified L3 with PASS and exit 0.
+ *
+ * So this cycle stopped waiting for the next member and walked the §4 token list instead. For
+ * every token type the question is the same: is it consumed whole before any structural decision,
+ * and can a `{`, `}`, `;` or `:` inside it be read as structure? The types that can carry one are
+ * the string (§4.3.5), the bad-string, the url and bad-url (§4.3.6, §4.3.14), any token carrying
+ * an escape (§4.3.7), and the simple blocks (§5.4.4); each is consumed above, before the stack.
+ * The types that bind an ident are the ident-like token, the hash-token and the at-keyword
+ * (§4.3.1) — and the last two were the gap: they were not tokens here at all, so the ident inside
+ * them was read as one of its own. `hashOrAtToken` consumes them, which is what closes the family
+ * rather than closing its two newest members. The remaining types — number, percentage, dimension,
+ * delim, comma, colon, semicolon, whitespace, CDO and CDC — carry no code point that this scanner
+ * would read as structure, and a `url` ident inside a number's unit is already bound by the
+ * ident-code-point test in `identLikeToken`.
+ */
+
+/*
  * The decoding decision (§4.3.7, §4.3.11), recorded because it is this file's contract with
  * every detector. A browser decides what a declaration means from what its tokens *spell*, not
  * from how they are written, so `col\6fr` is `color`, `#\66 f0000` is `#ff0000`, `\72 ed` is
@@ -275,6 +298,33 @@ function identLikeToken(text, index) {
 }
 
 /**
+ * §4.3.1: the hash-token or at-keyword-token at `index`, or null where neither starts there.
+ * `end` is just past the token and `value` is what it spells, the `#` or `@` included.
+ *
+ * `#` and `@` bind the ident sequence after them into one token, so the ident inside one is
+ * never a token of its own and can never open a url token of its own. A browser reads `#url(`
+ * as a hash-token followed by a `(` that opens a matched block, and `@url(` as an at-keyword
+ * followed by the same `(`; a scanner that lets the ident start a url token instead consumes
+ * through the first `)` and hands the block model a token stream no browser agrees with — the
+ * parentheses that decide what the later braces mean never reach the stack. That is the shape
+ * of every construct in this family, one layer below the model that was built to end it, so
+ * these two tokens are consumed before ident-like tokens rather than patched afterwards.
+ */
+function hashOrAtToken(text, index) {
+  const ch = text[index];
+  if (ch !== "#" && ch !== "@") return null;
+  // The asymmetry is the spec's: a hash-token needs only one ident code point or a valid escape
+  // after the `#`, so `#0f0` is one, while an at-keyword needs a whole ident *sequence* to start
+  // after the `@`, so `@0` is a delim and a number.
+  const starts = ch === "#"
+    ? isIdentChar(text[index + 1]) || validEscape(text, index + 1)
+    : startsIdentSequence(text, index + 1);
+  if (!starts) return null;
+  const ident = consumeIdentSequence(text, index + 1);
+  return { end: ident.end, value: ch + ident.value };
+}
+
+/**
  * Replace comment bodies with spaces so every later offset keeps its line number, reading the
  * three constructs a comment delimiter can be inside of — a url token, a string, an escape —
  * in the same left-to-right pass the tokenizer uses, so whichever opened first wins.
@@ -308,6 +358,18 @@ function scanComments(text, log) {
       const stop = token.url ? token.url.end : token.end;
       emit(text.slice(index, stop), false);
       index = stop;
+      continue;
+    }
+    /*
+     * The hash-token and the at-keyword, before the ident inside either can be read as a token
+     * of its own (§4.3.1). `#url(a/*b)` is a hash-token, a matched block and a comment that runs
+     * to end of file; reading the `url(` as a url token kept the delimiter as ordinary text and
+     * left this pass reading a different file from the one the browser parsed.
+     */
+    const bound = hashOrAtToken(text, index);
+    if (bound) {
+      emit(text.slice(index, bound.end), false);
+      index = bound.end;
       continue;
     }
     if (ch === "/" && text.startsWith("/*", index)) {
@@ -452,6 +514,14 @@ function decodeDeclarationText(text, note) {
       index = token.url ? token.url.end : token.end;
       continue;
     }
+    // §4.3.1: a hash-token or an at-keyword spells its `#` or `@` and its decoded ident, and the
+    // ident inside it opens nothing — `#\75 rl(a)` is the hash `#url` and a function, not a url.
+    const bound = hashOrAtToken(text, index);
+    if (bound) {
+      out += bound.value;
+      index = bound.end;
+      continue;
+    }
     if (ch === "\\") {
       // §4.3.8: a backslash before a newline or at end of input escapes nothing. Guessing at it
       // is what the fail-safe exists to prevent, so it is reported and left as written.
@@ -462,6 +532,23 @@ function decodeDeclarationText(text, note) {
         continue;
       }
       const escape = consumeEscape(text, index);
+      /*
+       * §4.3.3: reaching a loose escape with a digit immediately before it means the number
+       * ended at that digit and this escape starts a dimension's unit — an ident sequence begun
+       * anywhere else is consumed whole above. A unit whose first code point is not an ident
+       * start is a unit no CSS length has, and flattening it into the number changes the number:
+       * `1\31 px` is `1` with the unit `1px`, which Chromium discards, while the decoded text
+       * reads `11px` and a size rule reports a literal nothing ships. The value is left as
+       * written and the file goes to the fail-safe rather than to a detector that would misread
+       * it. (Bounded on purpose: an escaped exponent such as `1\65 5` spells the ident-start
+       * `e5`, so it is not caught here — see the enumeration.)
+       */
+      if (/[0-9]/.test(text[index - 1] ?? "") && !isIdentStartChar(escape.value)) {
+        note(`carries the escape ${JSON.stringify(text.slice(index, escape.end))} directly after a digit, which this scanner cannot spell without changing the number before it`);
+        out += text.slice(index, escape.end);
+        index = escape.end;
+        continue;
+      }
       out += escape.value;
       index = escape.end;
       continue;
@@ -552,10 +639,16 @@ const RULE_AT_RULES = new Set([
   "font-feature-values"
 ]);
 
-/** An at-rule's name without its vendor prefix, which is the name that decides its shape. */
+/**
+ * An at-rule's name without its vendor prefix, which is the name that decides its shape.
+ *
+ * The name is what the at-keyword's ident *spells*, not how it is written (§4.3.11): a browser
+ * reads `@\73 cope` as `@scope` and applies its declarations to the scope root, so a scanner
+ * matching the written form reads the same at-rule as one it cannot classify.
+ */
 function atRuleName(prelude) {
-  const match = /^@(-[a-zA-Z]+-)?([a-zA-Z-]+)/.exec(prelude);
-  return match ? match[2].toLowerCase() : "";
+  if (prelude[0] !== "@") return "";
+  return consumeIdentSequence(prelude, 1).value.toLowerCase().replace(/^-[a-z]+-/, "");
 }
 
 /**
@@ -580,6 +673,24 @@ function scanStylesheet(text) {
   const push = (ch) => {
     if (buffer.trim() === "" && ch.trim() !== "") bufferLine = line;
     buffer += ch;
+  };
+  /*
+   * A token consumed whole: its code points go into the buffer as written, and none of them is
+   * ever asked what it means for the structure. A newline inside one — an escape may swallow
+   * one (§4.3.7), and a url token may contain one (§4.3.6) — still advances the line count, so
+   * a finding after it names the line the file has.
+   */
+  const pushToken = (from, to) => {
+    for (let cursor = from; cursor < to; cursor += 1) {
+      const inner = src[cursor];
+      if (isNewline(inner)) {
+        if (inner === "\n") line += 1;
+        push(" ");
+        continue;
+      }
+      push(inner);
+    }
+    return to - 1;
   };
   const currentRule = () => {
     for (let i = stack.length - 1; i >= 0; i -= 1) {
@@ -657,10 +768,38 @@ function scanStylesheet(text) {
   // every declaration after it then falls outside the rule and no detector ever sees it.
   let quote = null;
   let quoteLine = 0;
+  /*
+   * §5.4.4 and §5.4.6: a bad-string is a parse error, and the construct holding it is thrown
+   * away — the parser consumes the remnants of the bad declaration, blocks and all, up to the
+   * `;` or the `}` that ends it. Recovering at the newline and then reading what follows as
+   * ordinary stylesheet is only half of that: the enumeration's own probe
+   * `.a::before { content: "x` — newline — `.probe { color: #ff0000; } }` gave Chromium
+   * `.a::before { }` and this scanner a phantom `.probe` rule carrying a colour no browser
+   * paints, with `unreadable: []`. So the poison is carried: while it is set, `{` opens a
+   * component-value block rather than a rule, and the text is discarded rather than read.
+   */
+  let badString = false;
+  const discardBadDeclaration = () => {
+    badString = false;
+    resetBuffer();
+  };
 
   for (let index = 0; index < src.length; index += 1) {
     const ch = src[index];
     if (quote) {
+      /*
+       * §4.3.7: an escape inside a string is consumed whole — its hex digits, and the one
+       * trailing whitespace those digits take with them, which may be the newline that would
+       * otherwise end the string. `content: "x\41` + newline + `"` is `"xA"` to a browser and
+       * the rule goes on; a scanner reading only `\` and one code point ended the string at that
+       * newline, lost the colour after it, and reported three tokenisation problems against a
+       * stylesheet that has none.
+       */
+      if (validEscape(src, index)) {
+        index = pushToken(index, consumeEscape(src, index).end);
+        continue;
+      }
+      // §4.3.5: a backslash before a newline is a line continuation and stays inside the string.
       if (ch === "\\" && index + 1 < src.length) {
         const next = src[index + 1];
         if (next === "\n") line += 1;
@@ -676,7 +815,10 @@ function scanStylesheet(text) {
       }
       // The bad-string rule: the string ends here and scanning resumes at this character, so
       // the newline below is whitespace again and everything after it parses as stylesheet.
+      // What it does not do is give the construct holding it back: that construct is a parse
+      // error, and its remnants are consumed rather than read.
       quote = null;
+      badString = true;
     }
     if (ch === '"' || ch === "'") {
       quote = ch;
@@ -700,17 +842,20 @@ function scanStylesheet(text) {
       if (token.url && !token.url.terminated) {
         log.note(`an unquoted url() token opened at line ${line} is still open at end of file`);
       }
-      const stop = token.url ? token.url.end : token.end;
-      for (let cursor = index; cursor < stop; cursor += 1) {
-        const inner = src[cursor];
-        if (isNewline(inner)) {
-          if (inner === "\n") line += 1;
-          push(" ");
-          continue;
-        }
-        push(inner);
-      }
-      index = stop - 1;
+      index = pushToken(index, token.url ? token.url.end : token.end);
+      continue;
+    }
+    /*
+     * The hash-token and the at-keyword (§4.3.1). `#` and `@` bind the ident after them, so the
+     * ident is not a token of its own and cannot open a url token: in `background: x) #url((y)}
+     * z);` a browser reads a hash, a `(` that opens a matched block and a `}` that is content
+     * inside it, while consuming a url token from the `u` swallowed the first `)`, desynchronised
+     * every later brace, dropped the applied colour as top-level text and opened a phantom rule
+     * — balanced, so nothing reached the fail-safe and the run certified L3 with PASS and exit 0.
+     */
+    const bound = hashOrAtToken(src, index);
+    if (bound) {
+      index = pushToken(index, bound.end);
       continue;
     }
     /*
@@ -722,17 +867,7 @@ function scanStylesheet(text) {
      */
     if (ch === "\\") {
       if (validEscape(src, index)) {
-        const escape = consumeEscape(src, index);
-        for (let cursor = index; cursor < escape.end; cursor += 1) {
-          const inner = src[cursor];
-          if (isNewline(inner)) {
-            if (inner === "\n") line += 1;
-            push(" ");
-            continue;
-          }
-          push(inner);
-        }
-        index = escape.end - 1;
+        index = pushToken(index, consumeEscape(src, index).end);
         continue;
       }
       log.note(`the backslash at line ${line} escapes nothing this scanner can read`);
@@ -766,8 +901,10 @@ function scanStylesheet(text) {
        * value. Only the `{` this test lets through may open a rule, so the `)` in `fn({)` can
        * no longer pop the function while a browser holds it inside the brace block.
        */
-      if (inComponentValue()) {
-        stack.push({ type: "curly", line });
+      // A `{` reached while a bad-string is being recovered from belongs to the construct being
+      // thrown away, so it opens a value block the discard will take with it — never a rule.
+      if (inComponentValue() || badString) {
+        stack.push({ type: "curly", line, bad: badString });
         push(ch);
         continue;
       }
@@ -820,13 +957,19 @@ function scanStylesheet(text) {
         continue;
       }
       // The matching closer of a component-value `{`: it ends a value block, not a rule, so
-      // the declaration carrying it goes on accumulating.
+      // the declaration carrying it goes on accumulating — unless that block was the remnant of
+      // a bad declaration, which ends here and is thrown away exactly as a browser throws it.
       if (top !== undefined && top.type === "curly") {
         stack.pop();
+        if (top.bad) {
+          discardBadDeclaration();
+          continue;
+        }
         push(ch);
         continue;
       }
-      flushDeclaration();
+      if (badString) discardBadDeclaration();
+      else flushDeclaration();
       if (stack.length === 0) {
         log.note(`the closing brace at line ${line} closes no block this scanner had open`);
       }
@@ -838,7 +981,10 @@ function scanStylesheet(text) {
         push(ch);
         continue;
       }
-      flushDeclaration();
+      // The `;` a browser recovers a bad declaration at: what came before it is thrown away
+      // rather than read, and the declaration after it is ordinary CSS again.
+      if (badString) discardBadDeclaration();
+      else flushDeclaration();
       continue;
     }
     push(ch);
@@ -869,6 +1015,15 @@ function parseStylesheet(text) {
 }
 
 const VAR_REFERENCE = /var\(\s*(--[A-Za-z0-9_-]+)/g;
+
+/** A `<style>` element, and the markup comment — the two markup spans that are not markup. */
+const STYLE_ELEMENT = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
+const MARKUP_COMMENT = /<!--[\s\S]*?-->/g;
+
+/** Blank a span to spaces, keeping every newline so later offsets keep their line number. */
+function blankSpans(text, pattern) {
+  return text.replace(pattern, (match) => match.replace(/[^\n]/g, " "));
+}
 
 /**
  * Every `var(--name)` reference in a parsed stylesheet's declarations, with the line of the
@@ -905,14 +1060,38 @@ function varUses(text) {
   return declarationVarUses(scanStylesheet(text).blocks);
 }
 
+/** Every `style="…"` attribute value in markup, with its line. */
+function styleAttributes(text) {
+  const found = [];
+  text.split(/\r?\n/).forEach((content, index) => {
+    for (const match of content.matchAll(/(?:^|[\s{;])style\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+      found.push({ value: match[1] ?? match[2] ?? "", line: index + 1 });
+    }
+  });
+  return found;
+}
+
 /**
  * Every `var(--name)` reference in markup, with its line.
  *
- * Markup is not CSS, so its bytes are read as written: a `class` attribute carrying an
- * arbitrary utility value such as `text-[var(--color-text-muted)]` is a real reference site and
- * carries no CSS escapes to decode. A `<style>` element is CSS, so its contents go through the
- * stylesheet path — where an escaped spelling is decoded in a declaration value and nowhere
- * else — and the two sets are merged per reference site.
+ * The spans that are CSS go through the CSS path, and only their declarations count. A `<style>`
+ * element is a stylesheet and a `style` attribute is a declaration list, so both are read as they
+ * *spell* — an escaped `\76 ar(--x)` resolves in a browser and has to be found here — and neither
+ * contributes its selector, prelude or comment text. Searching every raw line first and then
+ * parsing `<style>` again read those contents twice, once as text and once as CSS: `var(--ghost)`
+ * written inside the attribute selector `[data-value="var(--ghost)"]` became a reference to an
+ * undeclared token, so a page whose only declaration used a ratified token failed L3 and exited 1
+ * while Chromium kept that text in `selectorText` and resolved nothing. A false finding is as
+ * damaging as a false clean — it is how a rule system gets switched off.
+ *
+ * Everything outside those spans is markup, and markup is read as written. That is not laziness
+ * about escapes: it is where the references actually are. Over 2,113 markup files in the corpus,
+ * 4,416 raw references sit outside any `<style>` element — `cn("h-[var(--radix-select-trigger-height)]")`,
+ * `stopColor="hsl(var(--primary))"`, `const COLORS = ['hsl(var(--chart-2))']` — and a browser
+ * resolves every one of them. Restricting markup discovery to `style` attributes and the one
+ * supported utility bracket was tried against that corpus and lost 1,799 of them across 203 files,
+ * which is the false clean this rule exists to prevent. The markup comment is the one span that
+ * resolves nothing wherever it appears, so it is blanked with the `<style>` bodies.
  */
 function markupVarUses(text) {
   const uses = [];
@@ -923,16 +1102,24 @@ function markupVarUses(text) {
     seen.add(key);
     uses.push({ name, line });
   };
-  text.split(/\r?\n/).forEach((content, index) => {
-    for (const match of content.matchAll(VAR_REFERENCE)) add(match[1], index + 1);
-  });
-  for (const match of text.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+  for (const match of text.matchAll(STYLE_ELEMENT)) {
     const before = text.slice(0, match.index + match[0].indexOf(match[1]));
     const offset = before.split(/\r?\n/).length - 1;
     for (const use of declarationVarUses(scanStylesheet(match[1]).blocks)) {
       add(use.name, use.line + offset);
     }
   }
+  // A `style` attribute is a declaration list with no selector, so it is read as the body of one.
+  for (const attribute of styleAttributes(text)) {
+    for (const use of declarationVarUses(scanStylesheet(`x{${attribute.value}}`).blocks)) {
+      add(use.name, attribute.line);
+    }
+  }
+  blankSpans(blankSpans(text, STYLE_ELEMENT), MARKUP_COMMENT)
+    .split(/\r?\n/)
+    .forEach((content, index) => {
+      for (const match of content.matchAll(VAR_REFERENCE)) add(match[1], index + 1);
+    });
   return uses.sort((a, b) => a.line - b.line || a.name.localeCompare(b.name));
 }
 

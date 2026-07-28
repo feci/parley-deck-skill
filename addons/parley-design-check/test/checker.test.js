@@ -2125,6 +2125,380 @@ test("an at-rule that holds declarations is read as one, and one that holds rule
   assert.equal(clean.level.verified, "L3");
 });
 
+/*
+ * Round-06 codex-1, CRITICAL, and the layer under the block model.
+ *
+ * Cycle 9 replaced nine cycles of special cases with the matched-block model, and the model is
+ * right — but a correct stack over the wrong token stream is not a correct scanner. `identLikeToken`
+ * refused a candidate only when an ident code point stood before it, so at `#url(` and `@url(` it
+ * started again at the `u` and consumed a url token through the first `)`. CSS Syntax reads `#url`
+ * as one hash-token and `@url` as one at-keyword (§4.3.1), and leaves the `(` after either to open
+ * a matched simple block — the very parentheses that decide what the later braces mean. Consuming
+ * the url first meant the stack never saw them: codex-1's probe dropped the applied colour as
+ * top-level text, opened a phantom rule, finished balanced, and returned `unreadable: []`, verified
+ * L3, PASS and exit 0 while Chromium computed `rgb(255, 0, 0)` and its CSSOM held one rule.
+ *
+ * The fix is a token, not a case: `#` and `@` bind the ident after them, so no ident inside either
+ * can open anything of its own — which is also why the escaped spellings below close with it, and
+ * why the enumeration of §4 that produced it is recorded at the head of `css.js`.
+ */
+const HASH_AT_URL = {
+  "codex-1's #url( probe, byte for byte": [
+    ".probe {",
+    "  background: x) #url((y)} z);",
+    "  color: #ff0000;",
+    "  dummy: w) #url((a) {b: (1);",
+    "}",
+    ""
+  ].join("\n"),
+  "the same probe through @url(": [
+    ".probe {",
+    "  background: x) @url((y)} z);",
+    "  color: #ff0000;",
+    "  dummy: w) @url((a) {b: (1);",
+    "}",
+    ""
+  ].join("\n"),
+  "the same probe through the escaped #\\75 rl(": [
+    ".probe {",
+    "  background: x) #\\75 rl((y)} z);",
+    "  color: #ff0000;",
+    "  dummy: w) #\\75 rl((a) {b: (1);",
+    "}",
+    ""
+  ].join("\n"),
+  "the same probe through the escaped @\\75 rl(": [
+    ".probe {",
+    "  background: x) @\\75 rl((y)} z);",
+    "  color: #ff0000;",
+    "  dummy: w) @\\75 rl((a) {b: (1);",
+    "}",
+    ""
+  ].join("\n")
+};
+
+test("a hash-token and an at-keyword bind the url ident inside them, and hide no declaration", (t) => {
+  /*
+   * The scanner half. Chromium's CSSOM for every one of these is `.probe { color: rgb(255,0,0) }`
+   * and one rule; so must the scanner's be, or the phantom-rule shape is back one layer down.
+   */
+  for (const [name, source] of Object.entries(HASH_AT_URL)) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(scan.blocks.map((block) => block.selector), [".probe"], `${name} opened a phantom rule`);
+    assert.ok(
+      scan.blocks[0].declarations.some((d) => d.prop === "color" && d.value === "#ff0000"),
+      `${name} hid the colour a browser applies: ${JSON.stringify(scan.blocks[0].declarations)}`
+    );
+    // The residue the probe leaves reaches the fail-safe as well: the model reads the colour
+    // *and* says what it could not close.
+    assert.notDeepEqual(scan.unreadable, [], `${name} left the fail-safe silent over an unclosed block`);
+  }
+
+  /*
+   * The controls codex-1 asks for beside them. A `#` inside a url token's contents, an ordinary
+   * hash colour, a genuine `url(...)` and `@import url(...)` are the shapes real stylesheets are
+   * made of; a finding or an unreadable line against one of these is the false alarm that makes a
+   * gate get switched off.
+   */
+  for (const source of [
+    ".a { background: url(#fragment); color: var(--x); }",
+    ".a { background: url(/i.png); color: var(--x); }",
+    "@import url(other.css);\n.a { color: var(--x); }",
+    ".a { background: +url(a}b); color: var(--x); }"
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(scan.unreadable, [], `an ordinary url or hash was reported unreadable: ${source}`);
+    assert.deepEqual(scan.blocks.map((block) => block.selector), [".a"], `an ordinary url or hash broke a rule: ${source}`);
+    assert.ok(
+      scan.blocks[0].declarations.some((d) => d.prop === "color" && d.value === "var(--x)"),
+      `an ordinary url or hash lost the declaration after it: ${source}`
+    );
+  }
+  // And the hash- and at-bound spellings really do stop being urls: the brace inside is content
+  // of the matched block the `(` opens, and the declaration after it survives.
+  for (const source of [
+    ".a { background: #url(a}b); color: var(--x); }",
+    ".a { background: @url(a}b); color: var(--x); }",
+    ".a { grid-area: #url/*x*/(a}b); color: var(--x); }",
+    ".a { grid-area: # url(a}b); color: var(--x); }"
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(scan.blocks.map((block) => block.selector), [".a"], `a hash- or at-bound ident broke a rule: ${source}`);
+    assert.ok(
+      scan.blocks[0].declarations.some((d) => d.prop === "color"),
+      `a declaration after a hash- or at-bound ident was lost: ${source}`
+    );
+    assert.deepEqual(scan.unreadable, [], `a balanced hash- or at-bound ident was reported unreadable: ${source}`);
+  }
+
+  /*
+   * An at-rule's shape follows what its keyword *spells* (§4.3.11), for the same reason a
+   * declaration does. `@\73 cope` is `@scope` to a browser, which applies its declarations to the
+   * scope root; matched as written it was an at-rule this scanner could classify as neither
+   * rules nor declarations, so the colour reached the fail-safe instead of a detector.
+   */
+  const escapedScope = scanStylesheet("@\\73 cope (.probe) {\n  color: #ff0000;\n}\n");
+  assert.deepEqual(
+    escapedScope.blocks.map((b) => b.declarations.map((d) => `${d.prop}=${d.value}`)),
+    [["color=#ff0000"]],
+    "an escaped @scope was not read as @scope"
+  );
+  assert.deepEqual(escapedScope.unreadable, []);
+  assert.deepEqual(
+    scanStylesheet("@-webkit-\\6be\\79 frames drift { from { opacity: 0; } }\n.a { color: var(--x); }")
+      .blocks.map((b) => b.selector),
+    ["from", ".a"],
+    "a vendor-prefixed escaped at-keyword was not read as the at-rule it spells"
+  );
+
+  /*
+   * End to end, on the run that verifies. codex-1's counter-proposal fixes what each must
+   * produce: the raw-literal finding, or unreadable and UNJUDGEABLE. A clean PASS is the failure
+   * this test exists to catch, because a clean PASS is what the probe produced.
+   */
+  for (const [name, source] of Object.entries(HASH_AT_URL)) {
+    const run = mutatedRun(t, [{ file: "probe.css", write: source }]);
+    const report = check(run, { level: "L3" });
+    const raw = report["findings-detail"].filter(
+      (entry) => entry.rule === "core:literal-outside-token-layer" && /probe\.css/.test(entry.path || "")
+    );
+    const unreadable = report.inputs.unreadable.filter((entry) => /probe\.css/.test(entry));
+    assert.ok(
+      raw.length > 0 || unreadable.length > 0,
+      `${name} hid its colour from the detectors and from the fail-safe both: ${JSON.stringify(report)}`
+    );
+    assert.ok(
+      raw.some((entry) => /\.probe sets color to the colour literal #ff0000/.test(entry.violation)),
+      `${name}: the colour a browser applies to .probe was not reported: ${report.findings.join(" | ")}`
+    );
+    assert.notEqual(report.verdict, "PASS", `${name} certified a stylesheet hiding an applied colour`);
+    assert.notEqual(report.exit, 0, `${name} exited clean over a hidden applied colour`);
+    assert.equal(report.level.verified, null, `${name} verified L3 over a declaration no detector saw`);
+    assert.notEqual(cli(["--level", "L3", run]).status, 0, `${name}: the CLI exited clean over the probe`);
+  }
+
+  // The passing side, end to end: an ordinary `url(#fragment)` beside a token-resolved rule is a
+  // clean L3 run, and the escaped `@scope` beside it is still a finding.
+  const clean = check(mutatedRun(t, [
+    { file: "probe.css", write: ".probe {\n  background: url(#fragment);\n  color: var(--color-text-body);\n}\n" }
+  ]), { level: "L3" });
+  assert.deepEqual(
+    clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+    [],
+    "an ordinary url(#fragment) raised a finding"
+  );
+  assert.deepEqual(clean.inputs.unreadable, [], "an ordinary url(#fragment) was reported unreadable");
+  assert.equal(clean.verdict, "PASS");
+  assert.equal(clean.exit, 0);
+  assert.equal(clean.level.verified, "L3");
+
+  const scoped = check(mutatedRun(t, [{ file: "probe.css", write: "@\\73 cope (.record) {\n  color: #ff0000;\n}\n" }]), {
+    level: "L3"
+  });
+  assert.ok(
+    scoped["findings-detail"].some(
+      (entry) => entry.rule === "core:literal-outside-token-layer" && /sets color to the colour literal #ff0000/.test(entry.violation)
+    ),
+    `the declaration Chromium applies to an escaped scope root was not reported: ${scoped.findings.join(" | ")}`
+  );
+  assert.notEqual(scoped.exit, 0);
+});
+
+/*
+ * Round-06 codex-1, MAJOR, and the same lesson as round-05 on the other kind of input.
+ *
+ * Cycle 9 moved stylesheet `var()` discovery onto parsed declaration values. The markup path kept
+ * a regular expression over every raw line — including the contents of a `<style>` element, which
+ * were then *also* parsed as CSS. So `var(--ghost)` written inside the attribute selector
+ * `[data-value="var(--ghost)"]` became a reference to an undeclared token: CI rejected valid HTML
+ * whose only declaration used a ratified token, while Chromium kept that text in `selectorText`
+ * and resolved nothing. A false finding is as damaging as a false clean — it is how a rule system
+ * gets switched off.
+ *
+ * The span that is CSS is read as CSS and contributes only its declarations; the markup around it
+ * is read as written. codex-1 also proposed narrowing markup discovery to `style` attributes and
+ * supported utility brackets, and that half was measured rather than believed: over the 2,113
+ * markup files in the corpus it lost 1,799 references across 203 files —
+ * `cn("h-[var(--radix-select-trigger-height)]")`, `stopColor="hsl(var(--primary))"`,
+ * `const COLORS = ['hsl(var(--chart-2))']` — every one of which a browser resolves. So it was not
+ * taken: the false clean it would buy is larger than the false finding it would close.
+ */
+const STYLE_SELECTOR_MARKUP = [
+  "<style>",
+  '  [data-value="var(--ghost)"] {',
+  "    color: var(--color-text-body);",
+  "  }",
+  "</style>",
+  ""
+].join("\n");
+
+test("a var() use in markup is read from a declaration, never from selector text in <style>", (t) => {
+  // codex-1's fixture: one reference, and it is the declared one on the line that declares it.
+  assert.deepEqual(
+    markupVarUses(STYLE_SELECTOR_MARKUP).map((use) => `${use.name}@${use.line}`),
+    ["--color-text-body@3"],
+    "selector text inside a <style> element was read as a var() reference"
+  );
+  // Every span inside a `<style>` element that a browser resolves nothing from: the selector
+  // above, a prelude, a comment. Plus the markup comment, which resolves nothing anywhere.
+  for (const markup of [
+    "<style>\n  /* var(--ghost) */\n  .a { color: red; }\n</style>",
+    "<style>\n  @media (min-width: 40em) and (--ghost: var(--ghost)) { .a { color: red; } }\n</style>",
+    "<style>\n  .supports-\\[var\\(--ghost\\)\\] { color: red; }\n</style>",
+    "<!-- var(--ghost) is deliberately not used here -->"
+  ]) {
+    assert.deepEqual(markupVarUses(markup).map((use) => use.name), [], `markup that resolves nothing raised a reference: ${markup}`);
+  }
+
+  /*
+   * And the true positives it must not cost. Two go through the CSS path and are read as they
+   * spell, because a browser resolves an escaped spelling: a `<style>` declaration and a `style`
+   * attribute. The rest is markup read as written — the utility bracket, and the shapes a real
+   * component tree is made of, which the corpus says are where most markup references live.
+   */
+  assert.deepEqual(
+    markupVarUses(
+      [
+        '<p class="mt-2 text-[var(--utility)]">x</p>',
+        '<span style="color: var(--inline)">y</span>',
+        "<style>",
+        "  .a { color: \\76 ar(--in-style); }",
+        "</style>",
+        "<div style='background: \\76 ar(--single-quoted)'></div>",
+        'const COLORS = ["hsl(var(--chart-2))"];',
+        '<stop stopColor="hsl(var(--primary))" />',
+        'cn("h-[calc(100svh-var(--banner-height))]")'
+      ].join("\n")
+    ).map((use) => `${use.name}@${use.line}`),
+    [
+      "--utility@1", "--inline@2", "--in-style@4", "--single-quoted@6",
+      "--chart-2@7", "--primary@8", "--banner-height@9"
+    ]
+  );
+
+  /*
+   * End to end, on the run that verifies. The `<style>` selector is a clean L3 pass; the inline
+   * style attribute beside it is still a finding. Neither result may move without the other.
+   */
+  const clean = check(mutatedRun(t, [{ file: "probe.html", write: STYLE_SELECTOR_MARKUP }]), { level: "L3" });
+  assert.deepEqual(
+    clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+    [],
+    "selector text inside a <style> element raised a finding"
+  );
+  assert.deepEqual(clean.inputs.unreadable, [], "an ordinary <style> element was reported unreadable");
+  assert.equal(clean.verdict, "PASS");
+  assert.equal(clean.exit, 0);
+  assert.equal(clean.level.verified, "L3");
+
+  for (const markup of [
+    '<span style="color: var(--nope)">y</span>\n',
+    '<p class="text-[var(--nope)]">x</p>\n',
+    "<style>\n  .a { color: \\76 ar(--nope); }\n</style>\n"
+  ]) {
+    const found = check(mutatedRun(t, [{ file: "probe.html", write: markup }]), { level: "L3" });
+    assert.ok(
+      found["findings-detail"].some(
+        (entry) => entry.rule === "core:token-used-undeclared" && /references --nope/.test(entry.violation)
+      ),
+      `a reference a browser really resolves was not reported: ${markup} -> ${found.findings.join(" | ")}`
+    );
+    assert.notEqual(found.exit, 0);
+  }
+});
+
+/*
+ * Found by the §4 enumeration rather than by a reviewer, and in the other direction: not a
+ * declaration the checker misses, but one it invents.
+ *
+ * §4.3.5 makes a bad-string end at the newline; §5.4 throws away the construct holding it, blocks
+ * and all, up to the `;` or `}` that ends it. Recovering at the newline and then reading what
+ * follows as ordinary stylesheet was only the first half, and the second half was load-bearing:
+ * for `.a::before { content: "x` — newline — `.probe { color: #ff0000; } }` Chromium's CSSOM is
+ * `.a::before { }` and this scanner built a phantom `.probe` rule carrying a colour no browser
+ * paints, reported it, and left `unreadable` empty. Two of the 521 stylesheets in the real-world
+ * corpus carry this shape.
+ */
+test("a bad-string throws away the declaration that holds it, blocks and all", () => {
+  for (const [source, expected] of [
+    // Chromium: `.a::before { }` — the brace block is part of the bad declaration, not a rule.
+    ['.a::before { content: "x\n.probe { color: #ff0000; } }', [".a::before {  }"]],
+    // Chromium: an empty stylesheet — the bad prelude takes its block with it.
+    ['"x\n.probe { color: #ff0000; }', []],
+    // Chromium: `.probe { }` — the declaration ends at the `}` and is discarded.
+    ['.probe { content: "x\n color: #ff0000; }', [".probe {  }"]],
+    // Chromium: `.probe { color: rgb(255,0,0) }` — the `;` ends the bad declaration, and the
+    // declaration after it is ordinary CSS again, so recovery may not swallow it.
+    ['.probe { content: "x\n; color: #ff0000; }', [".probe { color: #ff0000 }"]],
+    // A bad-string inside a function still only costs its own declaration.
+    ['.probe { background: fn("x\n); color: #ff0000; }', [".probe { color: #ff0000 }"]]
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(
+      scan.blocks.map((b) => `${b.selector} { ${b.declarations.map((d) => `${d.prop}: ${d.value}`).join("; ")} }`),
+      expected,
+      `a bad-string built a rule or a declaration Chromium does not: ${JSON.stringify(source)}`
+    );
+  }
+  // The half that was already right and may not be lost: a bad-string does not swallow the rest
+  // of the file, so the rules after it are still read.
+  const after = scanStylesheet('.c::before { content: "unterminated\n color: #ff0000; }\n.hint { color: #ff0000; }\n');
+  assert.deepEqual(after.blocks.map((b) => b.selector), [".c::before", ".hint"]);
+  assert.ok(after.blocks[1].declarations.some((d) => d.prop === "color" && d.value === "#ff0000"));
+  assert.deepEqual(after.unreadable, []);
+
+  /*
+   * And the newline that is not a bad-string at all, which the same enumeration turned up on the
+   * other side: §4.3.7 lets a hex escape take one trailing whitespace with it, and that
+   * whitespace may be the newline. Chromium's CSSOM for `content: "x\41` — newline — `"` is
+   * `content: "xA"` with the colour after it applied; a scanner reading only `\` and one code
+   * point ended the string at the newline, lost the colour, and reported three tokenisation
+   * problems against a stylesheet that has none — a false alarm and a false clean at once.
+   */
+  const escapedNewline = scanStylesheet('.probe { content: "x\\41\n"; color: #ff0000; }');
+  assert.deepEqual(
+    escapedNewline.blocks.map((b) => `${b.selector} { ${b.declarations.map((d) => `${d.prop}: ${d.value}`).join("; ")} }`),
+    ['.probe { content: "xA"; color: #ff0000 }'],
+    "a hex escape that swallows the newline ended the string anyway"
+  );
+  assert.deepEqual(escapedNewline.unreadable, [], "a legal stylesheet was reported unreadable");
+  // The line continuation beside it (§4.3.5) still stays inside the string, and the escapes the
+  // decoder already refused are still refused.
+  assert.deepEqual(scanStylesheet('.probe { content: "a\\\nb"; color: #ff0000; }').unreadable, []);
+  assert.match(
+    scanStylesheet('.probe { font-family: "Foo\\2c Bar"; }').unreadable.join(" | "),
+    /string escape spelling ","/
+  );
+});
+
+/*
+ * The other thing the enumeration turned up, in §4.3.3.
+ *
+ * A dimension is a number and then an ident sequence, and the two are separate tokens: `1\31 px`
+ * is the number `1` with the unit `1px`, which Chromium discards, while the decoded text reads
+ * `11px` and a size rule reports a literal that never ships. The flat decoded value cannot say
+ * where the number ends, so where flattening would change it the value is left as written and the
+ * file goes to the fail-safe — which costs those rules their verdict instead of a false finding.
+ */
+test("a dimension whose unit begins with a digit is not flattened into its number", () => {
+  const scan = scanStylesheet(".probe { border-radius: 1\\31 px; color: #ff0000; }");
+  assert.equal(scan.blocks[0].declarations[0].value, "1\\31 px", "a unit was flattened into the number before it");
+  assert.match(scan.unreadable.join(" | "), /directly after a digit, which this scanner cannot spell/);
+  // The escapes it must not touch: a unit that spells an ordinary unit, an ident carrying digits,
+  // and a hash body — all of which a browser reads exactly as the flattened text spells them.
+  for (const [source, expected] of [
+    ["border-radius: 11p\\78", "11px"],
+    ["margin: 1\\65 m", "1em"],
+    ["grid-area: a1\\31 b", "a11b"],
+    ["color: #f\\66 0000", "#ff0000"],
+    ["width: 50%\\31 px", "50%1px"]
+  ]) {
+    const one = scanStylesheet(`.probe { ${source}; }`);
+    assert.equal(one.blocks[0].declarations[0].value, expected, `an ordinary escape was refused: ${source}`);
+    assert.deepEqual(one.unreadable, [], `an ordinary escape was reported unreadable: ${source}`);
+  }
+});
+
 test("the six constructs of this family are all still read, together", () => {
   // Every member found so far, in one file: a fix for the newest must not cost an older one.
   const source = [
