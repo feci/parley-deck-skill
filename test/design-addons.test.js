@@ -233,7 +233,16 @@ test("the package ships no addons/ directory", () => {
 function logicalLines(markdown) {
   const out = [];
   let parts = [];
-  for (const line of markdown.split("\n")) {
+  for (const raw of markdown.split("\n")) {
+    // Container noise is stripped from EVERY physical line, not just the first one. This is
+    // not a new rule — it is the rule below applied where it always belonged. A blockquote
+    // marker or an indent sits at the start of each line it contains, so splicing first left
+    // the interior markers embedded mid-command: `> node \` + `>   --test x` reconstructed as
+    // "node > --test x", which matches no command pattern, so the guard never tested it and
+    // stayed green on a command that exits 1 when a person copies it out of the rendered page.
+    // Markdown removes the container before a human ever sees shell text; so does this.
+    // (idea skills-cli-install-path, review round 14.)
+    const line = raw.replace(/^[\s>]*/, "").replace(/^\$\s+/, "");
     const continues = /\\\s*$/.test(line);
     parts.push(continues ? line.replace(/\\\s*$/, "") : line);
     if (continues) continue;
@@ -321,6 +330,13 @@ test("the published-command extractor captures whole commands, never fragments",
     "de --test cont/split-word.test.js",
     "node --test cont/valid-half.test.js \\",
     "--test-reporter=does-not-exist",
+    "> ```bash",
+    "> node \\",
+    ">   --test cont/blockquote.test.js",
+    "> ```",
+    "> > nod\\",
+    "> > e --te\\",
+    "> > st cont/blockquote-tokens.test.js",
     "```not-a-closing-fence",
     "```",
     "",
@@ -366,11 +382,19 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --test cont/split-args.test.js \\",
     // the exact round-13 probe: the break falls BETWEEN `node` and `--test`, so neither
     // physical line holds both tokens and a prefilter that runs per line sees no command
-    "node   --test cont/split-before-flag.test.js \\",
+    "node --test cont/split-before-flag.test.js \\",
     // and the break can fall inside a token, so no token boundary is a safe place to look
     "node --test cont/split-inside-flag.test.js \\",
     "node --test cont/split-word.test.js \\",
-    "node --test cont/valid-half.test.js --test-reporter=does-not-exist \\"
+    "node --test cont/valid-half.test.js --test-reporter=does-not-exist \\",
+    // A container marker sits at the START of every line it contains, so a continuation
+    // inside one interleaves markers with shell text. Stripping the container per physical
+    // line — before splicing — is what makes these reconstruct at all; splicing first left
+    // "node > --test x", which matched nothing and went green on a command that exits 1.
+    // The second case splits the tokens themselves inside a nested blockquote, which no
+    // amount of raw splicing could reassemble. (idea skills-cli-install-path, review round 14.)
+    "node --test cont/blockquote.test.js \\",
+    "node --test cont/blockquote-tokens.test.js \\"
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
