@@ -1333,13 +1333,27 @@ function valueVarUses(value) {
   return [...maskOpaqueTokens(value).matchAll(VAR_REFERENCE)].map((match) => match[1]);
 }
 
-/** A `<style>` element, and the markup comment — the two markup spans that are not markup. */
+/** A `<style>` element, and the markup comment — two of the markup spans that are not markup. */
 const STYLE_ELEMENT = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
 const MARKUP_COMMENT = /<!--[\s\S]*?-->/g;
 
 /** Blank a span to spaces, keeping every newline so later offsets keep their line number. */
 function blankSpans(text, pattern) {
   return text.replace(pattern, (match) => match.replace(/[^\n]/g, " "));
+}
+
+/**
+ * Blank each half-open `[start, end)` span to spaces, keeping every newline so later offsets keep
+ * their line number. The spans come from a consumer that already read them, rather than from a
+ * pattern matched a second time here.
+ */
+function blankOffsets(text, spans) {
+  let out = text;
+  for (const span of spans) {
+    const blanked = out.slice(span.start, span.end).replace(/[^\n]/g, " ");
+    out = out.slice(0, span.start) + blanked + out.slice(span.end);
+  }
+  return out;
 }
 
 /**
@@ -1383,13 +1397,32 @@ function varUses(text) {
   return declarationVarUses(scanStylesheet(text).blocks);
 }
 
-/** Every `style="…"` attribute value in markup, with its line. */
+/** A `style="…"` attribute: the declaration list it holds, quotes excluded. */
+const STYLE_ATTRIBUTE = /(?:^|[\s{;])style\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+
+/**
+ * Every `style="…"` attribute value in markup, with its line and the exact span its value
+ * occupies — the one consumer of this attribute, for the reason the token table above gives of
+ * every other token in this file. The span parsed as CSS and the span kept out of the raw markup
+ * sweep have to be the same span: two readings of where an attribute ends are two chances to
+ * disagree, and while the sweep decided that question by omission the attribute's contents were
+ * read twice, once as CSS and once as text.
+ *
+ * The split is on `\n` alone so the offsets stay exact, and the `\r` a CRLF line ends with is
+ * dropped from the line's text, so each line is the one `/\r?\n/` would have given.
+ */
 function styleAttributes(text) {
   const found = [];
-  text.split(/\r?\n/).forEach((content, index) => {
-    for (const match of content.matchAll(/(?:^|[\s{;])style\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
-      found.push({ value: match[1] ?? match[2] ?? "", line: index + 1 });
+  let offset = 0;
+  text.split("\n").forEach((raw, index) => {
+    const content = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+    for (const match of content.matchAll(STYLE_ATTRIBUTE)) {
+      const value = match[1] ?? match[2] ?? "";
+      // `match[0]` ends at the closing quote, so the value ends where that quote begins.
+      const end = offset + match.index + match[0].length - 1;
+      found.push({ value, line: index + 1, start: end - value.length, end });
     }
+    offset += raw.length + 1;
   });
   return found;
 }
@@ -1421,9 +1454,33 @@ function styleAttributes(text) {
  * not a CSS string token and `stringToken` has no jurisdiction over it. `className="text-[var(--x)]"`
  * and `const cl = "color:var(--error)"` are quoted in the *host* language and a browser resolves
  * every one of them; masking them as if they were CSS strings loses 2,410 of the references this
- * path finds, across 306 of the sweep corpus's 2,236 markup files. The spans that really are CSS — a
- * `<style>` body and a `style` attribute — are parsed as CSS above and collected through
- * `valueVarUses` with every other declaration, so the opaque-token rule reaches them there.
+ * path finds, across 306 of the sweep corpus's 2,236 markup files.
+ *
+ * That asymmetry is right, and round 10 found its boundary drawn one span too wide. A `style`
+ * attribute is CSS — it is parsed as a declaration list right above — and it was raw-scanned as
+ * well, so `<div style="font-family: 'var(--ghost)'; color: var(--real)">` was read once as CSS,
+ * where the quoted text is one opaque string token, and again as text, where the expression
+ * reported `--ghost`. Valid inline CSS then took a `core:token-used-undeclared` finding, lost its
+ * L3 certificate and exited 1 — the false finding this whole path exists to avoid, in the one span
+ * the measurement had already excluded from the trade-off. So both CSS spans are kept out of the
+ * sweep, the `<style>` body by its pattern and the attribute by the span its own consumer read,
+ * and both are collected through `valueVarUses` with every other declaration, which is where the
+ * opaque-token rule reaches them.
+ *
+ * The exclusion is of the span the CSS path *read*, though, and not of everything the attribute
+ * pattern matches — because those are not the same set, and the corpus says so. HTML gives the
+ * `style` attribute a `<declaration-list>`, which cannot open a rule; where parsing the value does
+ * open one, the text is not a declaration list and the CSS path did not read it. That is not a
+ * curiosity: `scale-track-360/public/accelerator.html:1347` writes
+ * `style="…;background:${s==='All'?'var(--c1)':'rgba(…)'};…"` inside a template literal a script
+ * assigns to `innerHTML`, so the quotes there are JavaScript's, the CSS path reads a phantom rule
+ * and finds nothing, and only the sweep finds the `--c1` a browser resolves once the template runs.
+ * Excluding that span would lose a real reference — the false clean — in exactly the host-language
+ * shape the measured decision protects. So a span is kept out of the sweep only where the value
+ * really did read as one declaration list with nothing reported unreadable, which is 8,235 of the
+ * corpus's 8,307 `style=` spans; the other 72 are host-language text that happens to be spelled
+ * like an attribute, and they stay where every other host-language span is. Ordinary markup is
+ * untouched by any of it: the corpus reports the same 2,410 references after the repair as before.
  */
 function markupVarUses(text) {
   const uses = [];
@@ -1442,12 +1499,22 @@ function markupVarUses(text) {
     }
   }
   // A `style` attribute is a declaration list with no selector, so it is read as the body of one.
+  const declarationLists = [];
   for (const attribute of styleAttributes(text)) {
-    for (const use of declarationVarUses(scanStylesheet(`x{${attribute.value}}`).blocks)) {
-      add(use.name, attribute.line);
-    }
+    const scan = scanStylesheet(`x{${attribute.value}}`);
+    for (const use of declarationVarUses(scan.blocks)) add(use.name, attribute.line);
+    // One scan answers both questions, so the span kept out of the sweep is the span that was
+    // read: the one block this attribute may hold, and nothing the scanner could not tokenise.
+    if (scan.blocks.length === 1 && scan.unreadable.length === 0) declarationLists.push(attribute);
   }
-  blankSpans(blankSpans(text, STYLE_ELEMENT), MARKUP_COMMENT)
+  /*
+   * The sweep over what is left: the `<style>` bodies and the markup comments blanked by their
+   * patterns, and then the attribute values the CSS path read, blanked by the spans their own
+   * consumer measured. The attributes go last so those two patterns still see the file as written —
+   * a `-->` inside an attribute value would otherwise end a comment that had already been blanked
+   * out from under it. Blanking keeps every offset, so the spans stay the ones that were measured.
+   */
+  blankOffsets(blankSpans(blankSpans(text, STYLE_ELEMENT), MARKUP_COMMENT), declarationLists)
     .split(/\r?\n/)
     .forEach((content, index) => {
       for (const match of content.matchAll(VAR_REFERENCE)) add(match[1], index + 1);

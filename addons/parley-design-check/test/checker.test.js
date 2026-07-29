@@ -3194,6 +3194,156 @@ test("an opaque token's contents are not a var() reference, in a declaration or 
   assert.notEqual(real.exit, 0);
 });
 
+/*
+ * Round-10's MAJOR, filed by codex-1, and the last edge of the asymmetry the test above records.
+ *
+ * Cycle 13 drew the boundary in words: markup text outside `<style>` and `style=` is not CSS, so a
+ * quote there belongs to the host language and the raw line sweep must not mask it — measured,
+ * because masking it loses 2,410 real references across 306 of the corpus's 2,236 markup files. The
+ * spans that *are* CSS were to go through the declaration path and pick up the masking with every
+ * other declaration. A `style` attribute did go through that path — and was then raw-scanned as
+ * well, so its contents were read twice and the second reading resurrected the text inside an
+ * opaque string as an undeclared token. codex-1 confirmed the direction from both ends: the CSS
+ * parser alone produces only `--color-text-body` out of the fixture below, and the raw pass adds
+ * `--ghost` back, which cost valid inline CSS a `core:token-used-undeclared` finding, its L3
+ * certificate and exit 0.
+ *
+ * The repair is the boundary the measurement already drew: both CSS spans are kept out of the
+ * sweep, and ordinary markup text keeps its deliberate non-masking. It excludes the span the CSS
+ * path *read*, not everything the attribute pattern matches, because the corpus separates the two:
+ * `style="…;background:${s==='All'?'var(--c1)':'rgba(…)'};…"` inside a template literal a script
+ * assigns to `innerHTML` is JavaScript, whose quotes are not CSS strings, and only the sweep finds
+ * the `--c1` a browser resolves once the template runs. HTML gives the attribute a
+ * `<declaration-list>`, which cannot open a rule, so a value that opens one is not a declaration
+ * list and stays where every other host-language span is. Over the corpus's 8,307 `style=` spans,
+ * 8,235 read as one declaration list and 72 do not. Re-run after the repair, the sweep reports the
+ * same 11,675 references over the same 2,236 markup files, and the 2,410 the measured decision
+ * protects are all still among them.
+ */
+const INLINE_STYLE_REPRODUCER = `<div style="font-family: 'var(--ghost)'; color: var(--color-text-body)">x</div>\n`;
+
+test("a style attribute is read as CSS once, and never raw-scanned a second time", (t) => {
+  // codex-1's reproducer: one reference, the one the CSS parser resolves.
+  assert.deepEqual(
+    markupVarUses(INLINE_STYLE_REPRODUCER).map((use) => `${use.name}@${use.line}`),
+    ["--color-text-body@1"],
+    "text inside a string in an inline style was read as a reference"
+  );
+  // Both quotings of the attribute, and the same text in a `url()` locator, which is the other
+  // opaque token: `style=` is one span whichever quote opens it.
+  for (const markup of [
+    `<div style='font-family: "var(--ghost)"'></div>`,
+    `<div style="background: url(var(--ghost))"></div>`,
+    `<div style="content: 'var(--ghost)'" class="mt-2"></div>`
+  ]) {
+    assert.deepEqual(
+      markupVarUses(markup).map((use) => use.name),
+      [],
+      `text inside an opaque token in an inline style was read as a reference: ${markup}`
+    );
+  }
+
+  /*
+   * The three controls, each of which the repair could have cost.
+   *
+   * One: a real reference in an inline style is still collected, exactly once. The count is
+   * asserted rather than the membership, because collecting it twice is the defect and a
+   * deduplicating collector would hide it. That it comes from the CSS path and not from the sweep
+   * is what the escaped spelling shows: `\76 ar(--escaped)` is `var(--escaped)` to a browser and
+   * to the declaration parser, and it is invisible to a regular expression over the raw text — so
+   * finding it at all means the attribute was read as CSS, and finding `--real` exactly once means
+   * it was not also read as text.
+   */
+  const inline = markupVarUses(
+    [`<span style="color: var(--real)">y</span>`, `<div style="background: \\76 ar(--escaped)"></div>`].join("\n")
+  ).map((use) => `${use.name}@${use.line}`);
+  assert.deepEqual(inline, ["--real@1", "--escaped@2"]);
+  assert.equal(
+    inline.filter((use) => use === "--real@1").length,
+    1,
+    "a real inline-style reference was collected twice, once as CSS and once as text"
+  );
+
+  /*
+   * Two: markup text outside both CSS spans is still read as written, which is the measured
+   * decision the repair may not widen into. Every line here is quoted in the host language and a
+   * browser resolves every one of them.
+   */
+  assert.deepEqual(
+    markupVarUses(
+      [
+        `const cl = "color:var(--error)";`,
+        `<p class="mt-2 text-[var(--utility)]">x</p>`,
+        `<stop stopColor="hsl(var(--primary))" />`,
+        `cn("h-[calc(100svh-var(--banner-height))]")`
+      ].join("\n")
+    ).map((use) => `${use.name}@${use.line}`),
+    ["--error@1", "--utility@2", "--primary@3", "--banner-height@4"],
+    "a reference a markup file builds inside its own string stopped being found"
+  );
+
+  // Three: a `<style>` body is CSS, and the string in it still references nothing.
+  assert.deepEqual(
+    markupVarUses('<style>\n.a { content: "var(--nope)"; color: var(--real); }\n</style>').map((use) => use.name),
+    ["--real"],
+    "a string inside a <style> body was read as a reference"
+  );
+
+  /*
+   * And the boundary itself, which is the span the CSS path read and not everything the attribute
+   * pattern matches. Both of these are the corpus's own shapes: a `style="…"` built inside a
+   * JavaScript template literal, and one built by a template engine's `{% … %}`. Neither value is a
+   * declaration list — each opens a rule, which HTML's `style` attribute cannot hold — so neither
+   * is the CSS the CSS path read, and the reference a browser resolves once the template runs is
+   * found where every other host-language reference is.
+   */
+  assert.deepEqual(
+    markupVarUses(
+      [
+        "el.innerHTML = `<button style=\"background:${on?'var(--c1)':'#fff'}\">x</button>`;",
+        `<span style="{% if x %}color: var(--brand-100);{% else %}color: var(--neutral-100);{% endif %}">y</span>`
+      ].join("\n")
+    ).map((use) => `${use.name}@${use.line}`),
+    ["--c1@1", "--brand-100@2", "--neutral-100@2"],
+    "a style attribute the host language builds lost the reference a browser resolves"
+  );
+
+  /*
+   * End to end at `--level L3`, on the run that verifies. The reproducer certified `VIOLATION`
+   * with exit 1 at `1675b6f` against inline CSS a browser applies without difficulty.
+   */
+  const clean = check(mutatedRun(t, [{ file: "probe.html", write: INLINE_STYLE_REPRODUCER }]), { level: "L3" });
+  assert.deepEqual(
+    clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+    [],
+    "a string inside an inline style raised a finding"
+  );
+  assert.deepEqual(clean.inputs.unreadable, [], "an ordinary inline style was reported unreadable");
+  assert.equal(clean.verdict, "PASS");
+  assert.equal(clean.level.verified, "L3");
+  assert.equal(clean.exit, 0);
+
+  /*
+   * And the guard against the swing back. A reference a browser really resolves must still lose
+   * the run its certificate, whether it is written in an inline style — as itself or escaped — or
+   * in the host-language text the sweep deliberately does not mask.
+   */
+  for (const markup of [
+    `<span style="color: var(--nope)">y</span>\n`,
+    `<span style="color: \\76 ar(--nope)">y</span>\n`,
+    `const cl = "color:var(--nope)";\n`
+  ]) {
+    const found = check(mutatedRun(t, [{ file: "probe.html", write: markup }]), { level: "L3" });
+    assert.ok(
+      found["findings-detail"].some(
+        (entry) => entry.rule === "core:token-used-undeclared" && /references --nope/.test(entry.violation)
+      ),
+      `a reference a browser really resolves was not reported: ${markup} -> ${found.findings.join(" | ")}`
+    );
+    assert.notEqual(found.exit, 0);
+  }
+});
+
 test("CDO and CDC at the top level of a stylesheet are discarded, as a browser discards them", (t) => {
   /*
    * §5.4.1: where a rule would begin at the top level, `<!--` and `-->` are consumed and dropped —
