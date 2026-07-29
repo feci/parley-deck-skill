@@ -168,3 +168,41 @@ test("the checker never bundles a copy of the rule registry", () => {
   walk(checkRoot);
   assert.deepEqual(offenders, [], "parley-design-check must not carry its own RULES.md");
 });
+
+// A directory rename is not finished when the tests pass — it is finished when the
+// instructions the skills give their readers still resolve. The addons/ -> skills/ move left
+// 34 live `addons/…` paths in shipped content, including a documented test command that
+// exited 0 while running zero tests. npm test could not see it, because the moved files
+// themselves were valid. This guard is the thing that would have seen it.
+// (idea skills-cli-install-path, review round 01 MAJOR-1 / round 02 MAJOR.)
+test("no shipped skill instruction points at the removed addons/ tree", () => {
+  const skillsRoot = path.join(root, "skills");
+  const offenders = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!/\.(md|js|json|ya?ml)$/.test(entry.name)) continue;
+      const text = fs.readFileSync(full, "utf8");
+      text.split("\n").forEach((line, i) => {
+        if (line.includes("addons/")) {
+          offenders.push(`${path.relative(root, full)}:${i + 1}`);
+        }
+      });
+    }
+  };
+  walk(skillsRoot);
+  assert.deepEqual(
+    offenders,
+    [],
+    `shipped skill content references the removed addons/ tree at:\n  ${offenders.join("\n  ")}`
+  );
+});
+
+test("the package ships no addons/ directory", () => {
+  assert.equal(fs.existsSync(path.join(root, "addons")), false);
+});
