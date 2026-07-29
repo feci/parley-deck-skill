@@ -229,20 +229,34 @@ function publishedTestCommands(markdown) {
   const units = new Set();
   for (const raw of markdown.split("\n")) {
     if (!/node\s+--test/.test(raw)) continue;
-    // Strip only leading container/prompt noise. A command never begins with ">" or "$ ",
-    // so this cannot swallow meaningful shell text.
+    // Strip only leading container/prompt noise. A command never begins with ">" or "$ ".
     const line = raw.replace(/^[\s>]*/, "").replace(/^\$\s+/, "").trim();
-    // The discriminator is NOT "am I inside a fence" — tracking fences meant reimplementing
-    // CommonMark, and each rule got one round of review to be wrong in. It is simply: does a
-    // backtick span contain the WHOLE command?
-    //   • Inline publication wraps the whole command:  `node --test "x"`  ->  the span is it.
-    //   • A fenced shell line wraps only a substitution: node --test `printf …` "x"
-    //     — no span contains "node --test", so the unit is the whole line, backticks and all,
-    //     and the strict grammar refuses it.
-    // One rule, no fence state, no closing-fence or blockquote special cases.
-    const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)].filter((m) => /node\s+--test/.test(m[2]));
-    if (spans.length > 0) for (const m of spans) units.add(m[2].trim());
-    else units.add(line);
+
+    // A shell continuation means the command is not confined to this line. Refuse rather than
+    // execute the truncated first half.
+    if (/\\$/.test(line)) {
+      units.add(line);
+      continue;
+    }
+
+    const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)];
+    const outside = line.replace(/(`+)[\s\S]*?\1/g, " ");
+    const commandOutside = /node\s+--test/.test(outside);
+
+    if (commandOutside && spans.length > 0) {
+      // The line mixes span-quoted text with bare shell that also runs the command — a
+      // compound or substituted form. Earlier revisions "resolved" this by executing one part
+      // and discarding the other, which is how both a false green and a false failure got in.
+      // It is refused as a whole instead: the unit is the entire line, which the grammar
+      // rejects on sight.
+      units.add(line);
+      continue;
+    }
+    if (commandOutside) {
+      units.add(line);
+      continue;
+    }
+    for (const m of spans) if (/node\s+--test/.test(m[2])) units.add(m[2].trim());
   }
   return units;
 }
@@ -253,7 +267,7 @@ function publishedTestCommands(markdown) {
 // Narrow and fail-closed beats broad and approximate: six revisions of a hand-written shell
 // parser were wrong in both directions at once.
 // (idea skills-cli-install-path, review rounds 03-09.)
-const SUPPORTED_COMMAND = /^node\s+--test\s+[^`;|&<>$]+$/;
+const SUPPORTED_COMMAND = /^node\s+--test\s+[^`;|&<>$\\]+$/;
 
 test("the published-command extractor captures whole commands, never fragments", () => {
   const fixture = [
@@ -328,6 +342,8 @@ test("the published-command extractor captures whole commands, never fragments",
   assert.equal(SUPPORTED_COMMAND.test("node --test `printf x.test.js`"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --test `printf %s --test-reporter=x` fenced/subst.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --test double/span.test.js"), true);
+  // a shell continuation is not a self-contained command
+  assert.equal(SUPPORTED_COMMAND.test('node --test "a/*.test.js" \\'), false);
   assert.equal(SUPPORTED_COMMAND.test('node --test "a/*.test.js"'), true);
 });
 
