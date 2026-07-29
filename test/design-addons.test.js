@@ -227,17 +227,30 @@ test("the package ships no addons/ directory", () => {
 // (idea skills-cli-install-path, review rounds 03-05.)
 function publishedTestCommands(markdown) {
   const units = new Set();
+  let fence = null; // the opening fence marker while inside a fenced block
   for (const raw of markdown.split("\n")) {
+    const fenceMatch = raw.match(/^\s*(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      const marker = fenceMatch[1];
+      if (fence === null) fence = marker[0].repeat(marker.length);
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+      continue;
+    }
     const line = raw.replace(/^\s*\$\s+/, "").trim();
     if (!/node\s+--test/.test(line)) continue;
-    // A "unit" is a whole published shell command, never a substring of one. Earlier revisions
-    // captured from the word `node` onward and threw away everything around it, so an env
-    // prefix, a `cd … &&`, or a command substitution was silently discarded — executing a
-    // fragment that happened to work while the published command did not, and vice versa.
-    const spans = [...line.matchAll(/`([^`]*)`/g)].map((m) => m[1]);
+    // Whether a backtick delimits a Markdown span or is shell syntax depends on exactly one
+    // thing: whether this line sits inside a fenced block. Inside a fence the line IS the
+    // command, verbatim — stripping "spans" there deletes command substitutions and turns a
+    // broken command into a working one. Outside a fence, a run of N backticks opens a span
+    // that a matching run of N closes (CommonMark), so ``…`` is one span, not two.
+    if (fence !== null) {
+      units.add(line);
+      continue;
+    }
+    const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)];
     if (spans.length > 0) {
-      for (const span of spans) if (/node\s+--test/.test(span)) units.add(span.trim());
-      const remainder = line.replace(/`[^`]*`/g, " ");
+      for (const span of spans) if (/node\s+--test/.test(span[2])) units.add(span[2].trim());
+      const remainder = line.replace(/(`+)[\s\S]*?\1/g, " ");
       if (/node\s+--test/.test(remainder)) units.add(remainder.trim());
     } else {
       units.add(line);
@@ -279,7 +292,10 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --test multi/one.test.js multi/two.test.js",
     "NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js",
     "cd some/dir && node --test suffixed/one.test.js",
+    "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
     "```",
+    "",
+    "Double-backtick span: ``node --test double/span.test.js``.",
     "",
     "```",
     "echo not-a-test-command",
@@ -301,7 +317,11 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --test\ttab/separated.test.js",
     "node --test multi/one.test.js multi/two.test.js",
     "NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js",
-    "cd some/dir && node --test suffixed/one.test.js"
+    "cd some/dir && node --test suffixed/one.test.js",
+    // inside a fence a backtick is shell syntax, so the substitution stays in the unit
+    "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
+    // outside a fence, ``…`` is ONE CommonMark span, not two delimiters
+    "node --test double/span.test.js"
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
@@ -311,6 +331,8 @@ test("the published-command extractor captures whole commands, never fragments",
   assert.equal(SUPPORTED_COMMAND.test("NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("cd some/dir && node --test suffixed/one.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --test `printf x.test.js`"), false);
+  assert.equal(SUPPORTED_COMMAND.test("node --test `printf %s --test-reporter=x` fenced/subst.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("node --test double/span.test.js"), true);
   assert.equal(SUPPORTED_COMMAND.test('node --test "a/*.test.js"'), true);
 });
 
