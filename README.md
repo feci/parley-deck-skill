@@ -109,8 +109,8 @@ npx -y parley-deck-skill@latest install --target all
 npx -y parley-deck-skill@latest doctor --target all
 ```
 
-Some runtimes cache skills; restart yours if it does not pick the change up. The full command
-reference is in [Install, update, and remove](#install-update-and-remove).
+If your runtime does not pick the change up, follow its own instructions for reloading
+skills. The full command reference is in [Install, update, and remove](#install-update-and-remove).
 
 ## Use Parley Deck
 
@@ -190,9 +190,9 @@ npm install -g parley-deck-skill && parley-deck-skill install
 gemini extensions install https://github.com/feci/parley-deck-skill   # legacy Gemini only
 ```
 
-The last two lines depend on those CLIs rather than on anything this package ships. Use
-either the Gemini extension command or `--target gemini`, not both — they write to different
-directories. Prefer `--target agy` for new Antigravity installs, and validate with
+The Gemini CLI command and `--target gemini` are two managers for the *same* destination —
+`~/.gemini/extensions/parley-deck`. Use one or the other, never both. Antigravity is a
+separate target: prefer `--target agy`, and validate with
 `agy plugin validate ~/.gemini/config/plugins/parley-deck`.
 
 Run `parley-deck-skill paths` for the install directory of every *detected* target, or
