@@ -227,34 +227,22 @@ test("the package ships no addons/ directory", () => {
 // (idea skills-cli-install-path, review rounds 03-05.)
 function publishedTestCommands(markdown) {
   const units = new Set();
-  let fence = null; // the opening fence marker while inside a fenced block
   for (const raw of markdown.split("\n")) {
-    const fenceMatch = raw.match(/^\s*(`{3,}|~{3,})/);
-    if (fenceMatch) {
-      const marker = fenceMatch[1];
-      if (fence === null) fence = marker[0].repeat(marker.length);
-      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null;
-      continue;
-    }
-    const line = raw.replace(/^\s*\$\s+/, "").trim();
-    if (!/node\s+--test/.test(line)) continue;
-    // Whether a backtick delimits a Markdown span or is shell syntax depends on exactly one
-    // thing: whether this line sits inside a fenced block. Inside a fence the line IS the
-    // command, verbatim — stripping "spans" there deletes command substitutions and turns a
-    // broken command into a working one. Outside a fence, a run of N backticks opens a span
-    // that a matching run of N closes (CommonMark), so ``…`` is one span, not two.
-    if (fence !== null) {
-      units.add(line);
-      continue;
-    }
-    const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)];
-    if (spans.length > 0) {
-      for (const span of spans) if (/node\s+--test/.test(span[2])) units.add(span[2].trim());
-      const remainder = line.replace(/(`+)[\s\S]*?\1/g, " ");
-      if (/node\s+--test/.test(remainder)) units.add(remainder.trim());
-    } else {
-      units.add(line);
-    }
+    if (!/node\s+--test/.test(raw)) continue;
+    // Strip only leading container/prompt noise. A command never begins with ">" or "$ ",
+    // so this cannot swallow meaningful shell text.
+    const line = raw.replace(/^[\s>]*/, "").replace(/^\$\s+/, "").trim();
+    // The discriminator is NOT "am I inside a fence" — tracking fences meant reimplementing
+    // CommonMark, and each rule got one round of review to be wrong in. It is simply: does a
+    // backtick span contain the WHOLE command?
+    //   • Inline publication wraps the whole command:  `node --test "x"`  ->  the span is it.
+    //   • A fenced shell line wraps only a substitution: node --test `printf …` "x"
+    //     — no span contains "node --test", so the unit is the whole line, backticks and all,
+    //     and the strict grammar refuses it.
+    // One rule, no fence state, no closing-fence or blockquote special cases.
+    const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)].filter((m) => /node\s+--test/.test(m[2]));
+    if (spans.length > 0) for (const m of spans) units.add(m[2].trim());
+    else units.add(line);
   }
   return units;
 }
@@ -293,7 +281,12 @@ test("the published-command extractor captures whole commands, never fragments",
     "NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js",
     "cd some/dir && node --test suffixed/one.test.js",
     "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
+    "```not-a-closing-fence",
     "```",
+    "",
+    "> ```bash",
+    "> node --test blockquoted/fence.test.js",
+    "> ```",
     "",
     "Double-backtick span: ``node --test double/span.test.js``.",
     "",
@@ -321,7 +314,9 @@ test("the published-command extractor captures whole commands, never fragments",
     // inside a fence a backtick is shell syntax, so the substitution stays in the unit
     "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
     // outside a fence, ``…`` is ONE CommonMark span, not two delimiters
-    "node --test double/span.test.js"
+    "node --test double/span.test.js",
+    // a blockquote prefix is container noise, never shell text
+    "node --test blockquoted/fence.test.js"
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
