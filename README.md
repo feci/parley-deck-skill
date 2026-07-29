@@ -99,8 +99,8 @@ a second concurrent worktree is provisioned, its file set is compared with every
 claimed boundary; an intersection is refused unless an explicit override is
 recorded. Each implementer gets a sibling worktree. Git gives that worktree its own
 working tree, index, `HEAD` and branch — it does not give it its own ports, databases or
-caches, so the manifest records those overrides too. Use it when two or more sessions or Phase-5 implementers work in one repository
-at once.
+caches, so the manifest records those overrides too. Use it when two or more sessions
+or Phase-5 implementers work in one repository at once.
 
 ## Install
 
@@ -177,7 +177,8 @@ Commands: `install`, `paths`, `doctor`, `status`, `sync-project`, `uninstall`, `
 ```text
 --target auto|all|codex|claude|agy|gemini|hermes|qwen|codebuddy|goose|kimi|droid|vibe|cursor|opencode|aionrs|generic
 --scope user|project     --project <path>     --dest <path>
---force  --dry-run  --yes  --json  --include-undetected
+--force  --dry-run  --json  --include-undetected
+--yes                    (sync-project only: without it, sync-project is a dry run)
 --no-addons              --only <name>[,<name>]
 ```
 
