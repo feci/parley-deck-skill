@@ -227,18 +227,21 @@ test("the package ships no addons/ directory", () => {
 // (idea skills-cli-install-path, review rounds 03-05.)
 function publishedTestCommands(markdown) {
   const found = new Set();
-  // One global match over the whole document. Not line-by-line, because a line may publish
-  // more than one command; not container-aware, because containers are an open set. A command
-  // runs to the first backtick (an inline span's close) or end of line, whichever comes first.
-  for (const m of markdown.matchAll(/node\s+--test\s+([^`\n]*)/g)) {
-    const command = `node --test ${m[1]}`
-      .replace(/[)\].,;:]+\s*$/, "")   // trailing markdown/prose punctuation
-      .trim()
-      .replace(/\s+/g, " ");
+  // Capture the command VERBATIM. Nothing is stripped, normalised or re-quoted: every earlier
+  // revision of this guard was a hand-written approximation of shell syntax, and each one both
+  // missed broken commands and manufactured failures for legitimate ones. A command runs to
+  // the first backtick (an inline span's close) or end of line.
+  for (const m of markdown.matchAll(/node\s+--test\s+[^`\n]*/g)) {
+    const command = m[0].replace(/\s+$/, "");
     if (command.length > "node --test".length + 1) found.add(command);
   }
   return found;
 }
+
+// Anything that could mean more than "run this test command" is refused rather than guessed.
+// Fail-closed: an unrecognised form is reported as unsupported, never silently executed or
+// silently skipped. (idea skills-cli-install-path, review round 08.)
+const UNSUPPORTED_SHELL = /[;|&<>]|\$\(/;
 
 test("the published-command extractor is not fooled by any container", () => {
   const fixture = [
@@ -280,7 +283,7 @@ test("the published-command extractor is not fooled by any container", () => {
     "node --test prose/one.test.js",
     "node --test pair/first.test.js",
     "node --test pair/second.test.js",
-    "node --test tab/separated.test.js",
+    "node --test\ttab/separated.test.js",
     "node --test multi/one.test.js multi/two.test.js"
   ]) {
     assert.ok(found.has(expected), `extractor missed: ${expected}`);
@@ -321,8 +324,11 @@ test("every `node --test` command a shipped file publishes runs tests and passes
   };
 
   for (const command of published) {
-    const targets = argv(command.slice("node --test ".length));
-    assert.ok(targets.length > 0, `published command names no target: ${command}`);
+    assert.equal(
+      UNSUPPORTED_SHELL.test(command),
+      false,
+      `published command uses shell syntax this guard refuses to interpret: ${command}`
+    );
     // A test runner spawned from inside a test runner inherits NODE_TEST_CONTEXT and reports
     // through the parent instead of to stdout, leaving nothing to read. Strip it so the child
     // behaves exactly as it does for a person typing the published command.
@@ -330,12 +336,20 @@ test("every `node --test` command a shipped file publishes runs tests and passes
     for (const key of Object.keys(env)) {
       if (key.startsWith("NODE_TEST")) delete env[key];
     }
-    const out = execFileSync(process.execPath, ["--test", ...targets], {
-      cwd: root,
-      encoding: "utf8",
-      env,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
+    // Run it through a real shell so quoting, whitespace and any trailing character are
+    // interpreted exactly as they are for a person who copies the line and presses enter.
+    let out;
+    try {
+      out = execFileSync("/bin/sh", ["-c", command], {
+        cwd: root,
+        encoding: "utf8",
+        env,
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+    } catch (error) {
+      out = `${error.stdout || ""}${error.stderr || ""}`;
+      assert.fail(`published command failed: ${command}\n${out.slice(-400)}`);
+    }
     // Node's default reporter prints "\u2139 pass N"; the TAP reporter prints "# pass N".
     // Accept either, and treat an unparseable summary as a failure rather than as zero.
     const read = (label) => {
