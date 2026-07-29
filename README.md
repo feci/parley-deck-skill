@@ -97,9 +97,9 @@ conflict Git can show.
 The worktree-allocation table in `IMPLEMENTATION.md` is the lock manifest. Before
 a second concurrent worktree is provisioned, its file set is compared with every
 claimed boundary; an intersection is refused unless an explicit override is
-recorded. Each implementer gets a sibling worktree, and the manifest records the
-per-worktree environment, port, database and cache overrides that isolating runtime
-state actually requires. Use it when two or more sessions or Phase-5 implementers work in one repository
+recorded. Each implementer gets a sibling worktree. Git gives that worktree its own
+working tree, index, `HEAD` and branch — it does not give it its own ports, databases or
+caches, so the manifest records those overrides too. Use it when two or more sessions or Phase-5 implementers work in one repository
 at once.
 
 ## Install
@@ -109,7 +109,7 @@ npx -y parley-deck-skill@latest install --target all
 npx -y parley-deck-skill@latest doctor --target all
 ```
 
-Restart any runtime that caches skills. The full command
+Some runtimes cache skills; restart yours if it does not pick the change up. The full command
 reference is in [Install, update, and remove](#install-update-and-remove).
 
 ## Use Parley Deck
@@ -162,7 +162,7 @@ npx -y parley-deck-skill@latest install --target all --dry-run
 
 # one runtime, a project scope, or an explicit directory
 npx -y parley-deck-skill@latest install --target codex
-npx -y parley-deck-skill@latest install --scope project --target all --project .
+npx -y parley-deck-skill@latest install --scope project --target all --project . --include-undetected
 npx -y parley-deck-skill@latest install --target generic --dest /path/to/skills/parley-deck
 
 # seed every supported path even where the runtime is not detected
@@ -190,12 +190,13 @@ npm install -g parley-deck-skill && parley-deck-skill install
 gemini extensions install https://github.com/feci/parley-deck-skill   # legacy Gemini only
 ```
 
-Use either the Gemini extension command or `--target gemini`, not both. Prefer `--target agy`
-for new Antigravity installs, and validate with
-`agy plugin validate ~/.gemini/config/plugins/parley-deck`. Codex users can also use the
-built-in `$skill-installer` with the repository URL, then restart Codex.
+The last two lines depend on those CLIs rather than on anything this package ships. Use
+either the Gemini extension command or `--target gemini`, not both — they write to different
+directories. Prefer `--target agy` for new Antigravity installs, and validate with
+`agy plugin validate ~/.gemini/config/plugins/parley-deck`.
 
-Run `parley-deck-skill paths` for the install directory of every target. The installer writes
+Run `parley-deck-skill paths` for the install directory of every *detected* target, or
+`parley-deck-skill paths --target all --include-undetected` for all fourteen. The installer writes
 `.parley-deck-skill-install.json` into each managed destination; updates replace marked
 installs safely, and unmarked directories are never overwritten or removed without `--force`.
 
@@ -245,10 +246,9 @@ parley-deck-skill/
 
 This repository is only the skill layer, and the skill implements **manual facilitation**:
 an agent follows it, invokes other CLI agents, and verifies canonical files. Deterministic
-automated orchestration is not part of it — that lives in the separate `parley-deck` server
-and `parley-deck-cli` repositories.
+automated orchestration is not part of it and requires separate tooling.
 
-Parley Deck did not invent the ideas it runs on. The one lineage a shipped file records is
+Parley Deck did not invent the ideas it runs on. The protocol lineage recorded here is
 **RHO** (Retrospective Harness Optimization), credited in `references/COOPERATION.md` §13,
 where RHO's single-model self-preference is deliberately replaced by the deck's multi-agent
 quorum. `NOTICE.md` records `hallmark` and `impeccable` as the prior art studied for the
