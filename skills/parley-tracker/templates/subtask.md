@@ -65,13 +65,13 @@ Assumption policy: if a required behaviour is undefined, stop and ask — never 
 - AC-2 [A][T] Given a ticket that fails the readiness scan, When claim runs, Then
   the command exits non-zero and the file is left unchanged (error path).
 - AC-3 [T][NFR] Measurable: the subtask's tests pass on the integration branch.
-  Verify: `node --test skills/parley-tracker/bin`
+  Verify: `node --test "skills/parley-tracker/bin/*.test.js"`
 
 ## Definition of Done / Verification
 <!-- Tick each AC when it passes; record the verifying commit sha. -->
 - [ ] AC-1 (Verify: claim writes the file on a passing ticket) — COMMIT-SHA
 - [ ] AC-2 (Verify: claim refuses and exits non-zero on a failing ticket) — COMMIT-SHA
-- [ ] AC-3 (Verify: `node --test skills/parley-tracker/bin`) — COMMIT-SHA
+- [ ] AC-3 (Verify: `node --test "skills/parley-tracker/bin/*.test.js"`) — COMMIT-SHA
 
 ## Non-goals
 - No tracker projection or live API write in this subtask.

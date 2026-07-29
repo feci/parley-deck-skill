@@ -206,3 +206,58 @@ test("no shipped skill instruction points at the removed addons/ tree", () => {
 test("the package ships no addons/ directory", () => {
   assert.equal(fs.existsSync(path.join(root, "addons")), false);
 });
+
+// A published verification command that exits 0 while running zero tests is worse than a
+// broken one: it certifies nothing while looking green, and an implementer ticks the box in
+// good faith. The addons/ text guard cannot see this class — the path can be perfectly
+// correct and the command still verify nothing. So run every command the shipped content
+// publishes and assert it both succeeds and actually executes tests.
+// (idea skills-cli-install-path, review round 03 MAJOR.)
+test("every `node --test` command a shipped file publishes runs tests and passes", () => {
+  const { execFileSync } = require("node:child_process");
+  const published = new Set();
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.name.endsWith(".md")) continue;
+      for (const m of fs.readFileSync(full, "utf8").matchAll(/`(node --test [^`]+)`/g)) {
+        published.add(m[1]);
+      }
+    }
+  };
+  walk(path.join(root, "skills"));
+  assert.ok(published.size > 0, "expected the skills to publish at least one test command");
+
+  for (const command of published) {
+    const target = command.slice("node --test ".length).replace(/^"|"$/g, "");
+    // A test runner spawned from inside a test runner inherits NODE_TEST_CONTEXT and reports
+    // through the parent instead of to stdout, leaving nothing to read. Strip it so the child
+    // behaves exactly as it does for a person typing the published command.
+    const env = { ...process.env };
+    for (const key of Object.keys(env)) {
+      if (key.startsWith("NODE_TEST")) delete env[key];
+    }
+    const out = execFileSync(process.execPath, ["--test", target], {
+      cwd: root,
+      encoding: "utf8",
+      env,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    // Node's default reporter prints "\u2139 pass N"; the TAP reporter prints "# pass N".
+    // Accept either, and treat an unparseable summary as a failure rather than as zero.
+    const read = (label) => {
+      const m = out.match(new RegExp(`^(?:\u2139|#)\\s*${label}\\s+(\\d+)\\s*$`, "m"));
+      assert.ok(m, `could not read "${label}" from the output of: ${command}`);
+      return Number(m[1]);
+    };
+    const pass = read("pass");
+    const fail = read("fail");
+    assert.equal(fail, 0, `published command failed: ${command}`);
+    assert.ok(pass > 0, `published command ran zero tests, so it verifies nothing: ${command}`);
+  }
+});
