@@ -61,6 +61,7 @@
     "pack:dry-run": "npm pack --dry-run"
   },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.19.0"
+    "@yao-pkg/pkg": "^6.19.0",
+    "commonmark": "^0.31.2"
   }
 }

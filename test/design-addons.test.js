@@ -225,93 +225,107 @@ test("the package ships no addons/ directory", () => {
 // A false positive here is harmless and arguably correct — if a shipped file prints a
 // `node --test` command anywhere, in any context, that command should work.
 // (idea skills-cli-install-path, review rounds 03-05.)
-// Join backslash-continued physical lines into logical shell lines FIRST, before anything
-// looks for a command. A continuation can split the command anywhere — `node \` + `--test x`,
-// or even `no\` + `de --test x` — so any detection that runs per physical line can be stepped
-// around by choosing where to break. A shell removes backslash-newline with no substitution,
-// so the splice does the same.
-function logicalLines(markdown) {
+// PUBLICATION CONTRACT — and why this stopped being a hand-written scanner.
+//
+// Seventeen cycles reconstructed markdown-plus-shell with regexes, and every one of them was
+// beaten by a shape the previous one had not imagined: fences, tilde fences, fake closes,
+// blockquotes, continuations at four different token boundaries, node flags between `node`
+// and `--test`, and finally markdown RENDERING itself — `node \--test x`, `node --**test** x`
+// and `node&#32;--test x` all render as a runnable command that no source-text scanner sees.
+// Round 16 had four independent reviewers and all four reached the same conclusion: the set
+// of ways markdown can spell a command is open, so no scanner over source text can close it.
+//
+// So the guard no longer approximates what a reader copies. It asks a real CommonMark parser,
+// and the contract it enforces is narrow enough to be checkable:
+//
+//   A published verification command MUST be the whole text of a single code node — one
+//   inline code span, or one line of one code block — in the canonical `node --test <targets>`
+//   form. Anything else that renders as such a command is REFUSED by name.
+//
+// What the parser buys that no line heuristic could: a `>` is a blockquote marker or literal
+// content depending only on the container, and the parser is the thing that knows. A fence
+// INSIDE a blockquote yields the bare command (correct to run); a `>` INSIDE a fence stays in
+// the literal (correctly refused). Cycle 16 stripped both and executed the mutated text —
+// certifying a line that, copied out, redirects into a file named `node`.
+// (idea skills-cli-install-path, review round 16: codex-1, agy-1, hermes-1, kimi-1.)
+const { Parser } = require("commonmark");
+
+// Detection stays deliberately BROADER than acceptance. Every false green in seventeen rounds
+// came from the two being the same pattern: whatever the grammar would refuse, detection also
+// failed to see, so the command was skipped — and skipping reads as success.
+const mentionsATestCommand = (s) => /\bnode\b/.test(s) && /--test\b/.test(s);
+
+// Inside a code node there is no container left to interpret, so splicing a backslash
+// continuation is exactly what a shell does. A unit assembled from more than one physical
+// line is emitted WITH its backslash so the grammar refuses it: the contract requires one
+// line, and a reader who copies two is outside it.
+function codeNodeUnits(literal) {
   const out = [];
   let parts = [];
-  for (const raw of markdown.split("\n")) {
-    // Remove the markdown CONTAINER MARKER from every physical line — and nothing else.
-    //
-    // The marker has to go, because it sits at the start of each line it contains: splicing
-    // `> node \` + `>   --test x` without removing it produced "node > --test x", which
-    // matches no command pattern, so the command was never tested at all (round 14).
-    //
-    // The content's own whitespace has to STAY, because deleting it merges tokens the shell
-    // keeps apart: `node\` + `  --test x` is "node  --test x" to a shell — it runs, and it
-    // fails — but deleting the indentation made it "node--test x", which the detector cannot
-    // see either (round 15). Cycle 15 claimed whitespace removal could only cause extra
-    // refusals; that claim was wrong, and this is the correction.
-    //
-    // Removing exactly the marker leaves what the reader actually copies out of the rendered
-    // page, so the reconstruction now matches the shell rather than approximating it in
-    // either direction. (idea skills-cli-install-path, review rounds 14 and 15.)
-    let line = raw;
-    for (;;) {
-      // one nesting level: up to three spaces of lead-in, the ">", and at most one space of
-      // padding — which is all CommonMark consumes for a blockquote marker.
-      const next = line.replace(/^ {0,3}> ?/, "");
-      if (next === line) break;
-      line = next;
-    }
-    const continues = /\\\s*$/.test(line);
-    parts.push(continues ? line.replace(/\\\s*$/, "") : line);
+  for (const line of String(literal).split("\n")) {
+    const continues = /\\$/.test(line);
+    parts.push(continues ? line.slice(0, -1) : line);
     if (continues) continue;
     out.push({ text: parts.join(""), spliced: parts.length > 1 });
     parts = [];
   }
-  if (parts.length > 0) out.push({ text: parts.join(""), spliced: parts.length > 1 });
+  if (parts.length > 0) out.push({ text: parts.join(""), spliced: true });
   return out;
 }
 
-// DETECTION IS DELIBERATELY BROADER THAN ACCEPTANCE, and the two must never be the same
-// pattern. Every false green in sixteen rounds came from detection being as narrow as the
-// grammar: whatever the grammar would refuse, detection also failed to see, so the command
-// was never judged at all — it was skipped, and skipping reads as success.
-//
-// Round 16 found the last of those from a new direction: `node --no-warnings --test x` (and
-// `node -r ./setup.js --test x`) never matched `/node\s+--test/`, because the flag sits
-// between the two tokens. It ran and failed for a reader while the guard stayed green.
-//
-// So a unit is a CANDIDATE if it mentions `node` and `--test` at all, in any order, with
-// anything between them. What the guard will actually execute is decided afterwards, and only
-// by SUPPORTED_COMMAND. A candidate that is not canonical is refused by name — never skipped.
-// (idea skills-cli-install-path, review round 16, agy-1.)
-const mentionsATestCommand = (s) => /\bnode\b/.test(s) && /--test\b/.test(s);
-
+// Returns a Map of command text -> where it was published ("code" | "prose"). The provenance
+// is part of the contract, not decoration: a command that renders outside a code node is
+// refused even when it would run, because a reader cannot tell it apart from prose and the
+// project has no way to keep it correct.
 function publishedTestCommands(markdown) {
-  const units = new Set();
-  for (const { text, spliced } of logicalLines(markdown)) {
-    if (!mentionsATestCommand(text)) continue;
-    // Strip only leading container/prompt noise. A command never begins with ">" or "$ ".
-    const line = text.replace(/^[\s>]*/, "").replace(/^\$\s+/, "").trim();
+  const units = new Map();
+  const add = ({ text, spliced }) => {
+    if (!mentionsATestCommand(text)) return;
+    units.set(spliced ? `${text.trim()} \\` : text.trim(), "code");
+  };
 
-    // A command assembled across physical lines is not a self-contained published command.
-    // Emit it with the backslash restored so the grammar, which forbids one, refuses it.
-    if (spliced) {
-      units.add(`${line} \\`);
+  // Rendered text OUTSIDE code nodes is collected per block. Markdown resolves escapes,
+  // entities and emphasis before the reader sees the page, so this is the string they copy —
+  // and a command published there is outside the contract whatever it says.
+  let rendered = [];
+  const flushRendered = () => {
+    for (const line of rendered.join("").split("\n")) {
+      if (mentionsATestCommand(line) && !units.has(line.trim())) units.set(line.trim(), "prose");
+    }
+    rendered = [];
+  };
+
+  const walker = new Parser().parse(markdown).walker();
+  let ev;
+  while ((ev = walker.next())) {
+    const { node, entering } = ev;
+    if (!entering) {
+      if (node.type === "paragraph" || node.type === "heading") flushRendered();
       continue;
     }
-
-    // The discriminator is NOT "am I inside a fence" — tracking fences meant reimplementing
-    // CommonMark. It is: does a backtick span contain the WHOLE command?
-    //   • Inline publication wraps the whole command:  `node --test "x"`  ->  the span is it.
-    //   • A fenced shell line wraps only a substitution: node --test `printf …` "x"
-    //     — no span contains the command, so the unit is the whole line, backticks and all,
-    //     and the strict grammar refuses it.
-    const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)];
-    const outside = line.replace(/(`+)[\s\S]*?\1/g, " ");
-    if (mentionsATestCommand(outside)) {
-      // Either a bare command, or a line that mixes span-quoted text with shell that also runs
-      // the command. Both are judged as the whole line; the grammar sorts them out.
-      units.add(line);
-      continue;
+    switch (node.type) {
+      case "code":
+      case "code_block":
+        for (const unit of codeNodeUnits(node.literal)) add(unit);
+        break;
+      case "text":
+        rendered.push(node.literal);
+        break;
+      case "softbreak":
+      case "linebreak":
+        rendered.push("\n");
+        break;
+      // Raw HTML is not rendered away — it reaches the reader. Treat it as copyable text
+      // rather than assuming it cannot carry a command.
+      case "html_inline":
+      case "html_block":
+        rendered.push(node.literal);
+        break;
+      default:
+        break;
     }
-    for (const m of spans) if (mentionsATestCommand(m[2])) units.add(m[2].trim());
   }
+  flushRendered();
   return units;
 }
 
@@ -324,12 +338,16 @@ function publishedTestCommands(markdown) {
 const SUPPORTED_COMMAND = /^node\s+--test\s+[^`;|&<>$\\]+$/;
 
 test("the published-command extractor captures whole commands, never fragments", () => {
+  // A WELL-FORMED document. The previous fixture was authored for a line scanner, so its
+  // structure was accidental: a fence that never closed swallowed the blockquote cases below
+  // it, and the assertions still passed because the scanner did not model containers either.
+  // A real parser exposed that immediately. Every block here is closed where it looks closed.
   const fixture = [
-    "Inline valid: `node --test \"a/*.test.js\"`",
+    'Inline valid: `node --test "a/*.test.js"`',
     "Inline broken: `node --test a/dir`",
     "",
     "```bash",
-    "node --test \"b/*.test.js\"",
+    'node --test "b/*.test.js"',
     "$ node --test b/dir",
     "```",
     "",
@@ -349,39 +367,70 @@ test("the published-command extractor captures whole commands, never fragments",
     "NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js",
     "cd some/dir && node --test suffixed/one.test.js",
     "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
-    "node --test \\",
-    "cont/split-args.test.js",
-    "node \\",
-    "  --test cont/split-before-flag.test.js",
-    "node --te\\",
-    "st cont/split-inside-flag.test.js",
-    "no\\",
-    "de --test cont/split-word.test.js",
-    "node --test cont/valid-half.test.js \\",
-    "--test-reporter=does-not-exist",
-    "node\\",
-    "  --test cont/no-space-before-backslash.test.js",
     "node --no-warnings --test flags/before-test.test.js",
     "node -r ./setup.js --test flags/require-hook.test.js",
-    "> ```bash",
-    "> node \\",
-    ">   --test cont/blockquote.test.js",
-    "> ```",
-    "> > nod\\",
-    "> > e --te\\",
-    "> > st cont/blockquote-tokens.test.js",
-    "```not-a-closing-fence",
+    "> node --test gt-is-content.test.js",
+    "```",
+    "",
+    "```bash",
+    "node --test \\",
+    "cont/split-args.test.js",
+    "```",
+    "",
+    "```bash",
+    "node \\",
+    "  --test cont/split-before-flag.test.js",
+    "```",
+    "",
+    "```bash",
+    "node --te\\",
+    "st cont/split-inside-flag.test.js",
+    "```",
+    "",
+    "```bash",
+    "no\\",
+    "de --test cont/split-word.test.js",
+    "```",
+    "",
+    "```bash",
+    "node --test cont/valid-half.test.js \\",
+    "--test-reporter=does-not-exist",
+    "```",
+    "",
+    "```bash",
+    "node\\",
+    "  --test cont/no-space-before-backslash.test.js",
+    "```",
+    "",
+    "```bash",
+    "node\\",
+    "--test cont/zero-width.test.js",
     "```",
     "",
     "> ```bash",
     "> node --test blockquoted/fence.test.js",
     "> ```",
     "",
+    "> ```bash",
+    "> node \\",
+    ">   --test cont/blockquote.test.js",
+    "> ```",
+    "",
+    "> > ```bash",
+    "> > nod\\",
+    "> > e --te\\",
+    "> > st cont/blockquote-tokens.test.js",
+    "> > ```",
+    "",
     "Double-backtick span: ``node --test double/span.test.js``.",
+    "",
+    "node \\--test rendered/escape.test.js",
+    "",
+    "node --**test** rendered/emphasis.test.js",
     "",
     "```",
     "echo not-a-test-command",
-    "```"
+    "```",
   ].join("\n");
   const found = publishedTestCommands(fixture);
 
@@ -390,7 +439,9 @@ test("the published-command extractor captures whole commands, never fragments",
     'node --test "a/*.test.js"',
     "node --test a/dir",
     'node --test "b/*.test.js"',
-    "node --test b/dir",
+    // The prompt is CONTENT of the code node, so it is part of what the reader copies. The
+    // guard no longer strips it into something runnable — it refuses the line as published.
+    "$ node --test b/dir",
     "node --test tilde/valid.test.js",
     "node --test indented/block.test.js",
     "node --test prose/one.test.js",
@@ -402,49 +453,50 @@ test("the published-command extractor captures whole commands, never fragments",
     "cd some/dir && node --test suffixed/one.test.js",
     // inside a fence a backtick is shell syntax, so the substitution stays in the unit
     "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
-    // outside a fence, ``…`` is ONE CommonMark span, not two delimiters
-    "node --test double/span.test.js",
-    // a blockquote prefix is container noise, never shell text
-    "node --test blockquoted/fence.test.js",
-    // A continuation can split the command anywhere, so detection must run on logical lines,
-    // not physical ones. Each is emitted whole WITH the backslash restored, so the grammar
-    // refuses it: a command assembled across lines is not a self-contained published command.
-    // The third is the dangerous shape — its first half alone is valid and green, so a
-    // per-physical-line guard would have executed it and certified a command that exits 1.
-    // (idea skills-cli-install-path, review round 13.)
+    // round 16 (agy-1): a node flag between the two tokens matched no detection pattern, so
+    // the command was skipped entirely — and skipping reads as success
+    "node --no-warnings --test flags/before-test.test.js",
+    "node -r ./setup.js --test flags/require-hook.test.js",
+    // round 16 (kimi-1): inside a fence the ">" is CONTENT, and the reader copies it. Cycle 16
+    // stripped it and ran the remainder, certifying a line that redirects into a file named
+    // "node". The parser keeps it, and the grammar refuses it.
+    "> node --test gt-is-content.test.js",
+    // A continuation is emitted with its backslash restored, so the grammar refuses it: the
+    // contract is one code node, one line. The split can fall at any token boundary, and the
+    // last of these has NO separator at all — the shape that defeated every prior detector.
     "node --test cont/split-args.test.js \\",
-    // the exact round-13 probe: the break falls BETWEEN `node` and `--test`, so neither
-    // physical line holds both tokens and a prefilter that runs per line sees no command
     "node   --test cont/split-before-flag.test.js \\",
-    // and the break can fall inside a token, so no token boundary is a safe place to look
     "node --test cont/split-inside-flag.test.js \\",
     "node --test cont/split-word.test.js \\",
     "node --test cont/valid-half.test.js --test-reporter=does-not-exist \\",
-    // A container marker sits at the START of every line it contains, so a continuation
-    // inside one interleaves markers with shell text. Stripping the container per physical
-    // line — before splicing — is what makes these reconstruct at all; splicing first left
-    // "node > --test x", which matched nothing and went green on a command that exits 1.
-    // The second case splits the tokens themselves inside a nested blockquote, which no
-    // amount of raw splicing could reassemble. (idea skills-cli-install-path, review round 14.)
+    "node  --test cont/no-space-before-backslash.test.js \\",
+    "node--test cont/zero-width.test.js \\",
+    // a blockquote CONTAINER is consumed by the parser, so the reader copies the bare command
+    "node --test blockquoted/fence.test.js",
     "node   --test cont/blockquote.test.js \\",
     "node --test cont/blockquote-tokens.test.js \\",
-    // round 15: no space before the backslash, indentation on the continuation. A shell
-    // yields "node  --test x" and runs it; deleting that indentation yielded "node--test x",
-    // which the detector could not see. Preserving it is what makes this reconstructable.
-    "node  --test cont/no-space-before-backslash.test.js \\",
-    // round 16 (agy-1): a node flag between `node` and `--test` matched no detection pattern,
-    // so the command was skipped entirely — and skipping reads as success. Detection is now
-    // broader than the grammar on purpose: these are seen, then refused by name.
-    "node --no-warnings --test flags/before-test.test.js",
-    "node -r ./setup.js --test flags/require-hook.test.js"
+    // outside a fence, ``…`` is ONE CommonMark span, not two delimiters
+    "node --test double/span.test.js",
+    // round 16 (codex-1): markdown RENDERING synthesizes these. No scanner over source text
+    // sees them; the reader copies a runnable command off the page.
+    "node --test rendered/escape.test.js",
+    "node --test rendered/emphasis.test.js",
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
-  assert.equal([...found].some((c) => c.includes("echo")), false);
+
+  // Provenance is recorded, because the contract turns on it: the same text is runnable when
+  // published in a code node and refused when it merely renders out of prose.
+  assert.equal(found.get('node --test "a/*.test.js"'), "code");
+  assert.equal(found.get("node --test rendered/escape.test.js"), "prose");
+  assert.equal(found.get("node --test rendered/emphasis.test.js"), "prose");
+  assert.equal([...found.keys()].some((c) => c.includes("echo")), false);
 
   // …and the surrounding-context forms are refused rather than executed as fragments.
   assert.equal(SUPPORTED_COMMAND.test("NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("cd some/dir && node --test suffixed/one.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("$ node --test b/dir"), false);
+  assert.equal(SUPPORTED_COMMAND.test("> node --test gt-is-content.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --test `printf x.test.js`"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --test `printf %s --test-reporter=x` fenced/subst.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --test double/span.test.js"), true);
@@ -476,7 +528,17 @@ test("every `node --test` command a shipped file publishes runs tests and passes
   walk(path.join(root, "skills"));
   assert.ok(published.size >= 2, `expected both published commands, saw ${published.size}`);
 
-  for (const command of published) {
+  for (const [command, origin] of published) {
+    // The publication contract first: a command must BE a code node, not merely render like
+    // one. A canonical command that reaches the reader out of prose would run green here and
+    // teach that the form is supported, so it is refused on provenance before form.
+    assert.equal(
+      origin,
+      "code",
+      `a verification command must be published as its own code span or code block; this one ` +
+        `only renders that way out of prose, where markdown can synthesize it from escapes, ` +
+        `entities or emphasis and no reader can tell it from documentation text: ${command}`
+    );
     assert.ok(
       SUPPORTED_COMMAND.test(command),
       `published command is not a bare \`node --test <targets>\` form, so this guard refuses ` +
