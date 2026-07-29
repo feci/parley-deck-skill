@@ -230,7 +230,7 @@ function publishedTestCommands(markdown) {
   // One global match over the whole document. Not line-by-line, because a line may publish
   // more than one command; not container-aware, because containers are an open set. A command
   // runs to the first backtick (an inline span's close) or end of line, whichever comes first.
-  for (const m of markdown.matchAll(/node --test ([^`\n]*)/g)) {
+  for (const m of markdown.matchAll(/node\s+--test\s+([^`\n]*)/g)) {
     const command = `node --test ${m[1]}`
       .replace(/[)\].,;:]+\s*$/, "")   // trailing markdown/prose punctuation
       .trim()
@@ -260,6 +260,11 @@ test("the published-command extractor is not fooled by any container", () => {
     "",
     "Two on one line: first `node --test pair/first.test.js`; then `node --test pair/second.test.js`.",
     "",
+    "```bash",
+    "node --test\ttab/separated.test.js",
+    "node --test multi/one.test.js multi/two.test.js",
+    "```",
+    "",
     "```",
     "echo not-a-test-command",
     "```"
@@ -274,7 +279,9 @@ test("the published-command extractor is not fooled by any container", () => {
     "node --test indented/block.test.js",
     "node --test prose/one.test.js",
     "node --test pair/first.test.js",
-    "node --test pair/second.test.js"
+    "node --test pair/second.test.js",
+    "node --test tab/separated.test.js",
+    "node --test multi/one.test.js multi/two.test.js"
   ]) {
     assert.ok(found.has(expected), `extractor missed: ${expected}`);
   }
@@ -301,8 +308,21 @@ test("every `node --test` command a shipped file publishes runs tests and passes
   walk(path.join(root, "skills"));
   assert.ok(published.size >= 2, `expected both published commands, saw ${published.size}`);
 
+  // Split a published command's argument string into argv the way a shell would: whitespace
+  // separates arguments, double quotes group them. Passing the whole string as ONE argument
+  // silently breaks any command with more than one target, and reports it as a product
+  // failure rather than a harness bug. (idea skills-cli-install-path, review round 07.)
+  const argv = (text) => {
+    const args = [];
+    const re = /"([^"]*)"|(\S+)/g;
+    let m;
+    while ((m = re.exec(text)) !== null) args.push(m[1] !== undefined ? m[1] : m[2]);
+    return args;
+  };
+
   for (const command of published) {
-    const target = command.slice("node --test ".length).replace(/^"|"$/g, "");
+    const targets = argv(command.slice("node --test ".length));
+    assert.ok(targets.length > 0, `published command names no target: ${command}`);
     // A test runner spawned from inside a test runner inherits NODE_TEST_CONTEXT and reports
     // through the parent instead of to stdout, leaving nothing to read. Strip it so the child
     // behaves exactly as it does for a person typing the published command.
@@ -310,7 +330,7 @@ test("every `node --test` command a shipped file publishes runs tests and passes
     for (const key of Object.keys(env)) {
       if (key.startsWith("NODE_TEST")) delete env[key];
     }
-    const out = execFileSync(process.execPath, ["--test", target], {
+    const out = execFileSync(process.execPath, ["--test", ...targets], {
       cwd: root,
       encoding: "utf8",
       env,
