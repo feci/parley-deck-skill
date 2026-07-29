@@ -342,12 +342,21 @@ function publishedTestCommands(markdown) {
   const walker = new Parser().parse(markdown).walker();
   let ev;
   let codeNodeId = 0;
+  // Alt text renders as a picture, not as text. A command there is published to nobody, so it
+  // is neither run nor policed — an earlier revision EXECUTED one, which is the opposite of
+  // what a guard built to distrust invisible text should do. (round 17, kimi-1.)
+  let insideImage = 0;
   while ((ev = walker.next())) {
     const { node, entering } = ev;
+    if (node.type === "image") {
+      insideImage += entering ? 1 : -1;
+      continue;
+    }
     if (!entering) {
       if (node.type === "paragraph" || node.type === "heading") flushVisible();
       continue;
     }
+    if (insideImage > 0) continue;
     switch (node.type) {
       case "code": {
         // An inline span is BOTH a copyable element and visible text, so it joins both passes.
@@ -361,20 +370,31 @@ function publishedTestCommands(markdown) {
         for (const unit of codeNodeUnits(node.literal)) addCode(unit);
         break;
       case "text":
-        emit(node.literal, -1);
+        // GFM strikethrough is not in CommonMark, so `node --t~~e~~st x` stays one literal
+        // here while GitHub, npm and editor previews render — and copy — `node --test x`.
+        // Dropping every `~~` run cannot hide a command, only reveal one, so the gap is closed
+        // in the fail-closed direction rather than by adopting a second dialect.
+        // (round 17, kimi-1.)
+        emit(node.literal.replace(/~~/g, ""), -1);
         break;
       case "softbreak":
       case "linebreak":
         emit("\n", -1);
         break;
       case "html_inline":
-      case "html_block":
+      case "html_block": {
         // Tags are markup, not page text — and stripping them is the point: `no<span></span>de`
         // reads as the word "node" to every reader. An earlier revision appended the raw tags,
         // which hid exactly this shape instead of exposing it.
-        emit(node.literal.replace(/<[^>]*>/g, ""), -1);
+        //
+        // Script and style bodies are the exception in the other direction: their CONTENT is
+        // never shown either, so policing it fails the build over text no reader can reach.
+        // (round 17, kimi-1.)
+        const hidden = /^\s*<\s*(script|style|template)\b/i.test(node.literal);
+        emit(hidden ? "" : node.literal.replace(/<[^>]*>/g, ""), -1);
         if (node.type === "html_block") flushVisible();
         break;
+      }
       default:
         break;
     }
@@ -494,6 +514,18 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "`node --test dup/same.test.js`",
     "",
+    "node --t~~e~~st gfm/strike-word.test.js",
+    "",
+    "node ~~--~~test gfm/strike-flag.test.js",
+    "",
+    "<!-- note: node --test invisible/comment.test.js -->",
+    "",
+    "<script>",
+    'var command = "node --test invisible/script.test.js";',
+    "</script>",
+    "",
+    "![`node --test invisible/alt.test.js`](picture.png)",
+    "",
     "```",
     "echo not-a-test-command",
     "```",
@@ -557,6 +589,10 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --test html/inline-node.test.js",
     "node --test html/inline-flag.test.js",
     "node --test html/block.test.js",
+    // round 17 (kimi-1): GFM strikethrough is not CommonMark, so this parser leaves the run
+    // literal while GitHub, npm and editor previews render — and copy — a clean command.
+    "node --test gfm/strike-word.test.js",
+    "node --test gfm/strike-flag.test.js",
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
@@ -576,6 +612,21 @@ test("the published-command extractor captures whole commands, never fragments",
   assert.equal(originOf("node --test html/inline-node.test.js"), "prose");
   assert.equal(originOf("node --test html/block.test.js"), "prose");
   assert.equal([...found].some((c) => c.includes("echo")), false);
+
+  // Text no reader can reach is neither run nor policed. Failing the build over a maintenance
+  // comment is noise; EXECUTING a command out of image alt text is the opposite of what a
+  // guard built to distrust invisible text should do. (round 17, kimi-1.)
+  for (const invisible of [
+    "node --test invisible/comment.test.js",
+    "node --test invisible/script.test.js",
+    "node --test invisible/alt.test.js",
+  ]) {
+    assert.equal(
+      found.has(invisible),
+      false,
+      `invisible text must not be treated as a published command: ${invisible}`
+    );
+  }
 
   // …and the surrounding-context forms are refused rather than executed as fragments.
   assert.equal(SUPPORTED_COMMAND.test("NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js"), false);
