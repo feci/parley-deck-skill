@@ -213,27 +213,35 @@ test("the package ships no addons/ directory", () => {
 // correct and the command still verify nothing. So run every command the shipped content
 // publishes and assert it both succeeds and actually executes tests.
 // (idea skills-cli-install-path, review round 03 MAJOR.)
-// Pull every published `node --test …` command out of one markdown document, from BOTH
-// inline code spans and fenced code blocks. Exported shape is a plain function so the
-// extractor itself can be tested against a fixture — an extractor that silently misses a
-// form produces a guard that silently passes, which is the failure this whole section exists
-// to prevent. (idea skills-cli-install-path, review round 04 MAJOR.)
+// Pull every published `node --test …` command out of one markdown document.
+//
+// This deliberately does NOT parse markdown structure. Four review rounds were spent
+// enumerating the places a command can hide — inline spans, then backtick fences, then tilde
+// fences — and each enumeration was narrower than the claim made for it. Fence syntax is an
+// open set (backtick, tilde, longer runs, indented blocks, HTML), so enumerating it can only
+// ever be incomplete. Scanning every line for the command itself closes the class by
+// construction: there is no container to miss, because containers are never consulted.
+//
+// A false positive here is harmless and arguably correct — if a shipped file prints a
+// `node --test` command anywhere, in any context, that command should work.
+// (idea skills-cli-install-path, review rounds 03-05.)
 function publishedTestCommands(markdown) {
   const found = new Set();
-  const add = (raw) => {
-    const command = raw.trim().replace(/\s+/g, " ");
-    if (command.startsWith("node --test ")) found.add(command);
-  };
-  // Inline code spans: `node --test …`
-  for (const m of markdown.matchAll(/`([^`\n]+)`/g)) add(m[1]);
-  // Fenced blocks: every line inside ``` … ```
-  for (const block of markdown.matchAll(/```[^\n]*\n([\s\S]*?)```/g)) {
-    for (const line of block[1].split("\n")) add(line.replace(/^\$\s*/, ""));
+  for (const line of markdown.split("\n")) {
+    const at = line.indexOf("node --test ");
+    if (at === -1) continue;
+    const command = line
+      .slice(at)
+      .split("`")[0]                   // an inline span ends at its closing backtick
+      .replace(/[)\].,;:]+\s*$/, "")   // trailing markdown/prose punctuation
+      .trim()
+      .replace(/\s+/g, " ");
+    if (command.length > "node --test ".length) found.add(command);
   }
   return found;
 }
 
-test("the published-command extractor finds both inline and fenced forms", () => {
+test("the published-command extractor is not fooled by any container", () => {
   const fixture = [
     "Inline valid: `node --test \"a/*.test.js\"`",
     "Inline broken: `node --test a/dir`",
@@ -243,21 +251,30 @@ test("the published-command extractor finds both inline and fenced forms", () =>
     "$ node --test b/dir",
     "```",
     "",
+    "~~~bash",
+    "node --test tilde/valid.test.js",
+    "~~~",
+    "",
+    "    node --test indented/block.test.js",
+    "",
+    "Prose mentioning `node --test prose/one.test.js` mid-sentence.",
+    "",
     "```",
     "echo not-a-test-command",
     "```"
   ].join("\n");
   const found = publishedTestCommands(fixture);
-  assert.deepEqual(
-    [...found].sort(),
-    [
-      'node --test "a/*.test.js"',
-      'node --test "b/*.test.js"',
-      "node --test a/dir",
-      "node --test b/dir"
-    ],
-    "the extractor must see inline and fenced commands, valid and broken alike"
-  );
+  for (const expected of [
+    'node --test "a/*.test.js"',
+    "node --test a/dir",
+    'node --test "b/*.test.js"',
+    "node --test b/dir",
+    "node --test tilde/valid.test.js",
+    "node --test indented/block.test.js",
+    "node --test prose/one.test.js"
+  ]) {
+    assert.ok(found.has(expected), `extractor missed: ${expected}`);
+  }
   assert.equal([...found].some((c) => c.includes("echo")), false);
 });
 
