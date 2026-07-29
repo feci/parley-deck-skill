@@ -213,6 +213,54 @@ test("the package ships no addons/ directory", () => {
 // correct and the command still verify nothing. So run every command the shipped content
 // publishes and assert it both succeeds and actually executes tests.
 // (idea skills-cli-install-path, review round 03 MAJOR.)
+// Pull every published `node --test …` command out of one markdown document, from BOTH
+// inline code spans and fenced code blocks. Exported shape is a plain function so the
+// extractor itself can be tested against a fixture — an extractor that silently misses a
+// form produces a guard that silently passes, which is the failure this whole section exists
+// to prevent. (idea skills-cli-install-path, review round 04 MAJOR.)
+function publishedTestCommands(markdown) {
+  const found = new Set();
+  const add = (raw) => {
+    const command = raw.trim().replace(/\s+/g, " ");
+    if (command.startsWith("node --test ")) found.add(command);
+  };
+  // Inline code spans: `node --test …`
+  for (const m of markdown.matchAll(/`([^`\n]+)`/g)) add(m[1]);
+  // Fenced blocks: every line inside ``` … ```
+  for (const block of markdown.matchAll(/```[^\n]*\n([\s\S]*?)```/g)) {
+    for (const line of block[1].split("\n")) add(line.replace(/^\$\s*/, ""));
+  }
+  return found;
+}
+
+test("the published-command extractor finds both inline and fenced forms", () => {
+  const fixture = [
+    "Inline valid: `node --test \"a/*.test.js\"`",
+    "Inline broken: `node --test a/dir`",
+    "",
+    "```bash",
+    "node --test \"b/*.test.js\"",
+    "$ node --test b/dir",
+    "```",
+    "",
+    "```",
+    "echo not-a-test-command",
+    "```"
+  ].join("\n");
+  const found = publishedTestCommands(fixture);
+  assert.deepEqual(
+    [...found].sort(),
+    [
+      'node --test "a/*.test.js"',
+      'node --test "b/*.test.js"',
+      "node --test a/dir",
+      "node --test b/dir"
+    ],
+    "the extractor must see inline and fenced commands, valid and broken alike"
+  );
+  assert.equal([...found].some((c) => c.includes("echo")), false);
+});
+
 test("every `node --test` command a shipped file publishes runs tests and passes", () => {
   const { execFileSync } = require("node:child_process");
   const published = new Set();
@@ -225,13 +273,13 @@ test("every `node --test` command a shipped file publishes runs tests and passes
         continue;
       }
       if (!entry.name.endsWith(".md")) continue;
-      for (const m of fs.readFileSync(full, "utf8").matchAll(/`(node --test [^`]+)`/g)) {
-        published.add(m[1]);
+      for (const command of publishedTestCommands(fs.readFileSync(full, "utf8"))) {
+        published.add(command);
       }
     }
   };
   walk(path.join(root, "skills"));
-  assert.ok(published.size > 0, "expected the skills to publish at least one test command");
+  assert.ok(published.size >= 2, `expected both published commands, saw ${published.size}`);
 
   for (const command of published) {
     const target = command.slice("node --test ".length).replace(/^"|"$/g, "");
