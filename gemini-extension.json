@@ -2,5 +2,5 @@
   "name": "parley-deck",
   "version": "1.2.0",
   "description": "Run Parley Deck multi-agent idea, implementation, review, and consensus workflows.",
-  "contextFileName": "SKILL.md"
+  "contextFileName": "skills/parley-deck/SKILL.md"
 }

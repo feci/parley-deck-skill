@@ -107,7 +107,8 @@ or Phase-5 implementers work in one repository at once.
 > [!TIP]
 > **One command, most agents.** The universal skill installer from
 > [`vercel-labs/skills`](https://github.com/vercel-labs/skills) installs all five skills into
-> whichever coding agents you have — many more than this package's own installer knows about:
+> the coding agents it supports — a longer list than this package's own installer covers, and
+> theirs to state, not ours:
 >
 > ```bash
 > npx -y skills add feci/parley-deck-skill
@@ -151,8 +152,10 @@ Substitute freely: *"review this branch against the idea's FINAL.md"*, *"compare
 approaches, arguing each independently in round 1"*, or *"use GitHub PR transport"* — the
 shape of the request is the same.
 
-If your runtime does not support skills directly, attach `skills/parley-deck/SKILL.md` and
-`skills/parley-deck/references/COOPERATION.md` as instruction context. The skill is plain Markdown by design.
+If your runtime does not support skills directly, attach the skill and the protocol as
+instruction context. In a repository checkout they are `skills/parley-deck/SKILL.md` and
+`skills/parley-deck/references/COOPERATION.md`; in an installed skill directory they are
+`SKILL.md` and `references/COOPERATION.md`. The skill is plain Markdown by design.
 
 ## Install, update, and remove
 
@@ -204,12 +207,15 @@ Other channels:
 brew install feci/parley/parley-deck-skill && parley-deck-skill install --target all
 winget install Feci.ParleyDeckSkill        # Windows; standalone binaries also on GitHub releases
 npm install -g parley-deck-skill && parley-deck-skill install
+gemini extensions install https://github.com/feci/parley-deck-skill   # legacy Gemini only
 ```
 
 For legacy Gemini use `--target gemini`, which writes `~/.gemini/extensions/parley-deck`.
-Installing this repository through `gemini extensions install <url>` is **not supported**: that
-path treats the repository root as the extension, and the core skill no longer lives there.
-Antigravity is a separate target: prefer `--target agy`, and validate with
+`gemini extensions install <repo-url>` is the other manager of that same destination — use one
+or the other, never both. The repository manifest points at `skills/parley-deck/SKILL.md` for
+that path, and a native install rewrites its staged copy to the flat destination shape;
+**we have not been able to run the Gemini CLI to confirm it end to end.** Antigravity is a
+separate target: prefer `--target agy`, and validate with
 `agy plugin validate ~/.gemini/config/plugins/parley-deck`.
 
 Run `parley-deck-skill paths` for the install directory of every *detected* target, or

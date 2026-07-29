@@ -659,3 +659,34 @@ test("uninstall after --no-addons install removes only the core skill", () => {
   assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), ["parley-deck"]);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-deck")), false);
 });
+
+// The repository manifest and the installed manifest describe two different layouts, and both
+// have to resolve. Regression guard for the reconciliation of the two contextFileName
+// consumers (idea skills-cli-install-path, review round 01 MAJOR).
+test("the repository gemini manifest points at the skill's repository path", () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "gemini-extension.json"), "utf8")
+  );
+  assert.equal(manifest.contextFileName, "skills/parley-deck/SKILL.md");
+  assert.equal(
+    fs.existsSync(path.join(__dirname, "..", manifest.contextFileName)),
+    true,
+    "the repository manifest must point at a file that exists in the repository"
+  );
+});
+
+test("a staged gemini install rewrites contextFileName to the flat destination shape", () => {
+  const home = tmpDir();
+  const result = installer.installCommand(context(home, { target: "gemini", force: true }));
+  assert.equal(result.ok, true);
+  const dest = path.join(home, ".gemini", "extensions", "parley-deck");
+  const staged = JSON.parse(fs.readFileSync(path.join(dest, "gemini-extension.json"), "utf8"));
+  assert.equal(staged.contextFileName, "SKILL.md");
+  assert.equal(
+    fs.existsSync(path.join(dest, staged.contextFileName)),
+    true,
+    "the staged manifest must point at a file that exists in the destination"
+  );
+  // The rewrite must touch only that one field.
+  assert.equal(staged.name, "parley-deck");
+});
