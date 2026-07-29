@@ -225,34 +225,50 @@ test("the package ships no addons/ directory", () => {
 // A false positive here is harmless and arguably correct — if a shipped file prints a
 // `node --test` command anywhere, in any context, that command should work.
 // (idea skills-cli-install-path, review rounds 03-05.)
+// Join backslash-continued physical lines into logical shell lines FIRST, before anything
+// looks for a command. A continuation can split the command anywhere — `node \` + `--test x`,
+// or even `no\` + `de --test x` — so any detection that runs per physical line can be stepped
+// around by choosing where to break. A shell removes backslash-newline with no substitution,
+// so the splice does the same.
+function logicalLines(markdown) {
+  const out = [];
+  let parts = [];
+  for (const line of markdown.split("\n")) {
+    const continues = /\\\s*$/.test(line);
+    parts.push(continues ? line.replace(/\\\s*$/, "") : line);
+    if (continues) continue;
+    out.push({ text: parts.join(""), spliced: parts.length > 1 });
+    parts = [];
+  }
+  if (parts.length > 0) out.push({ text: parts.join(""), spliced: parts.length > 1 });
+  return out;
+}
+
 function publishedTestCommands(markdown) {
   const units = new Set();
-  for (const raw of markdown.split("\n")) {
-    if (!/node\s+--test/.test(raw)) continue;
+  for (const { text, spliced } of logicalLines(markdown)) {
+    if (!/node\s+--test/.test(text)) continue;
     // Strip only leading container/prompt noise. A command never begins with ">" or "$ ".
-    const line = raw.replace(/^[\s>]*/, "").replace(/^\$\s+/, "").trim();
+    const line = text.replace(/^[\s>]*/, "").replace(/^\$\s+/, "").trim();
 
-    // A shell continuation means the command is not confined to this line. Refuse rather than
-    // execute the truncated first half.
-    if (/\\$/.test(line)) {
-      units.add(line);
+    // A command assembled across physical lines is not a self-contained published command.
+    // Emit it with the backslash restored so the grammar, which forbids one, refuses it.
+    if (spliced) {
+      units.add(`${line} \\`);
       continue;
     }
 
+    // The discriminator is NOT "am I inside a fence" — tracking fences meant reimplementing
+    // CommonMark. It is: does a backtick span contain the WHOLE command?
+    //   • Inline publication wraps the whole command:  `node --test "x"`  ->  the span is it.
+    //   • A fenced shell line wraps only a substitution: node --test `printf …` "x"
+    //     — no span contains "node --test", so the unit is the whole line, backticks and all,
+    //     and the strict grammar refuses it.
     const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)];
     const outside = line.replace(/(`+)[\s\S]*?\1/g, " ");
-    const commandOutside = /node\s+--test/.test(outside);
-
-    if (commandOutside && spans.length > 0) {
-      // The line mixes span-quoted text with bare shell that also runs the command — a
-      // compound or substituted form. Earlier revisions "resolved" this by executing one part
-      // and discarding the other, which is how both a false green and a false failure got in.
-      // It is refused as a whole instead: the unit is the entire line, which the grammar
-      // rejects on sight.
-      units.add(line);
-      continue;
-    }
-    if (commandOutside) {
+    if (/node\s+--test/.test(outside)) {
+      // Either a bare command, or a line that mixes span-quoted text with shell that also runs
+      // the command. Both are judged as the whole line; the grammar sorts them out.
       units.add(line);
       continue;
     }
@@ -295,6 +311,12 @@ test("the published-command extractor captures whole commands, never fragments",
     "NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js",
     "cd some/dir && node --test suffixed/one.test.js",
     "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
+    "node --test \\",
+    "cont/split-args.test.js",
+    "no\\",
+    "de --test cont/split-word.test.js",
+    "node --test cont/valid-half.test.js \\",
+    "--test-reporter=does-not-exist",
     "```not-a-closing-fence",
     "```",
     "",
@@ -330,7 +352,16 @@ test("the published-command extractor captures whole commands, never fragments",
     // outside a fence, ``…`` is ONE CommonMark span, not two delimiters
     "node --test double/span.test.js",
     // a blockquote prefix is container noise, never shell text
-    "node --test blockquoted/fence.test.js"
+    "node --test blockquoted/fence.test.js",
+    // A continuation can split the command anywhere, so detection must run on logical lines,
+    // not physical ones. Each is emitted whole WITH the backslash restored, so the grammar
+    // refuses it: a command assembled across lines is not a self-contained published command.
+    // The third is the dangerous shape — its first half alone is valid and green, so a
+    // per-physical-line guard would have executed it and certified a command that exits 1.
+    // (idea skills-cli-install-path, review round 13.)
+    "node --test cont/split-args.test.js \\",
+    "node --test cont/split-word.test.js \\",
+    "node --test cont/valid-half.test.js --test-reporter=does-not-exist \\"
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
