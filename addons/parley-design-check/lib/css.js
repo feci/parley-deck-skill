@@ -758,6 +758,133 @@ function atRuleName(prelude) {
   return consumeIdentSequence(prelude, 1).value.toLowerCase().replace(/^-[a-z]+-/, "");
 }
 
+/** The closer each block-opening code point of §5.4.7 is matched by. */
+const BLOCK_CLOSERS = { "(": ")", "[": "]", "{": "}" };
+
+/**
+ * What an `@function` prelude binds, and what it uses: `formals` are the custom property names
+ * its parameter list declares, and `uses` are the `var()` references its parameter defaults
+ * make. Reasons the list could not be read go to the caller's unreadable log.
+ *
+ * `@function --double(--x) { result: calc(var(--x) * 2) }` resolves `var(--x)` in its own body
+ * from the argument its caller passes, never from the token layer, so a reference to a formal
+ * parameter is not a reference to a token any contract could declare — reported as one it is a
+ * finding against ordinary CSS.
+ *
+ * A parameter is `<custom-property-name> <css-type>? [ : <declaration-value> ]?`, so only the
+ * *leading* ident of each top-level comma-separated segment is bound. Collecting every `--name`
+ * after the opening parenthesis instead bound the names a parameter's default value references
+ * as well, which turned a real use into a false clean — the worse direction of the same bug.
+ * Chromium parses `@function --pick(--x: var(--ghost)) { result: var(--ghost) }` as a real
+ * `CSSFunctionRule` and computes `color: --pick()` from `--ghost`; the checker bound `--ghost`
+ * as a parameter, suppressed the body's reference to it, never collected the one in the default,
+ * and certified PASS at verified L3 with no unreadable input and exit 0 over a token no ratified
+ * document declares. A default value is a value: what it references is used, and only what the
+ * segment leads with is bound.
+ *
+ * A parameter list this scanner cannot divide into parameters is not guessed at. It goes to the
+ * unreadable channel and binds nothing, so the rules that read the file lose their verdict rather
+ * than being handed a suppression nobody can trust.
+ */
+function functionBinding(prelude, line, log) {
+  const nothing = { formals: new Set(), uses: [] };
+  const note = (reason) => log.note(`the @function parameter list at line ${line} ${reason}`);
+
+  /*
+   * §4.3.4: a function token is an ident *immediately* followed by `(`, so the parameter list
+   * opens at the code point after the function's own name and nowhere else. Taking the first `(`
+   * in the text instead reads an escaped one inside that name — `@function --pi\(ck(--x)` — as
+   * the opener. A prelude with no `(` there declares no parameter list a browser accepts, so
+   * nothing is bound and nothing is suppressed, which is the safe half of that disagreement.
+   *
+   * CSS Functions names a function with a `<custom-property-name>`, so a prelude whose name is a
+   * plain ident is not this at-rule however it is spelled. Sass has had `@function px-to-rem($n)`
+   * for a decade, and this scanner reads source: across 639 real stylesheets, five preludes in two
+   * `.scss` files were the only `@function` parameter lists this parser could not read as CSS, and
+   * reporting them would have been the false alarm that gets a gate switched off. A name a browser
+   * would not accept binds nothing here and says nothing about it.
+   */
+  let cursor = consumeIdentSequence(prelude, 1).end;
+  while (isWhitespace(prelude[cursor])) cursor += 1;
+  if (!startsIdentSequence(prelude, cursor)) return nothing;
+  const functionName = consumeIdentSequence(prelude, cursor);
+  if (!functionName.value.startsWith("--")) return nothing;
+  const open = functionName.end;
+  if (prelude[open] !== "(") return nothing;
+
+  // The matching `)`, and the commas that divide the list at its own level. Strings, escapes and
+  // nested blocks are read through the shared consumers, so a comma inside `"a,b"`, `\,`,
+  // `type(<length>)` or `[a, b]` divides nothing — and a closer that matches no open block is an
+  // ordinary preserved token (§5.4.7), exactly as the stack machine treats one.
+  const stack = [")"];
+  const commas = [];
+  let close = -1;
+  let index = open + 1;
+  while (index < prelude.length) {
+    const ch = prelude[index];
+    if (ch === '"' || ch === "'") {
+      index = stringToken(prelude, index).end;
+      continue;
+    }
+    if (ch === "\\") {
+      index = validEscape(prelude, index) ? consumeEscape(prelude, index).end : index + 1;
+      continue;
+    }
+    if (BLOCK_CLOSERS[ch] !== undefined) {
+      stack.push(BLOCK_CLOSERS[ch]);
+      index += 1;
+      continue;
+    }
+    if (ch === stack[stack.length - 1]) {
+      stack.pop();
+      if (stack.length === 0) {
+        close = index;
+        break;
+      }
+      index += 1;
+      continue;
+    }
+    if (ch === "," && stack.length === 1) commas.push(index);
+    index += 1;
+  }
+  if (close === -1) {
+    note("is still open at the end of the prelude, so this scanner cannot tell a parameter from a value");
+    return nothing;
+  }
+  // `@function --now()` takes no parameters, which is a parameter list and not a defect.
+  if (commas.length === 0 && prelude.slice(open + 1, close).trim() === "") return nothing;
+
+  const formals = new Set();
+  const uses = [];
+  const bounds = [open, ...commas, close];
+  for (let i = 0; i + 1 < bounds.length; i += 1) {
+    const from = bounds[i] + 1;
+    const to = bounds[i + 1];
+    let at = from;
+    while (at < to && isWhitespace(prelude[at])) at += 1;
+    const name = startsIdentSequence(prelude, at) ? consumeIdentSequence(prelude, at) : null;
+    if (!name || !name.value.startsWith("--")) {
+      note(
+        `carries ${JSON.stringify(prelude.slice(from, to).trim())}, which this scanner cannot read as a parameter`
+      );
+      return nothing;
+    }
+    formals.add(name.value);
+    /*
+     * Everything after the name is the parameter's optional type and its optional default value.
+     * A default is read as the declaration value it is — decoded first, because `\76 ar(--ghost)`
+     * is `var(--ghost)` to a browser — and every reference in it is collected as a use. No
+     * `<css-type>` can carry a `var()`, so reading the type with the default costs nothing and
+     * spares this parser one more place to be wrong about where a default begins.
+     */
+    const rest = decodeDeclarationText(prelude.slice(name.end, to), (reason) =>
+      note(`carries a parameter that ${reason}`)
+    );
+    for (const match of rest.matchAll(VAR_REFERENCE)) uses.push({ name: match[1], line });
+  }
+  return { formals, uses };
+}
+
 /**
  * Parse a stylesheet into rule blocks and the reasons it could not be tokenised. Each block
  * records its selector list, the at-rule contexts it sits inside, and its declarations with
@@ -1033,6 +1160,9 @@ function scanStylesheet(text) {
       // Every at-rule this block sits inside, whether that at-rule holds rules or declarations.
       const context = stack.filter((entry) => entry.at).map((entry) => entry.at);
       const at = prelude.startsWith("@") ? { name: atRuleName(prelude), prelude, line: startLine } : null;
+      // The binding is read here, where the unreadable log is, because a parameter list this
+      // scanner cannot divide is a file it cannot read rather than a suppression it may guess.
+      if (at && at.name === "function") at.binding = functionBinding(prelude, startLine, log);
       if (at && !DECLARATION_AT_RULES.has(at.name)) {
         stack.push({ type: "at", line: startLine, at });
         continue;
@@ -1198,27 +1328,16 @@ function blankSpans(text, pattern) {
  * damaging as a false clean — it is what makes a gate get switched off — so the search runs
  * over `declarations[].value` and never over selector, prelude or comment text.
  */
-/**
- * The custom property names an `@function` prelude binds as parameters, or null for every other
- * block. `@function --double(--x)` resolves `var(--x)` in its own body from the argument its
- * caller passes, never from the token layer, so a reference to one is not a reference to a token
- * any contract could declare — reported as one it is a finding against ordinary CSS.
- */
-function functionParameters(block) {
-  const at = block.atBlock;
-  if (!at || at.name !== "function") return null;
-  const open = at.prelude.indexOf("(");
-  if (open === -1) return null;
-  return new Set(at.prelude.slice(open + 1).match(/--[A-Za-z0-9_-]+/g) || []);
-}
-
 function declarationVarUses(blocks) {
   const uses = [];
   for (const block of blocks) {
-    const parameters = functionParameters(block);
+    // The parameters this block's `@function` prelude binds, and the references its parameter
+    // defaults make. Both are read once, at scan time, by `functionBinding`.
+    const binding = block.atBlock ? block.atBlock.binding : null;
+    if (binding) uses.push(...binding.uses);
     for (const declaration of block.declarations) {
       for (const match of declaration.value.matchAll(VAR_REFERENCE)) {
-        if (parameters && parameters.has(match[1])) continue;
+        if (binding && binding.formals.has(match[1])) continue;
         uses.push({ name: match[1], line: declaration.line });
       }
     }

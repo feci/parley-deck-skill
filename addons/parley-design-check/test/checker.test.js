@@ -2917,6 +2917,169 @@ test("the at-rules whose body shape is known are read, and only the unknown ones
   );
 });
 
+/*
+ * codex-1's round-08 reproducer, browser-confirmed: Chromium 150 parses this as a real
+ * `CSSFunctionRule`, answers true to `CSS.supports("color", "--pick()")`, and computes the probe
+ * colour as `rgb(255, 0, 0)` — out of `--ghost`, which no ratified token document declares.
+ *
+ * Closing the false *unreadable* on `@function` bought a false *clean*, which is the worse
+ * direction of the same bug. `--x` is the one formal parameter here; `--ghost` is a reference in
+ * that parameter's default value. Binding every `--name` after the opening parenthesis bound
+ * `--ghost` too, so the body's real use of it was suppressed as if the caller supplied it, the
+ * reference in the default was never collected at all, and the run reported PASS, verified L3, an
+ * empty unreadable list and exit 0 over a token the browser resolves. A default value is a value.
+ */
+const FUNCTION_DEFAULT_REPRODUCER = [
+  ":root { --ghost: rgb(255,0,0); }",
+  "@function --pick(--x: var(--ghost)) { result: var(--ghost); }",
+  ".probe { color: --pick(); }",
+  ""
+].join("\n");
+
+/* The two clean controls the finding names, which the repair may not cost. */
+const FUNCTION_BOUND_PARAMETER = [
+  "@function --pick(--x) { result: var(--x); }",
+  ".probe { color: --pick(var(--color-text-body)); }",
+  ""
+].join("\n");
+const FUNCTION_DECLARED_DEFAULT = [
+  "@function --pick(--x: var(--color-text-body)) { result: var(--x); }",
+  ".probe { color: --pick(); }",
+  ""
+].join("\n");
+
+test("an @function binds its parameters and uses its defaults, and a default is never a binding", (t) => {
+  /*
+   * The scanner half. Only the leading custom-property name of each top-level segment is bound,
+   * and every reference in what follows it is a use — so the reproducer yields `--ghost` twice,
+   * once for the default and once for the body, and never `--x`.
+   */
+  assert.deepEqual(
+    varUses(FUNCTION_DEFAULT_REPRODUCER).map((use) => `${use.name}@${use.line}`),
+    ["--ghost@2", "--ghost@2"],
+    "a reference in a parameter default was bound as a parameter"
+  );
+  assert.deepEqual(
+    varUses(FUNCTION_BOUND_PARAMETER).map((use) => `${use.name}@${use.line}`),
+    ["--color-text-body@2"],
+    "the bound parameter was read as a reference to a ratified token"
+  );
+  assert.deepEqual(
+    varUses(FUNCTION_DECLARED_DEFAULT).map((use) => `${use.name}@${use.line}`),
+    ["--color-text-body@1"],
+    "a default referencing a declared token stopped being read as a use"
+  );
+
+  /*
+   * The list divides at its own commas only: a comma inside a nested function, a bracket block or
+   * a string divides nothing, an escaped one is part of the ident that carries it, and the
+   * `returns` clause sits outside the parentheses and binds nothing. A `<css-type>` may carry no
+   * `var()`, so reading it with the default costs no use and no binding.
+   */
+  for (const [source, expected] of [
+    ["@function --f(--x <length>: 1px, --y type(<length>): var(--gap)) { result: var(--x); }", ["--gap"]],
+    ["@function --f(--x: rgb(1, 2, 3), --y: var(--gap)) { result: calc(var(--x) + var(--y)); }", ["--gap"]],
+    ['@function --f(--x: "a, --y") { result: var(--x); }', []],
+    ["@function --f(--x: [a, var(--gap)]) { result: var(--x); }", ["--gap"]],
+    ["@function --f(--x: 1) returns <length> { result: var(--x); }", []],
+    ["@function --now() { result: 1; }\n.a { color: var(--gap); }", ["--gap"]],
+    // Read as it spells, not as it is written, on both sides of the binding (§4.3.11).
+    ["@function --f(\\2d\\2d x) { result: var(--x); }", []],
+    ["@function --f(--x: \\76 ar(--ghost)) { result: var(--x); }", ["--ghost"]]
+  ]) {
+    assert.deepEqual(
+      varUses(source).map((use) => use.name),
+      expected,
+      `the parameter list was divided wrongly: ${source}`
+    );
+    assert.deepEqual(scanStylesheet(source).unreadable, [], `an ordinary @function was reported unreadable: ${source}`);
+  }
+
+  /*
+   * A parameter list this scanner cannot divide into parameters is not guessed at. It goes to the
+   * unreadable channel and binds nothing, so the file costs its rules a verdict rather than
+   * handing them a suppression: guessing "these are all parameters" is the false clean above, and
+   * guessing "none of them is" is a finding against a name the caller really does supply.
+   */
+  const unparseable = scanStylesheet("@function --f(x: 1) { result: var(--x); }");
+  assert.match(
+    unparseable.unreadable.join(" | "),
+    /the @function parameter list at line 1 carries "x: 1", which this scanner cannot read as a parameter/,
+    "a parameter list with no custom-property name was read as if it bound something"
+  );
+  assert.deepEqual(
+    varUses("@function --f(x: 1) { result: var(--x); }").map((use) => use.name),
+    ["--x"],
+    "an unreadable parameter list still suppressed a reference"
+  );
+
+  /*
+   * And the at-rule that only shares the name. CSS Functions names a function with a
+   * `<custom-property-name>`; Sass has had `@function px-to-rem($n)` for a decade, and this
+   * scanner reads source. Five preludes in two real `.scss` files of the sweep corpus were the
+   * only `@function` parameter lists it could not read as CSS, and reporting them would have been
+   * the false alarm this whole repair exists on the other side of.
+   */
+  for (const source of [
+    "@function px-to-rem($n) {\n  x: $n;\n}\n.probe { color: var(--color-text-body); }",
+    "@function fonts($family, $weight: 400) {\n  x: map-get($sizes, $family);\n}\n.probe { color: var(--color-text-body); }"
+  ]) {
+    assert.deepEqual(
+      scanStylesheet(source).unreadable,
+      [],
+      `a Sass @function was reported unreadable: ${source}`
+    );
+    assert.deepEqual(varUses(source).map((use) => use.name), ["--color-text-body"]);
+  }
+  // The two shapes exactly as the corpus writes them: a `@return` body is text this scanner has
+  // always reported, and that is not what may change — the parameter list must stay unremarked.
+  for (const source of [
+    "@function px-to-rem($n) {\n  @return $n / 16 * 1rem;\n}\n.probe { color: var(--color-text-body); }",
+    "@function fonts($family, $weight: 400) {\n  @return map-get($sizes, $family);\n}\n.probe { color: var(--color-text-body); }"
+  ]) {
+    assert.ok(
+      !scanStylesheet(source).unreadable.some((reason) => /@function parameter list/.test(reason)),
+      `a Sass @function parameter list reached the fail-safe: ${source}`
+    );
+  }
+
+  /*
+   * End to end, on the run that verifies, at `--level L3`. What this fixture must not produce is
+   * the clean pass it produced at `82bde7d`: either the finding, or unreadable and UNJUDGEABLE.
+   */
+  const report = check(mutatedRun(t, [{ file: "probe.css", write: FUNCTION_DEFAULT_REPRODUCER }]), { level: "L3" });
+  const undeclared = report["findings-detail"].filter((finding) => finding.rule === "core:token-used-undeclared");
+  const unreadable = report.inputs.unreadable.filter((entry) => /probe\.css/.test(entry));
+  assert.ok(
+    undeclared.length > 0 || unreadable.length > 0,
+    `a browser-resolved reference to an undeclared token certified clean: ${JSON.stringify(report["findings-detail"])}`
+  );
+  assert.ok(
+    undeclared.some((finding) => /references --ghost/.test(finding.violation)),
+    `the reference the browser resolves was not the one reported: ${JSON.stringify(undeclared)}`
+  );
+  assert.equal(report.verdict, "VIOLATION");
+  assert.notEqual(report.level.verified, "L3", "a run over an undeclared token verified the level it claims");
+  assert.notEqual(report.exit, 0, "a run over a browser-resolved undeclared token exited clean");
+
+  // And the two clean controls the repair may not cost: an ordinary `@function` still passes.
+  for (const [name, source] of [
+    ["a body using only the bound parameter", FUNCTION_BOUND_PARAMETER],
+    ["a default referencing a ratified token", FUNCTION_DECLARED_DEFAULT]
+  ]) {
+    const clean = check(mutatedRun(t, [{ file: "probe.css", write: source }]), { level: "L3" });
+    assert.deepEqual(
+      clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+      [],
+      `${name} raised a finding`
+    );
+    assert.deepEqual(clean.inputs.unreadable, [], `${name} was reported unreadable`);
+    assert.equal(clean.verdict, "PASS", `${name} left the run unclean`);
+    assert.equal(clean.level.verified, "L3");
+    assert.equal(clean.exit, 0);
+  }
+});
+
 test("CDO and CDC at the top level of a stylesheet are discarded, as a browser discards them", (t) => {
   /*
    * §5.4.1: where a rule would begin at the top level, `<!--` and `-->` are consumed and dropped —
