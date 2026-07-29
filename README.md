@@ -204,12 +204,12 @@ Other channels:
 brew install feci/parley/parley-deck-skill && parley-deck-skill install --target all
 winget install Feci.ParleyDeckSkill        # Windows; standalone binaries also on GitHub releases
 npm install -g parley-deck-skill && parley-deck-skill install
-gemini extensions install https://github.com/feci/parley-deck-skill   # legacy Gemini only
 ```
 
-The Gemini CLI command and `--target gemini` are two managers for the *same* destination —
-`~/.gemini/extensions/parley-deck`. Use one or the other, never both. Antigravity is a
-separate target: prefer `--target agy`, and validate with
+For legacy Gemini use `--target gemini`, which writes `~/.gemini/extensions/parley-deck`.
+Installing this repository through `gemini extensions install <url>` is **not supported**: that
+path treats the repository root as the extension, and the core skill no longer lives there.
+Antigravity is a separate target: prefer `--target agy`, and validate with
 `agy plugin validate ~/.gemini/config/plugins/parley-deck`.
 
 Run `parley-deck-skill paths` for the install directory of every *detected* target, or
