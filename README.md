@@ -118,8 +118,8 @@ or Phase-5 implementers work in one repository at once.
 > It detects your agents and asks which to install into. `--agent <name>` picks them
 > explicitly; `--list` shows what the repository offers without installing anything.
 
-This package's own installer covers fourteen named runtimes and adds detection, health checks
-and project-metadata sync that the universal one does not:
+This package's own installer covers fourteen named runtimes and adds health checks
+(`doctor`, `status`) and project-metadata sync that the universal one does not:
 
 ```bash
 npx -y parley-deck-skill@latest install --target all

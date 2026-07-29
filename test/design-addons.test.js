@@ -226,24 +226,35 @@ test("the package ships no addons/ directory", () => {
 // `node --test` command anywhere, in any context, that command should work.
 // (idea skills-cli-install-path, review rounds 03-05.)
 function publishedTestCommands(markdown) {
-  const found = new Set();
-  // Capture the command VERBATIM. Nothing is stripped, normalised or re-quoted: every earlier
-  // revision of this guard was a hand-written approximation of shell syntax, and each one both
-  // missed broken commands and manufactured failures for legitimate ones. A command runs to
-  // the first backtick (an inline span's close) or end of line.
-  for (const m of markdown.matchAll(/node\s+--test\s+[^`\n]*/g)) {
-    const command = m[0].replace(/\s+$/, "");
-    if (command.length > "node --test".length + 1) found.add(command);
+  const units = new Set();
+  for (const raw of markdown.split("\n")) {
+    const line = raw.replace(/^\s*\$\s+/, "").trim();
+    if (!/node\s+--test/.test(line)) continue;
+    // A "unit" is a whole published shell command, never a substring of one. Earlier revisions
+    // captured from the word `node` onward and threw away everything around it, so an env
+    // prefix, a `cd … &&`, or a command substitution was silently discarded — executing a
+    // fragment that happened to work while the published command did not, and vice versa.
+    const spans = [...line.matchAll(/`([^`]*)`/g)].map((m) => m[1]);
+    if (spans.length > 0) {
+      for (const span of spans) if (/node\s+--test/.test(span)) units.add(span.trim());
+      const remainder = line.replace(/`[^`]*`/g, " ");
+      if (/node\s+--test/.test(remainder)) units.add(remainder.trim());
+    } else {
+      units.add(line);
+    }
   }
-  return found;
+  return units;
 }
 
-// Anything that could mean more than "run this test command" is refused rather than guessed.
-// Fail-closed: an unrecognised form is reported as unsupported, never silently executed or
-// silently skipped. (idea skills-cli-install-path, review round 08.)
-const UNSUPPORTED_SHELL = /[;|&<>]|\$\(/;
+// The only shape this guard will execute: the command, its targets, and nothing else. Every
+// other published form — an environment prefix, a `cd … &&`, a command substitution, a pipe,
+// a trailing shell operator — is REFUSED by name rather than guessed at or silently skipped.
+// Narrow and fail-closed beats broad and approximate: six revisions of a hand-written shell
+// parser were wrong in both directions at once.
+// (idea skills-cli-install-path, review rounds 03-09.)
+const SUPPORTED_COMMAND = /^node\s+--test\s+[^`;|&<>$]+$/;
 
-test("the published-command extractor is not fooled by any container", () => {
+test("the published-command extractor captures whole commands, never fragments", () => {
   const fixture = [
     "Inline valid: `node --test \"a/*.test.js\"`",
     "Inline broken: `node --test a/dir`",
@@ -266,6 +277,8 @@ test("the published-command extractor is not fooled by any container", () => {
     "```bash",
     "node --test\ttab/separated.test.js",
     "node --test multi/one.test.js multi/two.test.js",
+    "NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js",
+    "cd some/dir && node --test suffixed/one.test.js",
     "```",
     "",
     "```",
@@ -273,6 +286,8 @@ test("the published-command extractor is not fooled by any container", () => {
     "```"
   ].join("\n");
   const found = publishedTestCommands(fixture);
+
+  // Every command is captured WHOLE — including the forms that must later be refused.
   for (const expected of [
     'node --test "a/*.test.js"',
     "node --test a/dir",
@@ -284,11 +299,19 @@ test("the published-command extractor is not fooled by any container", () => {
     "node --test pair/first.test.js",
     "node --test pair/second.test.js",
     "node --test\ttab/separated.test.js",
-    "node --test multi/one.test.js multi/two.test.js"
+    "node --test multi/one.test.js multi/two.test.js",
+    "NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js",
+    "cd some/dir && node --test suffixed/one.test.js"
   ]) {
-    assert.ok(found.has(expected), `extractor missed: ${expected}`);
+    assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
   assert.equal([...found].some((c) => c.includes("echo")), false);
+
+  // …and the surrounding-context forms are refused rather than executed as fragments.
+  assert.equal(SUPPORTED_COMMAND.test("NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("cd some/dir && node --test suffixed/one.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("node --test `printf x.test.js`"), false);
+  assert.equal(SUPPORTED_COMMAND.test('node --test "a/*.test.js"'), true);
 });
 
 test("every `node --test` command a shipped file publishes runs tests and passes", () => {
@@ -311,23 +334,11 @@ test("every `node --test` command a shipped file publishes runs tests and passes
   walk(path.join(root, "skills"));
   assert.ok(published.size >= 2, `expected both published commands, saw ${published.size}`);
 
-  // Split a published command's argument string into argv the way a shell would: whitespace
-  // separates arguments, double quotes group them. Passing the whole string as ONE argument
-  // silently breaks any command with more than one target, and reports it as a product
-  // failure rather than a harness bug. (idea skills-cli-install-path, review round 07.)
-  const argv = (text) => {
-    const args = [];
-    const re = /"([^"]*)"|(\S+)/g;
-    let m;
-    while ((m = re.exec(text)) !== null) args.push(m[1] !== undefined ? m[1] : m[2]);
-    return args;
-  };
-
   for (const command of published) {
-    assert.equal(
-      UNSUPPORTED_SHELL.test(command),
-      false,
-      `published command uses shell syntax this guard refuses to interpret: ${command}`
+    assert.ok(
+      SUPPORTED_COMMAND.test(command),
+      `published command is not a bare \`node --test <targets>\` form, so this guard refuses ` +
+        `to interpret it rather than execute a fragment of it: ${command}`
     );
     // A test runner spawned from inside a test runner inherits NODE_TEST_CONTEXT and reports
     // through the parent instead of to stdout, leaving nothing to read. Strip it so the child
