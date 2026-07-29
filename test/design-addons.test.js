@@ -273,60 +273,114 @@ function codeNodeUnits(literal) {
   return out;
 }
 
-// Returns a Map of command text -> where it was published ("code" | "prose"). The provenance
-// is part of the contract, not decoration: a command that renders outside a code node is
-// refused even when it would run, because a reader cannot tell it apart from prose and the
-// project has no way to keep it correct.
+// Returns an ARRAY of { command, origin } occurrences, origin being "code" or "prose".
+//
+// An array, not a map keyed by text: the same command string can be published twice with
+// different provenance, and a map kept only one of them — a valid code occurrence masked an
+// invalid prose one, and the contract went unenforced (round 17, codex-1).
+//
+// Two passes, because a reader has two ways to acquire a command:
+//
+//  1. COPY A CODE ELEMENT. A code node's literal is exactly what they get.
+//  2. READ THE RENDERED PAGE. What they see is the block's VISIBLE text — escapes, entities
+//     and emphasis resolved, HTML TAGS REMOVED (a tag is markup; it is not on the page), and
+//     inline code spans included, because a span is visible text too.
+//
+// The second pass is where a command can be synthesized from parts belonging to no single code
+// node: `node ` from prose plus `--test` from a span, or `no<span></span>de`, whose tag
+// vanishes on render. Neither piece is a command; the visible line is. So the question is not
+// which bucket a fragment landed in, but: DO BOTH TOKENS OF THE OCCURRENCE COME FROM ONE AND
+// THE SAME CODE NODE? If they do, a single copyable element holds the whole command and the
+// code pass already has it. If they do not, no such element exists, and it is refused.
+//
+// Occurrence-level on purpose. Requiring the command to be the whole visible LINE would have
+// been simpler and would have broken two shipped documents that legitimately write `Verify: `
+// before a span, and a checklist item with the span in parentheses. In both, the command is
+// wholly inside one span — which is the property that actually matters.
+// (idea skills-cli-install-path, review round 17, codex-1.)
 function publishedTestCommands(markdown) {
-  const units = new Map();
-  const add = ({ text, spliced }) => {
+  const occurrences = [];
+  const seen = new Set();
+  const record = (command, origin) => {
+    const key = origin + " " + command;
+    if (seen.has(key)) return;
+    seen.add(key);
+    occurrences.push({ command, origin });
+  };
+  const addCode = ({ text, spliced }) => {
     if (!mentionsATestCommand(text)) return;
-    units.set(spliced ? `${text.trim()} \\` : text.trim(), "code");
+    record(spliced ? text.trim() + " \\" : text.trim(), "code");
   };
 
-  // Rendered text OUTSIDE code nodes is collected per block. Markdown resolves escapes,
-  // entities and emphasis before the reader sees the page, so this is the string they copy —
-  // and a command published there is outside the contract whatever it says.
-  let rendered = [];
-  const flushRendered = () => {
-    for (const line of rendered.join("").split("\n")) {
-      if (mentionsATestCommand(line) && !units.has(line.trim())) units.set(line.trim(), "prose");
+  // Visible text of the current block, plus — per character — which code node it came from
+  // (-1 for anything not inside one).
+  let visible = "";
+  let owners = [];
+  const emit = (str, owner) => {
+    visible += str;
+    for (let i = 0; i < str.length; i += 1) owners.push(owner);
+  };
+  const flushVisible = () => {
+    let lineStart = 0;
+    for (const line of visible.split("\n")) {
+      const from = lineStart;
+      lineStart += line.length + 1;
+      for (const m of line.matchAll(/\bnode\b/g)) {
+        const rest = line.slice(m.index);
+        const flag = rest.match(/--test\b/);
+        if (!flag) continue;
+        const nodeOwner = owners[from + m.index];
+        const flagOwner = owners[from + m.index + flag.index];
+        if (nodeOwner !== -1 && nodeOwner === flagOwner) continue;
+        record(rest.trim(), "prose");
+      }
     }
-    rendered = [];
+    visible = "";
+    owners = [];
   };
 
   const walker = new Parser().parse(markdown).walker();
   let ev;
+  let codeNodeId = 0;
   while ((ev = walker.next())) {
     const { node, entering } = ev;
     if (!entering) {
-      if (node.type === "paragraph" || node.type === "heading") flushRendered();
+      if (node.type === "paragraph" || node.type === "heading") flushVisible();
       continue;
     }
     switch (node.type) {
-      case "code":
+      case "code": {
+        // An inline span is BOTH a copyable element and visible text, so it joins both passes.
+        const id = codeNodeId++;
+        for (const unit of codeNodeUnits(node.literal)) addCode(unit);
+        emit(node.literal, id);
+        break;
+      }
       case "code_block":
-        for (const unit of codeNodeUnits(node.literal)) add(unit);
+        // A block is its own container; its literal is not part of a paragraph's visible text.
+        for (const unit of codeNodeUnits(node.literal)) addCode(unit);
         break;
       case "text":
-        rendered.push(node.literal);
+        emit(node.literal, -1);
         break;
       case "softbreak":
       case "linebreak":
-        rendered.push("\n");
+        emit("\n", -1);
         break;
-      // Raw HTML is not rendered away — it reaches the reader. Treat it as copyable text
-      // rather than assuming it cannot carry a command.
       case "html_inline":
       case "html_block":
-        rendered.push(node.literal);
+        // Tags are markup, not page text — and stripping them is the point: `no<span></span>de`
+        // reads as the word "node" to every reader. An earlier revision appended the raw tags,
+        // which hid exactly this shape instead of exposing it.
+        emit(node.literal.replace(/<[^>]*>/g, ""), -1);
+        if (node.type === "html_block") flushVisible();
         break;
       default:
         break;
     }
   }
-  flushRendered();
-  return units;
+  flushVisible();
+  return occurrences;
 }
 
 // The only shape this guard will execute: the command, its targets, and nothing else. Every
@@ -428,11 +482,26 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "node --**test** rendered/emphasis.test.js",
     "",
+    "node `--test` mixed/span.test.js",
+    "",
+    "no<span></span>de --test html/inline-node.test.js",
+    "",
+    "node --te<span></span>st html/inline-flag.test.js",
+    "",
+    "<div>no<span></span>de --test html/block.test.js</div>",
+    "",
+    "node \\--test dup/same.test.js",
+    "",
+    "`node --test dup/same.test.js`",
+    "",
     "```",
     "echo not-a-test-command",
     "```",
   ].join("\n");
-  const found = publishedTestCommands(fixture);
+  const occurrences = publishedTestCommands(fixture);
+  const found = new Set(occurrences.map((o) => o.command));
+  const originOf = (command) =>
+    occurrences.filter((o) => o.command === command).map((o) => o.origin).sort().join("+");
 
   // Every command is captured WHOLE — including the forms that must later be refused.
   for (const expected of [
@@ -481,16 +550,32 @@ test("the published-command extractor captures whole commands, never fragments",
     // sees them; the reader copies a runnable command off the page.
     "node --test rendered/escape.test.js",
     "node --test rendered/emphasis.test.js",
+    // round 17 (codex-1): the command belongs to no single code node — half of it is prose and
+    // half a span, or a tag splits a token and vanishes on render. Each piece is harmless; the
+    // visible line is a runnable, broken command.
+    "node --test mixed/span.test.js",
+    "node --test html/inline-node.test.js",
+    "node --test html/inline-flag.test.js",
+    "node --test html/block.test.js",
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
 
   // Provenance is recorded, because the contract turns on it: the same text is runnable when
   // published in a code node and refused when it merely renders out of prose.
-  assert.equal(found.get('node --test "a/*.test.js"'), "code");
-  assert.equal(found.get("node --test rendered/escape.test.js"), "prose");
-  assert.equal(found.get("node --test rendered/emphasis.test.js"), "prose");
-  assert.equal([...found.keys()].some((c) => c.includes("echo")), false);
+  assert.equal(originOf('node --test "a/*.test.js"'), "code");
+  assert.equal(originOf("node --test rendered/escape.test.js"), "prose");
+  assert.equal(originOf("node --test rendered/emphasis.test.js"), "prose");
+  // A command wholly inside one span keeps its code provenance even mid-sentence — that is
+  // what two shipped documents rely on, and the reason this rule is occurrence-level.
+  assert.equal(originOf("node --test prose/one.test.js"), "code");
+  // …and a valid code occurrence must not mask an invalid prose one with identical text: both
+  // are recorded, so the contract is enforced on the prose one (round 17, codex-1).
+  assert.equal(originOf("node --test dup/same.test.js"), "code+prose");
+  // a tag is markup, not page text: stripping it is what exposes the split token
+  assert.equal(originOf("node --test html/inline-node.test.js"), "prose");
+  assert.equal(originOf("node --test html/block.test.js"), "prose");
+  assert.equal([...found].some((c) => c.includes("echo")), false);
 
   // …and the surrounding-context forms are refused rather than executed as fragments.
   assert.equal(SUPPORTED_COMMAND.test("NODE_OPTIONS='--require ./x.cjs' node --test prefixed/one.test.js"), false);
@@ -510,7 +595,8 @@ test("the published-command extractor captures whole commands, never fragments",
 
 test("every `node --test` command a shipped file publishes runs tests and passes", () => {
   const { execFileSync } = require("node:child_process");
-  const published = new Set();
+  const published = [];
+  const withFile = new Map();
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
@@ -520,24 +606,29 @@ test("every `node --test` command a shipped file publishes runs tests and passes
         continue;
       }
       if (!entry.name.endsWith(".md")) continue;
-      for (const command of publishedTestCommands(fs.readFileSync(full, "utf8"))) {
-        published.add(command);
+      for (const occurrence of publishedTestCommands(fs.readFileSync(full, "utf8"))) {
+        published.push(occurrence);
+        withFile.set(`${occurrence.origin} ${occurrence.command}`, path.relative(root, full));
       }
     }
   };
   walk(path.join(root, "skills"));
-  assert.ok(published.size >= 2, `expected both published commands, saw ${published.size}`);
+  const distinct = new Set(published.map((o) => o.command));
+  assert.ok(distinct.size >= 2, `expected both published commands, saw ${distinct.size}`);
 
-  for (const [command, origin] of published) {
+  const ran = new Set();
+  for (const { command, origin } of published) {
+    const where = withFile.get(`${origin} ${command}`) || "a shipped file";
     // The publication contract first: a command must BE a code node, not merely render like
     // one. A canonical command that reaches the reader out of prose would run green here and
     // teach that the form is supported, so it is refused on provenance before form.
     assert.equal(
       origin,
       "code",
-      `a verification command must be published as its own code span or code block; this one ` +
-        `only renders that way out of prose, where markdown can synthesize it from escapes, ` +
-        `entities or emphasis and no reader can tell it from documentation text: ${command}`
+      `a verification command must be published as its own code span or code block, so that ` +
+        `one copyable element holds all of it. This one is synthesized by rendering — from ` +
+        `escapes, entities, emphasis, stripped HTML tags, or prose spliced onto a span — and ` +
+        `no reader can tell it from documentation text. In ${where}: ${command}`
     );
     assert.ok(
       SUPPORTED_COMMAND.test(command),
@@ -551,6 +642,8 @@ test("every `node --test` command a shipped file publishes runs tests and passes
     for (const key of Object.keys(env)) {
       if (key.startsWith("NODE_TEST")) delete env[key];
     }
+    if (ran.has(command)) continue;
+    ran.add(command);
     // Run it through a real shell so quoting, whitespace and any trailing character are
     // interpreted exactly as they are for a person who copies the line and presses enter.
     let out;
