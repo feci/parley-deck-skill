@@ -1,0 +1,9 @@
+/* One literal, which a waiver may excuse, in a file that otherwise resolves through tokens. */
+.panel {
+  color: #1b1b1b;
+  background-color: var(--color-surface-raised);
+}
+
+.panel__note {
+  color: var(--color-text-muted);
+}

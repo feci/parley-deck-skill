@@ -1,0 +1,9 @@
+/* Focus indication arrives in the same frame focus does: no transition reaches it. */
+.control {
+  transition: opacity 120ms ease-out;
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

@@ -1,0 +1,8 @@
+/* A fourth face, arrived through a component library's default, never ratified. */
+.prose {
+  font-family: "Chartwell Text", serif;
+}
+
+.widget__label {
+  font-family: "Helvetica Neue", sans-serif;
+}

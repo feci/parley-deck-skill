@@ -1,0 +1,8 @@
+/* Named properties, none of them layout-affecting, and a curve that stops where it ends. */
+.card {
+  transition: opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card__bar {
+  transition: transform 200ms ease-out;
+}

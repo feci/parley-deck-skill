@@ -1,0 +1,4 @@
+/* One of the declared tokens is referenced; the other is a decision nobody kept. */
+.panel {
+  color: var(--color-text-body);
+}

@@ -1,0 +1,7 @@
+/* The glyphs have no single foreground colour, so no ratio describes them. */
+.headline {
+  background-image: linear-gradient(90deg, var(--color-accent), var(--color-accent-soft));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

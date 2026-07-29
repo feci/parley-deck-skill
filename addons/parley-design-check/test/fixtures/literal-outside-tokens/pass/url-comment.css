@@ -1,0 +1,7 @@
+/* The same shape with every governed value resolved: a comment delimiter inside a url token is
+   part of the url, and consuming it must not swallow the declarations after it. */
+.badge {
+  background: url(sprite/*glyph.svg);
+  color: var(--color-text-body);
+  border-radius: var(--radius-panel);
+}

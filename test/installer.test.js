@@ -402,7 +402,7 @@ test("CLI supports dry-run JSON output", () => {
 
 test("discovers packaged add-on skills", () => {
   const names = installer.discoverAddons(root).map((addon) => addon.name);
-  assert.deepEqual(names, ["parley-tracker", "parley-worktrees"]);
+  assert.deepEqual(names, ["parley-design", "parley-design-check", "parley-tracker", "parley-worktrees"]);
   for (const addon of installer.discoverAddons(root)) {
     assert.equal(fs.existsSync(path.join(addon.root, "SKILL.md")), true);
   }
@@ -416,11 +416,19 @@ test("installs all add-ons by default alongside the core skill", () => {
   assert.equal(result.ok, true);
   // The first installed skill is the core skill; the rest are add-ons.
   const action = result.actions[0];
-  assert.deepEqual(action.skills.map((skill) => skill.skill), ["parley-deck", "parley-tracker", "parley-worktrees"]);
+  assert.deepEqual(action.skills.map((skill) => skill.skill), [
+    "parley-deck",
+    "parley-design",
+    "parley-design-check",
+    "parley-tracker",
+    "parley-worktrees",
+  ]);
   for (const skill of action.skills) {
     assert.equal(skill.action, "installed");
   }
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-deck", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design-check", "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker", "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-worktrees", "SKILL.md")), true);
 
@@ -438,6 +446,8 @@ test("--no-addons installs only the core skill", () => {
   assert.equal(result.ok, true);
   assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), ["parley-deck"]);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-deck", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design")), false);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design-check")), false);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker")), false);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-worktrees")), false);
 });
@@ -451,6 +461,27 @@ test("--only installs the core skill plus only the named add-on(s)", () => {
   assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), ["parley-deck", "parley-tracker"]);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker", "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(skillsDir, "parley-worktrees")), false);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design")), false);
+});
+
+test("--only installs the design pair without the other add-ons", () => {
+  const home = tmpDir();
+  const result = installer.installCommand(
+    context(home, { target: "codex", only: ["parley-design", "parley-design-check"] })
+  );
+  const skillsDir = path.join(home, ".codex", "skills");
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.actions[0].skills.map((skill) => skill.skill), [
+    "parley-deck",
+    "parley-design",
+    "parley-design-check",
+  ]);
+  // The doctrine skill must ship its references, not just SKILL.md.
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design", "references", "PDS.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design", "references", "RULES.md")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design-check", "bin", "check.js")), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-tracker")), false);
 });
 
 test("parseArgs reads --no-addons and --only", () => {
@@ -504,7 +535,7 @@ test("doctor reports add-on skills per target", () => {
 
   const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
   assert.equal(result.ok, true);
-  assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck", "parley-tracker", "parley-worktrees"]);
+  assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck", "parley-design", "parley-design-check", "parley-tracker", "parley-worktrees"]);
   for (const skill of result.targets[0].skills) {
     assert.equal(skill.status, "valid");
   }
@@ -526,7 +557,7 @@ test("a default install records the selected add-ons in the core marker", () => 
   installer.installCommand(context(home, { target: "codex" }));
   const dest = path.join(home, ".codex", "skills", "parley-deck");
   const marker = JSON.parse(fs.readFileSync(path.join(dest, installer.MARKER_FILE), "utf8"));
-  assert.deepEqual(marker.addons, ["parley-tracker", "parley-worktrees"]);
+  assert.deepEqual(marker.addons, ["parley-design", "parley-design-check", "parley-tracker", "parley-worktrees"]);
 });
 
 test("a --no-addons install records addons:false in the core marker", () => {

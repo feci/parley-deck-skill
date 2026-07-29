@@ -1,0 +1,23 @@
+{
+  "color": {
+    "$type": "color",
+    "text": {
+      "body": {
+        "$value": { "colorSpace": "srgb", "components": [0.129, 0.125, 0.118], "hex": "#211f1e" }
+      }
+    },
+    "surface": {
+      "page": {
+        "$value": { "colorSpace": "srgb", "components": [0.98, 0.976, 0.965], "hex": "#faf9f6" }
+      }
+    },
+    "rule": { "$value": "{color.text.body}" }
+  },
+  "space": {
+    "$type": "dimension",
+    "gap": {
+      "md": { "$value": "20px" },
+      "lg": { "$value": "32px" }
+    }
+  }
+}

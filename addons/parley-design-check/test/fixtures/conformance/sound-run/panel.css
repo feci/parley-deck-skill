@@ -1,0 +1,13 @@
+/* The applied surface: every governed value resolves through the ratified token layer. */
+.record {
+  font-family: "Chartwell Text", serif;
+  color: var(--color-text-body);
+  background-color: var(--color-surface-page);
+  padding: var(--space-gap-md);
+  gap: var(--space-gap-lg);
+  border-bottom-color: var(--color-rule);
+}
+
+.record__code {
+  font-family: "Chartwell Mono", monospace;
+}

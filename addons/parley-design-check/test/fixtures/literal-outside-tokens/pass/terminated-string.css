@@ -1,0 +1,9 @@
+/* The same shape, terminated: the string is text, and the rule below resolves through tokens. */
+.c::before {
+  content: "terminated";
+}
+
+.hint {
+  color: var(--color-text-body);
+  border-radius: var(--radius-panel);
+}

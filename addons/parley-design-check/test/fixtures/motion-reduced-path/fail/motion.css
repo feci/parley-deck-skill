@@ -1,0 +1,13 @@
+/* Motion the interface starts on its own, with no path for a reader who asked for less. */
+@keyframes drift {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.banner {
+  animation: drift 900ms ease-out;
+}

@@ -1,0 +1,11 @@
+/*
+ * An escaped brace in an ident. CSS Syntax §4.3.7 makes the escaped code point part of the
+ * ident it sits in, so `main\}area` is one custom ident and the declarations after it are
+ * applied as written. A scanner that reads that brace as structure closes `.plate` early, and
+ * the raw colour and radius below it fall outside any rule block and are never judged.
+ */
+.plate {
+  grid-area: main\}area;
+  color: #ff0000;
+  border-radius: 11px;
+}

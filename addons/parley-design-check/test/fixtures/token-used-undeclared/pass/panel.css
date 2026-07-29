@@ -1,0 +1,5 @@
+/* Every reference resolves to a token the contract declares. */
+.panel {
+  color: var(--color-text-body);
+  background-color: var(--color-surface-sunken);
+}

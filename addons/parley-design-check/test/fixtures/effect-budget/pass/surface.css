@@ -1,0 +1,9 @@
+/* Two devices, under the budget, so a reader can still attribute either one to intent. */
+.hero {
+  background-image: linear-gradient(180deg, var(--color-surface-page), var(--color-surface-raised));
+  box-shadow: 0 10px 30px var(--color-shadow);
+}
+
+.hero__mat {
+  background-color: var(--color-surface-raised);
+}

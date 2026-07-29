@@ -1,0 +1,5 @@
+/* A reference left behind by a rename, resolving to whatever the runtime falls back to. */
+.panel {
+  color: var(--color-text-body);
+  background-color: var(--color-surface-sunken);
+}

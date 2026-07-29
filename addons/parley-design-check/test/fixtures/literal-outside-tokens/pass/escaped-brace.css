@@ -1,0 +1,7 @@
+/* The same shape with every governed value resolved: an escaped brace is part of the ident that
+   carries it, and reading it must not turn an ordinary declaration into a finding of its own. */
+.plate {
+  grid-area: main\}area;
+  color: var(--color-text-body);
+  border-radius: var(--radius-panel);
+}
