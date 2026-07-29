@@ -267,10 +267,25 @@ function logicalLines(markdown) {
   return out;
 }
 
+// DETECTION IS DELIBERATELY BROADER THAN ACCEPTANCE, and the two must never be the same
+// pattern. Every false green in sixteen rounds came from detection being as narrow as the
+// grammar: whatever the grammar would refuse, detection also failed to see, so the command
+// was never judged at all — it was skipped, and skipping reads as success.
+//
+// Round 16 found the last of those from a new direction: `node --no-warnings --test x` (and
+// `node -r ./setup.js --test x`) never matched `/node\s+--test/`, because the flag sits
+// between the two tokens. It ran and failed for a reader while the guard stayed green.
+//
+// So a unit is a CANDIDATE if it mentions `node` and `--test` at all, in any order, with
+// anything between them. What the guard will actually execute is decided afterwards, and only
+// by SUPPORTED_COMMAND. A candidate that is not canonical is refused by name — never skipped.
+// (idea skills-cli-install-path, review round 16, agy-1.)
+const mentionsATestCommand = (s) => /\bnode\b/.test(s) && /--test\b/.test(s);
+
 function publishedTestCommands(markdown) {
   const units = new Set();
   for (const { text, spliced } of logicalLines(markdown)) {
-    if (!/node\s+--test/.test(text)) continue;
+    if (!mentionsATestCommand(text)) continue;
     // Strip only leading container/prompt noise. A command never begins with ">" or "$ ".
     const line = text.replace(/^[\s>]*/, "").replace(/^\$\s+/, "").trim();
 
@@ -285,17 +300,17 @@ function publishedTestCommands(markdown) {
     // CommonMark. It is: does a backtick span contain the WHOLE command?
     //   • Inline publication wraps the whole command:  `node --test "x"`  ->  the span is it.
     //   • A fenced shell line wraps only a substitution: node --test `printf …` "x"
-    //     — no span contains "node --test", so the unit is the whole line, backticks and all,
+    //     — no span contains the command, so the unit is the whole line, backticks and all,
     //     and the strict grammar refuses it.
     const spans = [...line.matchAll(/(`+)([\s\S]*?)\1/g)];
     const outside = line.replace(/(`+)[\s\S]*?\1/g, " ");
-    if (/node\s+--test/.test(outside)) {
+    if (mentionsATestCommand(outside)) {
       // Either a bare command, or a line that mixes span-quoted text with shell that also runs
       // the command. Both are judged as the whole line; the grammar sorts them out.
       units.add(line);
       continue;
     }
-    for (const m of spans) if (/node\s+--test/.test(m[2])) units.add(m[2].trim());
+    for (const m of spans) if (mentionsATestCommand(m[2])) units.add(m[2].trim());
   }
   return units;
 }
@@ -346,6 +361,8 @@ test("the published-command extractor captures whole commands, never fragments",
     "--test-reporter=does-not-exist",
     "node\\",
     "  --test cont/no-space-before-backslash.test.js",
+    "node --no-warnings --test flags/before-test.test.js",
+    "node -r ./setup.js --test flags/require-hook.test.js",
     "> ```bash",
     "> node \\",
     ">   --test cont/blockquote.test.js",
@@ -414,7 +431,12 @@ test("the published-command extractor captures whole commands, never fragments",
     // round 15: no space before the backslash, indentation on the continuation. A shell
     // yields "node  --test x" and runs it; deleting that indentation yielded "node--test x",
     // which the detector could not see. Preserving it is what makes this reconstructable.
-    "node  --test cont/no-space-before-backslash.test.js \\"
+    "node  --test cont/no-space-before-backslash.test.js \\",
+    // round 16 (agy-1): a node flag between `node` and `--test` matched no detection pattern,
+    // so the command was skipped entirely — and skipping reads as success. Detection is now
+    // broader than the grammar on purpose: these are seen, then refused by name.
+    "node --no-warnings --test flags/before-test.test.js",
+    "node -r ./setup.js --test flags/require-hook.test.js"
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
@@ -429,6 +451,9 @@ test("the published-command extractor captures whole commands, never fragments",
   // a shell continuation is not a self-contained command
   assert.equal(SUPPORTED_COMMAND.test('node --test "a/*.test.js" \\'), false);
   assert.equal(SUPPORTED_COMMAND.test('node --test "a/*.test.js"'), true);
+  // a node flag before --test is detected, then refused — never silently skipped
+  assert.equal(SUPPORTED_COMMAND.test("node --no-warnings --test flags/before-test.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("node -r ./setup.js --test flags/require-hook.test.js"), false);
 });
 
 test("every `node --test` command a shipped file publishes runs tests and passes", () => {
