@@ -46,7 +46,7 @@ check --json <paths...>               emit the report as JSON
 --help --version
 ```
 
-Run it as `node addons/parley-design-check/bin/check.js check <paths...>` from a checkout,
+Run it as `node skills/parley-design-check/bin/check.js check <paths...>` from a checkout,
 or from wherever the add-on was installed. Paths may be files or directories; directories
 are walked, and hidden directories, `node_modules` and build output are skipped.
 
@@ -369,7 +369,7 @@ passing fixture is also checked to have actually been judged.
 ## Tests
 
 ```text
-node --test "addons/parley-design-check/test/*.test.js"
+node --test "skills/parley-design-check/test/*.test.js"
 ```
 
 Offline, no fixtures over the network, and well under five seconds. They cover the registry
@@ -380,12 +380,12 @@ conformance levels.
 ## Files
 
 ```text
-addons/parley-design-check/SKILL.md            this file
-addons/parley-design-check/bin/check.js        the CLI: arguments, report rendering, exit codes
-addons/parley-design-check/lib/registry.js     the literate-registry reader and its strict YAML subset
-addons/parley-design-check/lib/artifacts.js    PDS artifact and DTCG token readers, and colour maths
-addons/parley-design-check/lib/css.js          the T1 SOURCE scanner
-addons/parley-design-check/lib/engine.js       capability, tier gating, waivers, conformance, verdicts
-addons/parley-design-check/lib/detectors/      one module per detector
-addons/parley-design-check/test/               the suite and its fixtures
+skills/parley-design-check/SKILL.md            this file
+skills/parley-design-check/bin/check.js        the CLI: arguments, report rendering, exit codes
+skills/parley-design-check/lib/registry.js     the literate-registry reader and its strict YAML subset
+skills/parley-design-check/lib/artifacts.js    PDS artifact and DTCG token readers, and colour maths
+skills/parley-design-check/lib/css.js          the T1 SOURCE scanner
+skills/parley-design-check/lib/engine.js       capability, tier gating, waivers, conformance, verdicts
+skills/parley-design-check/lib/detectors/      one module per detector
+skills/parley-design-check/test/               the suite and its fixtures
 ```

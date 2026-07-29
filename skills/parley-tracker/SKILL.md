@@ -76,11 +76,11 @@ The three canonical skeletons authors copy, and the readiness tooling, live
 next to this file:
 
 ```text
-addons/parley-tracker/templates/epic.md     # filled, self-passing exemplars
-addons/parley-tracker/templates/story.md
-addons/parley-tracker/templates/subtask.md
-addons/parley-tracker/bin/validate.js       # readiness gap-scan / lint
-addons/parley-tracker/bin/claim.js          # gap-scan-gated claim
+skills/parley-tracker/templates/epic.md     # filled, self-passing exemplars
+skills/parley-tracker/templates/story.md
+skills/parley-tracker/templates/subtask.md
+skills/parley-tracker/bin/validate.js       # readiness gap-scan / lint
+skills/parley-tracker/bin/claim.js          # gap-scan-gated claim
 ```
 
 Each template is a **filled, self-passing example** (`validate` exits 0 on it):

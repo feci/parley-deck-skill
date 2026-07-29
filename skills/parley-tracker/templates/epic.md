@@ -57,18 +57,18 @@ and ask through the configured Parley/tracker channel — never invent it.
 - AC-E1 [B][T] Given every linked story is `done`, When the epic is reviewed, Then
   each epic acceptance criterion passes its `Verify:` command and the epic is `done`.
 - AC-E2 [B][T] Measurable: 100% of ready child tickets pass readiness validation.
-  Verify: `node addons/parley-tracker/bin/validate.js --strict --dir tickets`
+  Verify: `node skills/parley-tracker/bin/validate.js --strict --dir tickets`
 - AC-E3 [T][NFR] Measurable: validation of the whole tree completes in one command.
-  Verify: `node addons/parley-tracker/bin/validate.js --strict --dir tickets`
+  Verify: `node skills/parley-tracker/bin/validate.js --strict --dir tickets`
 - AC-E4 [T] Edge/error: a child ticket with a leftover placeholder is rejected, not
-  silently accepted. Verify: `node addons/parley-tracker/bin/validate.js tickets/example/epic.md`
+  silently accepted. Verify: `node skills/parley-tracker/bin/validate.js tickets/example/epic.md`
 
 ## Definition of Done / Verification
 <!-- Tick each AC when it passes; record the verifying commit sha. -->
 - [ ] AC-E1 (Verify: every child story `done`) — COMMIT-SHA
-- [ ] AC-E2 (Verify: `node addons/parley-tracker/bin/validate.js --strict --dir tickets`) — COMMIT-SHA
-- [ ] AC-E3 (Verify: `node addons/parley-tracker/bin/validate.js --strict --dir tickets`) — COMMIT-SHA
-- [ ] AC-E4 (Verify: `node addons/parley-tracker/bin/validate.js tickets/example/epic.md`) — COMMIT-SHA
+- [ ] AC-E2 (Verify: `node skills/parley-tracker/bin/validate.js --strict --dir tickets`) — COMMIT-SHA
+- [ ] AC-E3 (Verify: `node skills/parley-tracker/bin/validate.js --strict --dir tickets`) — COMMIT-SHA
+- [ ] AC-E4 (Verify: `node skills/parley-tracker/bin/validate.js tickets/example/epic.md`) — COMMIT-SHA
 
 ## Non-goals
 - No tracker credentials or live API calls in the canonical files.

@@ -8,7 +8,7 @@ assignee: n/a                      # human | agent:AGENT-ID | n/a
 priority: p1                       # p0 | p1 | p2 | p3
 labels: [domain:tracker, nfr:reliability]
 estimate: n/a
-files: [addons/parley-tracker/bin/claim.js]   # the parallelism boundary; AI scopes its reads to these
+files: [skills/parley-tracker/bin/claim.js]   # the parallelism boundary; AI scopes its reads to these
 apis: [n/a]
 arch: [parley-deck/ideas/SLUG/FINAL.md]
 worktree: n/a                      # or { path: PATH, branch: BRANCH, base: BASE-COMMIT }
@@ -55,11 +55,11 @@ Canonical source: parley-deck/ideas/SLUG/FINAL.md@REVISION.
 Read the whole ticket before claiming, then run the gap-scan; if any required
 slot is missing and not `n/a`, do NOT claim — return `BLOCKED: <slot>`.
 Allowed files / areas (likely, not exhaustive):
-- addons/parley-tracker/bin/claim.js
+- skills/parley-tracker/bin/claim.js
 Do not modify:
-- addons/parley-tracker/templates/
+- skills/parley-tracker/templates/
 References: API/contract: the validate module; architecture: the FINAL design;
-existing tests: addons/parley-tracker/bin/validate.test.js; similar prior work: n/a.
+existing tests: skills/parley-tracker/bin/validate.test.js; similar prior work: n/a.
 Assumption policy: if any required endpoint, schema, UX state, or error
 behaviour is missing, stop and ask through the configured Parley/tracker channel.
 
@@ -72,13 +72,13 @@ behaviour is missing, stop and ask through the configured Parley/tracker channel
 - AC-2 [A][T] Given a ticket already in-progress with another assignee, When a second
   claim is attempted, Then the claim is refused and the file is left unchanged (error path).
 - AC-3 [T][NFR] Measurable: claiming runs the readiness scan and exits non-zero on failure.
-  Verify: `node addons/parley-tracker/bin/claim.js --assignee me addons/parley-tracker/templates/story.md`
+  Verify: `node skills/parley-tracker/bin/claim.js --assignee me skills/parley-tracker/templates/story.md`
 
 ## Definition of Done / Verification
 <!-- Tick each AC when it passes; record the verifying commit sha. -->
 - [ ] AC-1 (Verify: claim succeeds on a passing ticket) — COMMIT-SHA
 - [ ] AC-2 (Verify: claim refused on an in-progress ticket) — COMMIT-SHA
-- [ ] AC-3 (Verify: `node addons/parley-tracker/bin/claim.js --assignee me ...`) — COMMIT-SHA
+- [ ] AC-3 (Verify: `node skills/parley-tracker/bin/claim.js --assignee me ...`) — COMMIT-SHA
 
 ## Non-goals
 - No locking server or distributed coordination — the claim is a file edit.

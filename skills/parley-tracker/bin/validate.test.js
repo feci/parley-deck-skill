@@ -48,7 +48,7 @@ status: ready
 assignee: agent:impl-1
 priority: p1
 labels: [domain:tracker, coord:claim]
-files: [addons/parley-tracker/bin/claim.js]
+files: [skills/parley-tracker/bin/claim.js]
 apis: [n/a]
 arch: [n/a]
 worktree: n/a

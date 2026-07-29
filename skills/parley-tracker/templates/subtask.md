@@ -8,7 +8,7 @@ assignee: n/a                      # human | agent:AGENT-ID | n/a
 priority: p1                       # p0 | p1 | p2 | p3
 labels: [domain:tracker]
 estimate: n/a
-files: [addons/parley-tracker/bin/claim.js]   # the parallelism boundary; keep disjoint from sibling subtasks
+files: [skills/parley-tracker/bin/claim.js]   # the parallelism boundary; keep disjoint from sibling subtasks
 apis: [n/a]
 arch: [n/a]
 worktree: n/a                      # or { path: PATH, branch: BRANCH, base: BASE-COMMIT }
@@ -46,10 +46,10 @@ Out of scope: tracker projection, locking servers, claim expiry.
 Canonical source: parley-deck/ideas/SLUG/FINAL.md@REVISION.
 Run the gap-scan before claiming; on any missing required slot, return `BLOCKED: <slot>`.
 Allowed files / areas (likely, not exhaustive):
-- addons/parley-tracker/bin/claim.js
+- skills/parley-tracker/bin/claim.js
 Do not modify:
-- addons/parley-tracker/bin/validate.js
-- addons/parley-tracker/templates/
+- skills/parley-tracker/bin/validate.js
+- skills/parley-tracker/templates/
 Do not (negative scope — keep at least one explicit constraint):
 - change a public API / interface without raising an Open question
 - change a stored schema without raising an Open question
@@ -65,13 +65,13 @@ Assumption policy: if a required behaviour is undefined, stop and ask — never 
 - AC-2 [A][T] Given a ticket that fails the readiness scan, When claim runs, Then
   the command exits non-zero and the file is left unchanged (error path).
 - AC-3 [T][NFR] Measurable: the subtask's tests pass on the integration branch.
-  Verify: `node --test addons/parley-tracker/bin`
+  Verify: `node --test skills/parley-tracker/bin`
 
 ## Definition of Done / Verification
 <!-- Tick each AC when it passes; record the verifying commit sha. -->
 - [ ] AC-1 (Verify: claim writes the file on a passing ticket) — COMMIT-SHA
 - [ ] AC-2 (Verify: claim refuses and exits non-zero on a failing ticket) — COMMIT-SHA
-- [ ] AC-3 (Verify: `node --test addons/parley-tracker/bin`) — COMMIT-SHA
+- [ ] AC-3 (Verify: `node --test skills/parley-tracker/bin`) — COMMIT-SHA
 
 ## Non-goals
 - No tracker projection or live API write in this subtask.
