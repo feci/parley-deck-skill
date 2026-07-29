@@ -29,26 +29,23 @@
     "parley-deck-skill": "bin/parley-deck-skill.js"
   },
   "files": [
-    "SKILL.md",
+    "skills/",
     "README.md",
     "LICENSE",
     "NOTICE.md",
-    "addons/",
-    "agents/",
     "bin/",
-    "gemini-extension.json",
     "lib/",
-    "plugin.json",
-    "references/"
+    "gemini-extension.json",
+    "plugin.json"
   ],
   "pkg": {
     "assets": [
-      "SKILL.md",
+      "skills/parley-deck/SKILL.md",
       "README.md",
       "LICENSE",
-      "addons/**/*",
-      "agents/**/*",
-      "references/**/*",
+      "skills/**/*",
+      "skills/parley-deck/agents/**/*",
+      "skills/parley-deck/references/**/*",
       "plugin.json",
       "gemini-extension.json"
     ]

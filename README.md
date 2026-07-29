@@ -28,7 +28,7 @@ other four build on it. All five install by default — `--no-addons` takes just
 
 <!-- Base: codex-1. Graft: the closing "more than one model's first answer" line from kimi-1. -->
 
-### [`parley-deck`](./SKILL.md) — make multi-agent work inspectable
+### [`parley-deck`](./skills/parley-deck/SKILL.md) — make multi-agent work inspectable
 
 Use the core skill when a design, plan, implementation, or review deserves
 independent analysis. Every participant owns its canonical artifact; one agent
@@ -43,7 +43,7 @@ one model's first answer.
 
 <!-- Base: kimi-1. Grafts: the alongside/never-instead relationship from hermes-1; the bounded-graft constraint from claude-1. -->
 
-### [`parley-design`](./addons/parley-design/SKILL.md) — choose one visual direction without averaging it away
+### [`parley-design`](./skills/parley-design/SKILL.md) — choose one visual direction without averaging it away
 
 PDS/1.0 makes participants diverge on directions, critique them, choose one whole,
 bind it as a contract, apply it, and audit what shipped. It is markdown doctrine
@@ -58,7 +58,7 @@ an audit against a ratified contract instead of taste.
 
 <!-- Base: codex-1. Graft: the "says so instead of passing it" line from claude-1. -->
 
-### [`parley-design-check`](./addons/parley-design-check/SKILL.md) — enforce only what the evidence can prove
+### [`parley-design-check`](./skills/parley-design-check/SKILL.md) — enforce only what the evidence can prove
 
 This add-on runs the checkable PDS/1.0 rules over design artifacts, DTCG token
 documents, stylesheets, and markup. It uses Node built-ins, carries no fallback
@@ -71,7 +71,7 @@ its detector modules, so it says what it cannot check instead of passing it.
 
 <!-- Base: codex-1. Grafts: "the tracker is a mirror" and the migration consequence from claude-1. -->
 
-### [`parley-tracker`](./addons/parley-tracker/SKILL.md) — write tickets for the business, the builder, and the agent
+### [`parley-tracker`](./skills/parley-tracker/SKILL.md) — write tickets for the business, the builder, and the agent
 
 This skill authors canonical markdown epics, stories, and subtasks with `At a
 glance`, `[B] Business`, `[T] Technical`, and `[A] Agent directives` sections.
@@ -87,7 +87,7 @@ connector. Change trackers and you lose a projection, not a requirement.
 
 <!-- Base: kimi-1. Graft: the no-stack-trace failure framing from claude-1. -->
 
-### [`parley-worktrees`](./addons/parley-worktrees/SKILL.md) — isolate concurrent work before it collides
+### [`parley-worktrees`](./skills/parley-worktrees/SKILL.md) — isolate concurrent work before it collides
 
 This is protection against the concurrency failure that leaves no stack trace:
 two agents writing the same files and producing a result nobody intended. The
@@ -103,6 +103,22 @@ caches, so the manifest records those overrides too. Use it when two or more ses
 or Phase-5 implementers work in one repository at once.
 
 ## Install
+
+> [!TIP]
+> **One command, most agents.** The universal skill installer from
+> [`vercel-labs/skills`](https://github.com/vercel-labs/skills) installs all five skills into
+> whichever coding agents you have — many more than this package's own installer knows about:
+>
+> ```bash
+> npx -y skills add feci/parley-deck-skill
+> npx -y skills list
+> ```
+>
+> It detects your agents and asks which to install into. `--agent <name>` picks them
+> explicitly; `--list` shows what the repository offers without installing anything.
+
+This package's own installer covers fourteen named runtimes and adds detection, health checks
+and project-metadata sync that the universal one does not:
 
 ```bash
 npx -y parley-deck-skill@latest install --target all
@@ -135,8 +151,8 @@ Substitute freely: *"review this branch against the idea's FINAL.md"*, *"compare
 approaches, arguing each independently in round 1"*, or *"use GitHub PR transport"* — the
 shape of the request is the same.
 
-If your runtime does not support skills directly, attach `SKILL.md` and
-`references/COOPERATION.md` as instruction context. The skill is plain Markdown by design.
+If your runtime does not support skills directly, attach `skills/parley-deck/SKILL.md` and
+`skills/parley-deck/references/COOPERATION.md` as instruction context. The skill is plain Markdown by design.
 
 ## Install, update, and remove
 
@@ -225,18 +241,16 @@ Canonical files are the source of truth. PR and MR comments are mirrors.
 
 ```text
 parley-deck-skill/
-├── SKILL.md                      # canonical entrypoint for agents
-├── addons/
+├── skills/
+│   ├── parley-deck/              # the core skill
+│   │   ├── SKILL.md              # canonical entrypoint for agents
+│   │   ├── references/           # COOPERATION.md, compatibility.json, WORKED_EXAMPLES.md
+│   │   └── agents/               # manifest.yaml (neutral), openai.yaml (Codex UI metadata)
 │   ├── parley-design/            # doctrine + PDS/1.0 (markdown only)
 │   ├── parley-design-check/      # the checker: bin/, lib/, test/
 │   ├── parley-tracker/
 │   └── parley-worktrees/
 ├── bin/  lib/                    # dependency-free Node installer
-├── references/
-│   ├── COOPERATION.md            # portability snapshot of the protocol
-│   ├── compatibility.json        # protocol/metadata schema compatibility
-│   └── WORKED_EXAMPLES.md        # non-authoritative examples
-├── agents/                       # manifest.yaml (neutral), openai.yaml (Codex UI metadata)
 ├── test/  packaging/  scripts/
 ├── plugin.json                   # Antigravity CLI plugin mode
 ├── gemini-extension.json         # legacy Gemini extension mode
@@ -250,7 +264,7 @@ an agent follows it, invokes other CLI agents, and verifies canonical files. Det
 automated orchestration is not part of it and requires separate tooling.
 
 Parley Deck did not invent the ideas it runs on. The protocol lineage recorded here is
-**RHO** (Retrospective Harness Optimization), credited in `references/COOPERATION.md` §13,
+**RHO** (Retrospective Harness Optimization), credited in `skills/parley-deck/references/COOPERATION.md` §13,
 where RHO's single-model self-preference is deliberately replaced by the deck's multi-agent
 quorum. `NOTICE.md` records `hallmark` and `impeccable` as the prior art studied for the
 design add-ons. Reference is for attribution and lineage only; no endorsement, sponsorship,

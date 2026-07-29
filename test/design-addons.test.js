@@ -4,8 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const designRoot = path.join(root, "addons", "parley-design");
-const checkRoot = path.join(root, "addons", "parley-design-check");
+const designRoot = path.join(root, "skills", "parley-design");
+const checkRoot = path.join(root, "skills", "parley-design-check");
 
 // Consensus C3: four doctrine files, hard ceiling 64 KiB, enforced by a test rather than by a
 // comment. A doctrine that quietly grows costs every participant on every run.
@@ -136,7 +136,7 @@ test("every rule id the doctrine cites is one the registry declares", () => {
   // PDS §10 rule 3 turns an unknown id into UNJUDGEABLE, so a doctrine that cites an id the
   // registry never declared teaches citations its own extension policy launders into
   // non-findings. Round-01 found four of those in the spec's own examples (kimi-1).
-  const { loadRegistry } = require("../addons/parley-design-check/lib/registry.js");
+  const { loadRegistry } = require("../skills/parley-design-check/lib/registry.js");
   const registry = loadRegistry(path.join(designRoot, "references", "RULES.md"));
   const files = [
     path.join(designRoot, "SKILL.md"),

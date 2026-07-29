@@ -207,12 +207,15 @@ test("installs a codex skill with marker", () => {
 test("installs when optional README and LICENSE payload files are absent", () => {
   const home = tmpDir();
   const packageRoot = tmpDir();
-  fs.mkdirSync(path.join(packageRoot, "agents"), { recursive: true });
-  fs.mkdirSync(path.join(packageRoot, "references"), { recursive: true });
-  fs.writeFileSync(path.join(packageRoot, "SKILL.md"), "skill\n", "utf8");
-  fs.writeFileSync(path.join(packageRoot, "agents", "manifest.yaml"), "name: parley-deck\n", "utf8");
-  fs.writeFileSync(path.join(packageRoot, "references", "COOPERATION.md"), "protocol\n", "utf8");
-  fs.writeFileSync(path.join(packageRoot, "references", "compatibility.json"), "{\"schemaVersion\":1}\n", "utf8");
+  // The core skill payload lives under skills/parley-deck/; plugin.json and
+  // gemini-extension.json stay at the package root.
+  const core = path.join(packageRoot, "skills", "parley-deck");
+  fs.mkdirSync(path.join(core, "agents"), { recursive: true });
+  fs.mkdirSync(path.join(core, "references"), { recursive: true });
+  fs.writeFileSync(path.join(core, "SKILL.md"), "skill\n", "utf8");
+  fs.writeFileSync(path.join(core, "agents", "manifest.yaml"), "name: parley-deck\n", "utf8");
+  fs.writeFileSync(path.join(core, "references", "COOPERATION.md"), "protocol\n", "utf8");
+  fs.writeFileSync(path.join(core, "references", "compatibility.json"), "{\"schemaVersion\":1}\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "plugin.json"), "{}\n", "utf8");
   fs.writeFileSync(path.join(packageRoot, "gemini-extension.json"), "{}\n", "utf8");
 
