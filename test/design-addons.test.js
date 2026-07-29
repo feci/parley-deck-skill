@@ -253,7 +253,10 @@ const { Parser } = require("commonmark");
 // Detection stays deliberately BROADER than acceptance. Every false green in seventeen rounds
 // came from the two being the same pattern: whatever the grammar would refuse, detection also
 // failed to see, so the command was skipped — and skipping reads as success.
-const mentionsATestCommand = (s) => /\bnode\b/.test(s) && /--test\b/.test(s);
+// Case-insensitive on purpose: macOS mounts a case-insensitive filesystem by default, so
+// `Node --test x` really runs there. SUPPORTED_COMMAND stays exact, so such a line is detected
+// and then REFUSED rather than skipped. (round 17, hermes-1.)
+const mentionsATestCommand = (s) => /\bnode\b/i.test(s) && /--test\b/.test(s);
 
 // Inside a code node there is no container left to interpret, so splicing a backslash
 // continuation is exactly what a shell does. A unit assembled from more than one physical
@@ -325,7 +328,7 @@ function publishedTestCommands(markdown) {
     for (const line of visible.split("\n")) {
       const from = lineStart;
       lineStart += line.length + 1;
-      for (const m of line.matchAll(/\bnode\b/g)) {
+      for (const m of line.matchAll(/\bnode\b/gi)) {
         const rest = line.slice(m.index);
         const flag = rest.match(/--test\b/);
         if (!flag) continue;
@@ -378,7 +381,14 @@ function publishedTestCommands(markdown) {
         emit(node.literal.replace(/~~/g, ""), -1);
         break;
       case "softbreak":
+        // CommonMark 6.7: a soft break renders as a SPACE. Emitting a newline split one
+        // copyable line into two the scanner judged separately, so a command spanning a soft
+        // break was neither run nor refused — it was invisible. (round 17, hermes-1.)
+        emit(" ", -1);
+        break;
       case "linebreak":
+        // A hard break is a real <br>: the reader sees two lines and copies two lines, which
+        // is not a published one-line command. It stays a break.
         emit("\n", -1);
         break;
       case "html_inline":
@@ -526,6 +536,14 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "![`node --test invisible/alt.test.js`](picture.png)",
     "",
+    "Run node",
+    "--test softbreak/one.test.js",
+    "",
+    "Hard break keeps two lines: node  ",
+    "--test hardbreak/one.test.js",
+    "",
+    "`Node --test case/upper.test.js`",
+    "",
     "```",
     "echo not-a-test-command",
     "```",
@@ -593,6 +611,13 @@ test("the published-command extractor captures whole commands, never fragments",
     // literal while GitHub, npm and editor previews render — and copy — a clean command.
     "node --test gfm/strike-word.test.js",
     "node --test gfm/strike-flag.test.js",
+    // round 17 (hermes-1): a soft break renders as a space, so this is ONE copyable line to a
+    // reader. Emitting a newline had split it into two the scanner judged separately, and the
+    // command was neither run nor refused.
+    "node --test softbreak/one.test.js",
+    // detection is case-insensitive so the grammar gets to refuse this rather than skip it —
+    // macOS is case-insensitive, so `Node` really runs there
+    "Node --test case/upper.test.js",
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
@@ -611,6 +636,10 @@ test("the published-command extractor captures whole commands, never fragments",
   // a tag is markup, not page text: stripping it is what exposes the split token
   assert.equal(originOf("node --test html/inline-node.test.js"), "prose");
   assert.equal(originOf("node --test html/block.test.js"), "prose");
+  assert.equal(SUPPORTED_COMMAND.test("Node --test case/upper.test.js"), false);
+  // A HARD break is a real line break: the reader sees and copies two lines, which is not a
+  // published one-line command. It must not be spliced into one. (round 17, hermes-1.)
+  assert.equal(found.has("node --test hardbreak/one.test.js"), false);
   assert.equal([...found].some((c) => c.includes("echo")), false);
 
   // Text no reader can reach is neither run nor policed. Failing the build over a maintenance
