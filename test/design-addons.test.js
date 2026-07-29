@@ -313,6 +313,10 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --test `printf %s --test-reporter=x` fenced/subst.test.js",
     "node --test \\",
     "cont/split-args.test.js",
+    "node \\",
+    "  --test cont/split-before-flag.test.js",
+    "node --te\\",
+    "st cont/split-inside-flag.test.js",
     "no\\",
     "de --test cont/split-word.test.js",
     "node --test cont/valid-half.test.js \\",
@@ -360,6 +364,11 @@ test("the published-command extractor captures whole commands, never fragments",
     // per-physical-line guard would have executed it and certified a command that exits 1.
     // (idea skills-cli-install-path, review round 13.)
     "node --test cont/split-args.test.js \\",
+    // the exact round-13 probe: the break falls BETWEEN `node` and `--test`, so neither
+    // physical line holds both tokens and a prefilter that runs per line sees no command
+    "node   --test cont/split-before-flag.test.js \\",
+    // and the break can fall inside a token, so no token boundary is a safe place to look
+    "node --test cont/split-inside-flag.test.js \\",
     "node --test cont/split-word.test.js \\",
     "node --test cont/valid-half.test.js --test-reporter=does-not-exist \\"
   ]) {
