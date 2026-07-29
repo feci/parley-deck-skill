@@ -31,7 +31,7 @@ const DEVICES = [
     test: (declaration) => (declaration.prop === "animation" || declaration.prop === "animation-iteration-count") && /\binfinite\b/i.test(declaration.value)
   },
   { kind: "hover transform", test: (declaration, block) => declaration.prop === "transform" && /:hover\b/.test(block.selector) },
-  { kind: "chromatic border", test: (declaration) => /^border(-(top|right|bottom|left))?$/.test(declaration.prop) && /\b([3-9]|[1-9]\d+)px\b/.test(declaration.value) }
+  { kind: "chromatic border", test: (declaration) => /^border(-(top|right|bottom|left))?$/.test(declaration.prop) && /\b([3-9]|[1-9]\d+)px\b/i.test(declaration.value) }
 ];
 
 const DEFAULT_BUDGET = 3;

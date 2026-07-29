@@ -84,14 +84,33 @@ checker did not read is never counted as a file that passed.
 ### The stylesheet scanner, and the file it could not read
 
 One requirement runs through the scanner: the file the browser applies and the file the
-checker reads have to be one file, or a declaration below the defect ships unjudged. Seven
-constructs have broken it so far, each found by a probe and each read as text now rather than
-as structure — a brace inside a quoted string (`content: "}"`), an unterminated string (ended
-at the newline, as CSS Syntax §4.3.5 ends it), a brace inside an unquoted `url()` token
-(§4.3.6), a comment delimiter inside one (§4.3.2 consumes no comment inside a url token), an
-escaped brace in an ident (`font-family: A\}B`, `.a\}`, §4.3.7), an escaped spelling of the
-`url` ident (`u\72l(`, `\75 rl(` — §4.3.4 decides a token's class on what its ident spells),
-and a brace inside any `(…)` or `[…]` (`background: fn(}y)`, ordinary CSS needing no escape).
+checker reads have to be one file, or a declaration below the defect ships unjudged. Eight
+constructs broke it one at a time, each found by a probe and each closed by reading it as text
+rather than as structure. Closing them one at a time converged on nothing — every fix knew
+about the constructs already filed and nothing about the rule they were instances of — so the
+assurance argument is no longer that list. It is an enumeration, and it has two axes.
+
+**Per token type.** Every §4 output token is accounted for: which of them can carry a `{`, `}`,
+`;` or `:` that this scanner would otherwise read as structure (the string and bad-string, the
+url and bad-url, any token carrying an escape, the simple blocks, and the ident bound inside a
+hash-token or at-keyword), and which cannot (number, percentage, dimension, delim, comma,
+colon, semicolon, whitespace, CDO, CDC).
+
+**Per consumer**, which is the axis that was missing and the axis that matters. A verdict about
+a token type is a verdict about the function that consumes it, and the scanner has several
+passes: the comment pre-pass, the block model, the decoder, the mask the literal matchers read
+through, and the declaration splitter. When two of them read one token, they can disagree — and
+they did: the pre-pass had its own string reader that skipped one code point after a backslash
+where §4.3.7 takes up to six hexadecimal digits and the whitespace after them, so a hexadecimal
+escape swallowing a newline ended the string in one pass and not the other, a real comment fell
+inside a string one of them had invented, and the run certified L3 with `PASS` and exit 0 while
+the browser applied the colour. The per-type verdict had been checked against the pass that was
+right.
+
+So each token type has exactly one consumer, named in the table at the head of `lib/css.js`
+beside the passes that call it, and the rule that table encodes is: **a pass may decide what a
+token means for its own purpose, and may never decide where that token ends.** A second reading
+of a token is the defect, not the disagreement it produces.
 
 **The block model the scanner claims (§5.4).** `(`, `[` and `{` each open a matched simple
 block; a closer pops only the innermost open block, and one that matches nothing is an
@@ -101,12 +120,18 @@ are content.
 
 **What a declaration means, against how it is written (§4.3.7).** A browser reads a
 declaration by what its tokens spell, so `col\6fr` is `color`, `#\66 f0000` is `#ff0000` and
-`11p\78` is `11px`. Every detector matches the spelled form; every message names the written
-one beside it. Ident sequences and loose escapes are decoded. A url token's contents are kept
-verbatim — no rule reads a name or a length out of one. A string's contents are decoded only
+`11p\78` is `11px`. A function name and a unit are idents, and idents are ASCII case-insensitive
+(§3.3), so `RGB(255, 0, 0)`, `VAR(--x)` and `11PX` are matched as their lowercase spellings —
+but a custom property *name* is case-sensitive, so `--Brand` and `--brand` stay two tokens.
+Every detector matches the spelled form; every message names the written one beside it. Ident
+sequences and loose escapes are decoded. A url token's contents are kept verbatim — no rule
+reads a name or a length out of one, and no literal matcher reads *into* one either, so
+`fill: url(#fade)` is a locator and not the colour `#fade`. A string's contents are decoded only
 where the escape spells an ident code point or a space (`"\49 nter"` is the face `Inter`); an
-escape spelling a quote, a comma or a backslash would corrupt the value for whatever splits it
-on those, so the string is left as written and the file goes to the fail-safe below.
+escape spelling a code point a later reader counts — the comma a font-family list splits on, a
+brace, a parenthesis — would corrupt the value for that reader, so the string is left as written
+and the file goes to the fail-safe below. A quote or a backslash is not one of those:
+`content: "say \"hi\""` is ordinary CSS, it is kept as written, and it costs the file nothing.
 
 A hand-rolled scanner has no upper bound on that family, so the scanner also reports what it
 could not read. A comment, string or url token still open at end of input; a brace that closes
@@ -191,6 +216,11 @@ condition rests on something the run declares about itself, the checker recomput
 | G2's "modifies the winner's token file" | the file re-read and digested, against the VERDICT's `tokens-digest` |
 | a `waived` answer to a winner VIOLATION | a valid, unexpired, independently counter-signed entry whose scope resolves to the winner's DIRECTION or the token file it names |
 | a waiver's independence | both ids present in the roster the run's artifacts name; no roster, no suppression |
+| process order (§1 rule 1) | each artifact read against §1's **mapping** of step to phase, never tallied — a run with its rounds swapped satisfies every count while inverting the order the level certifies |
+| the primary-axis assignment (§4 rule 2) | the U1 rotation **recomputed** from the brief's declared axes, not read off the DIRECTION's own `assigned-position` |
+| a gate the run says it crossed (§3) | the recorded outcome for that transition; a gate crossed and never recorded fails, for G3 and G4 alike, and a recorded pass beside a finding that refutes it fails with it |
+| the rule ids a run cites | resolution in the **loaded** registry; an id this registry does not declare is `UNJUDGEABLE` and leaves the level unverified, never a pass |
+| the waiver file a CONTRACT names | the file being there and readable; naming a file nobody can read is not the state of naming no file, and it is reported rather than read as one |
 
 Three bindings this version does not claim to have, stated here rather than left implied:
 

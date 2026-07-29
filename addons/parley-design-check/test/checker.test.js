@@ -16,7 +16,7 @@ const path = require("node:path");
 
 const { loadDetectors, runCheck } = require("../lib/engine.js");
 const { parseYamlSubset } = require("../lib/registry.js");
-const { markupVarUses, parseStylesheet, scanStylesheet, stripComments, varUses } = require("../lib/css.js");
+const { markupVarUses, maskOpaqueTokens, parseStylesheet, scanStylesheet, stripComments, varUses } = require("../lib/css.js");
 
 const ADDON_ROOT = path.resolve(__dirname, "..");
 const DETECTORS_DIR = path.join(ADDON_ROOT, "lib", "detectors");
@@ -2472,6 +2472,222 @@ test("a bad-string throws away the declaration that holds it, blocks and all", (
 });
 
 /*
+ * Round-07 codex-1, CRITICAL, and the assertion directly above this one is why it survived.
+ *
+ * That assertion is right and it was checked against the wrong pass. `css.js` had two readers of
+ * the string token: the stack machine's, which called `consumeEscape` and is what the test above
+ * exercises, and a second one private to the comment pre-pass, which advanced one code point after
+ * each backslash. §4.3.7 takes up to six hexadecimal digits and one trailing whitespace code point
+ * with them, and that whitespace may be the newline — so the two readers disagreed about where
+ * `content: "x\41` — newline — `"` ends. The pre-pass ended it at the newline, the quote on the
+ * line below opened a string it had invented, and the real comment that followed fell inside that
+ * invented string and was left in the source. The stack machine then read the comment as CSS:
+ * `color: #ff0000` fell outside every rule, a phantom declaration and a phantom rule took its
+ * place, every block and every parenthesis balanced, `unreadable` stayed empty, and the run
+ * certified L3 with PASS and exit 0 while Chromium applied the raw colour. It runs the other way
+ * too — a comment delimiter written inside a string was blanked as a comment, which silently
+ * rewrote the string's value or discarded the rest of the file.
+ *
+ * The repair is not a third reader that agrees with the second: two implementations that agree
+ * today drift tomorrow, which is what this one did. `stringToken` is now the only string consumer
+ * in `css.js`, and the pre-pass, the stack machine, the declaration splitter and the parenthesis
+ * balance all call it, so there is nothing left to diverge. This test therefore asserts the
+ * pre-pass output beside the parse: a verdict taken from one pass is a verdict about one pass.
+ */
+const STRING_COMMENT_PROBES = {
+  // Chromium: `.probe { content: "xA"; color: rgb(255, 0, 0); }` — one rule, and the colour applies.
+  "codex-1's probe, byte for byte": [
+    ".probe {",
+    '  content: "x\\41',
+    '"; /* x: 1; } */',
+    "  color: #ff0000;",
+    "  dummy: y { z: 1;",
+    "}",
+    ""
+  ].join("\n"),
+  // The same construct through the other quote.
+  "the same probe through a single-quoted string": [
+    ".probe {",
+    "  content: 'x\\41",
+    "'; /* x: 1; } */",
+    "  color: #ff0000;",
+    "  dummy: y { z: 1;",
+    "}",
+    ""
+  ].join("\n"),
+  // Stripped of the unclosed block, so the fail-safe cannot answer for the detectors.
+  "the probe with nothing left open": '.probe { content: "x\\41\n"; /* x: 1; } */ color: #ff0000; }',
+  // The escape at its longest: six hexadecimal digits, then the newline they take with them.
+  "six hexadecimal digits, then the newline": '.probe { content: "x\\000041\n"; /* x: 1; } */ color: #ff0000; }',
+  /*
+   * kimi-1's independent spelling, which runs the desynchronisation the other way: the opening
+   * delimiter is inside the browser's string, so the pre-pass — whose string had already ended —
+   * read it as a comment and blanked the browser-live `color: #ff0000` through the closer on the
+   * line below. Chromium: `.probe { content: "xA/*"; color: rgb(255, 0, 0); }`. Both spellings
+   * certified L3 with PASS, exit 0 and `unreadable: []`, which is why one consumer and not two
+   * agreeing readers is the repair.
+   */
+  "kimi-1's spelling, the delimiter inside the string": '.probe { content: "x\\41\n/*"; color: #ff0000; dummy: "*/"; }'
+};
+
+// What each probe's `content` declaration must spell, which is what Chromium's CSSOM carries.
+const PROBE_CONTENT = {
+  "codex-1's probe, byte for byte": '"xA"',
+  "the same probe through a single-quoted string": "'xA'",
+  "the probe with nothing left open": '"xA"',
+  "six hexadecimal digits, then the newline": '"xA"',
+  "kimi-1's spelling, the delimiter inside the string": '"xA/*"'
+};
+
+test("one string consumer: the comment pre-pass ends a string where the stack machine does", (t) => {
+  /*
+   * The pre-pass half, which is where the defect lived and which no earlier test read. Blanking is
+   * the only thing this pass may do, and it may do it only to a comment: the probe's real comment
+   * becomes spaces, and every other code point — the string, its escape, the newline the escape
+   * swallows — comes back unchanged.
+   */
+  const stripped = stripComments(STRING_COMMENT_PROBES["codex-1's probe, byte for byte"]);
+  assert.equal(
+    stripped,
+    ['.probe {', '  content: "x\\41', '";              ', "  color: #ff0000;", "  dummy: y { z: 1;", "}", ""].join("\n"),
+    "the pre-pass and the tokenizer disagree about where the string ends"
+  );
+
+  /*
+   * The scanner half. Chromium's CSSOM for each probe carries `content: "xA"` and the applied
+   * colour; so must the scanner's, and the phantom declaration the desynchronisation manufactured
+   * (`/* x`) may not be anywhere in it.
+   */
+  for (const [name, source] of Object.entries(STRING_COMMENT_PROBES)) {
+    const scan = scanStylesheet(source);
+    const probe = scan.blocks.find((block) => block.selector === ".probe");
+    assert.ok(probe, `${name} lost the .probe rule entirely`);
+    assert.ok(
+      probe.declarations.some((d) => d.prop === "content" && d.value === PROBE_CONTENT[name]),
+      `${name} did not read the string as the one token a browser reads: ${JSON.stringify(probe.declarations)}`
+    );
+    assert.ok(
+      probe.declarations.some((d) => d.prop === "color" && d.value === "#ff0000"),
+      `${name} hid the colour a browser applies: ${JSON.stringify(probe.declarations)}`
+    );
+    assert.ok(
+      !scan.blocks.some((block) => block.declarations.some((d) => d.prop.includes("/*"))),
+      `${name} read a comment as a declaration: ${JSON.stringify(scan.blocks.map((b) => b.declarations))}`
+    );
+  }
+  // The two probes that close everything they open are ordinary stylesheets, and a false alarm
+  // against one of them is the other way this gate gets switched off.
+  for (const name of [
+    "the probe with nothing left open",
+    "six hexadecimal digits, then the newline",
+    "kimi-1's spelling, the delimiter inside the string"
+  ]) {
+    assert.deepEqual(
+      scanStylesheet(STRING_COMMENT_PROBES[name]).unreadable,
+      [],
+      `${name}: a stylesheet the scanner reads exactly was reported unreadable`
+    );
+  }
+
+  /*
+   * The other direction, which the same divergence produced: a comment delimiter written *inside*
+   * a string is text (§4.3.2), and the pre-pass may not blank it. The two sources below are the
+   * opening delimiter alone and an opening and closing pair; Chromium keeps both verbatim in the
+   * string and applies the colour after it, while the second reader blanked the pair out of the
+   * value in one and discarded the rest of the file in the other. The expected `content` values
+   * are the assertion's second column.
+   */
+  for (const [source, content] of [
+    ['.probe { content: "x\\41\n/* }"; color: #ff0000; }', '"xA/* }"'],
+    ['.probe { content: "x\\41\n/* } */"; color: #ff0000; }', '"xA/* } */"']
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(
+      scan.blocks.map((b) => `${b.selector} { ${b.declarations.map((d) => `${d.prop}: ${d.value}`).join("; ")} }`),
+      [`.probe { content: ${content}; color: #ff0000 }`],
+      `a comment delimiter inside a string was read as a comment: ${JSON.stringify(source)}`
+    );
+    assert.deepEqual(scan.unreadable, [], `a legal stylesheet was reported unreadable: ${JSON.stringify(source)}`);
+  }
+
+  /*
+   * The controls codex-1's counter-proposal names, each one a string the two passes must still
+   * agree about: an ordinary string, a bad string, a line continuation, and the same hexadecimal
+   * escape whose optional trailing whitespace is *not* a newline. Each is given with what Chromium
+   * builds for it, because "the scanner is self-consistent" is the claim that was already false.
+   */
+  for (const [source, expected] of [
+    // Chromium: `.probe { content: "ab"; color: rgb(255, 0, 0); }`.
+    ['.probe { content: "ab"; /* x: 1; } */ color: #ff0000; }', ['.probe { content: "ab"; color: #ff0000 }']],
+    // The escape's trailing whitespace is a space, and then a tab: the string ends at its quote.
+    ['.probe { content: "x\\41 "; /* x: 1; } */ color: #ff0000; }', ['.probe { content: "xA"; color: #ff0000 }']],
+    ['.probe { content: "x\\41\t"; /* x: 1; } */ color: #ff0000; }', ['.probe { content: "xA"; color: #ff0000 }']],
+    // Chromium: `.probe { }` — the bad-string's declaration is a parse error and recovery runs to
+    // the `;` after the colour, so the colour is not applied and the scanner may not report it.
+    ['.probe { content: "x\n/* y: 1; } */ color: #ff0000; }', [".probe {  }"]],
+    // A `}` inside a comment inside a rule is still a comment.
+    ['.probe { color: #ff0000; /* } */ }', [".probe { color: #ff0000 }"]]
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(
+      scan.blocks.map((b) => `${b.selector} { ${b.declarations.map((d) => `${d.prop}: ${d.value}`).join("; ")} }`),
+      expected,
+      `a control string was read as something Chromium does not build: ${JSON.stringify(source)}`
+    );
+    assert.deepEqual(scan.unreadable, [], `an ordinary stylesheet was reported unreadable: ${JSON.stringify(source)}`);
+  }
+  // The line continuation (§4.3.5) still stays inside the string across a following comment, and
+  // an unterminated string is still reported rather than read to the end of the file.
+  assert.deepEqual(scanStylesheet('.probe { content: "a\\\nb"; /* x: 1; } */ color: #ff0000; }').unreadable, []);
+  assert.match(
+    scanStylesheet('.probe { color: #ff0000; content: "x\\41').unreadable.join(" | "),
+    /the string opened at line 1 is still open at end of file/
+  );
+
+  /*
+   * End to end, on the run that verifies. codex-1's counter-proposal fixes what this must produce:
+   * the raw-literal finding, or unreadable and no verified level. A clean PASS is the failure this
+   * test exists to catch, because a clean PASS with `unreadable: []` and exit 0 is what the probe
+   * produced.
+   */
+  for (const [name, source] of Object.entries(STRING_COMMENT_PROBES)) {
+    const run = mutatedRun(t, [{ file: "probe.css", write: source }]);
+    const report = check(run, { level: "L3" });
+    const raw = report["findings-detail"].filter(
+      (entry) => entry.rule === "core:literal-outside-token-layer" && /probe\.css/.test(entry.path || "")
+    );
+    const unreadable = report.inputs.unreadable.filter((entry) => /probe\.css/.test(entry));
+    assert.ok(
+      raw.length > 0 || unreadable.length > 0,
+      `${name} hid its colour from the detectors and from the fail-safe both: ${JSON.stringify(report)}`
+    );
+    assert.ok(
+      raw.some((entry) => /\.probe sets color to the colour literal #ff0000/.test(entry.violation)),
+      `${name}: the colour a browser applies to .probe was not reported: ${report.findings.join(" | ")}`
+    );
+    assert.notEqual(report.verdict, "PASS", `${name} certified a stylesheet hiding an applied colour`);
+    assert.notEqual(report.exit, 0, `${name} exited clean over a hidden applied colour`);
+    assert.equal(report.level.verified, null, `${name} verified L3 over a declaration no detector saw`);
+    assert.notEqual(cli(["--level", "L3", run]).status, 0, `${name}: the CLI exited clean over the probe`);
+  }
+
+  // The passing side, end to end: the same string and the same comment beside a token-resolved
+  // declaration is a clean L3 run, so the fix buys its finding without buying a false alarm.
+  const clean = check(mutatedRun(t, [
+    { file: "probe.css", write: '.probe {\n  content: "x\\41\n"; /* x: 1; } */\n  color: var(--color-text-body);\n}\n' }
+  ]), { level: "L3" });
+  assert.deepEqual(
+    clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+    [],
+    "an ordinary string beside a comment raised a finding"
+  );
+  assert.deepEqual(clean.inputs.unreadable, [], "an ordinary string beside a comment was reported unreadable");
+  assert.equal(clean.verdict, "PASS");
+  assert.equal(clean.exit, 0);
+  assert.equal(clean.level.verified, "L3");
+});
+
+/*
  * The other thing the enumeration turned up, in §4.3.3.
  *
  * A dimension is a number and then an ident sequence, and the two are separate tokens: `1\31 px`
@@ -2524,6 +2740,248 @@ test("the six constructs of this family are all still read, together", () => {
     );
   }
   assert.deepEqual(scanStylesheet(source).unreadable, [], "a readable stylesheet was reported unreadable");
+});
+
+/*
+ * Round-07 kimi-1, and one lesson under all six: every one of these fires on CSS that ships. A
+ * checker that reports ordinary files is switched off, and a checker that is switched off cannot
+ * report anything — so a false alarm against real CSS is the same failure as a false clean, and
+ * the fixtures below are shipped shapes rather than probes. Each carries what Chromium builds for
+ * it, because "what the scanner does" is not the standard either half is held to.
+ */
+test("a function name and a unit are case-insensitive idents, and a token name is not", (t) => {
+  /*
+   * §3.3: an ident is ASCII case-insensitive, so `RGB(255, 0, 0)`, `VAR(--x)` and `11PX` are the
+   * declarations their lowercase spellings are — Chromium applies all three, and normalises the
+   * unit to `11px` in its own CSSOM. Matched as written, each passed clean while the browser
+   * applied it. What is *not* folded with them is the custom property name: it is case-sensitive,
+   * so `--Brand` and `--brand` are two tokens and folding them would resolve a reference against
+   * a declaration that does not answer it.
+   */
+  assert.deepEqual(
+    varUses(".a { color: VAR(--Brand); background: var(--brand); }").map((use) => use.name),
+    ["--Brand", "--brand"],
+    "the case of a token name was folded, or an uppercase VAR( reference was missed"
+  );
+
+  // Chromium: `.probe { color: rgb(255, 0, 0); }` and `.probe { border-radius: 11px; }`.
+  for (const [source, expected] of [
+    [".probe { color: RGB(255, 0, 0); }", /colour literal RGB\(/],
+    [".probe { color: HSL(0, 100%, 50%); }", /colour literal HSL\(/],
+    [".probe { border-radius: 11PX; }", /size literal 11PX/],
+    [".probe { padding: 4REM; }", /spacing literal 4REM/]
+  ]) {
+    const report = check(mutatedRun(t, [{ file: "probe.css", write: source }]), { level: "L3" });
+    assert.ok(
+      report["findings-detail"].some(
+        (entry) => entry.rule === "core:literal-outside-token-layer" && expected.test(entry.violation)
+      ),
+      `an uppercase spelling of a literal a browser applies was not reported: ${source} — ${report.findings.join(" | ")}`
+    );
+  }
+  // And the uppercase reference to an undeclared token is a finding, as its lowercase spelling is.
+  const uppercase = check(mutatedRun(t, [{ file: "probe.css", write: ".probe { color: VAR(--ghost); }" }]), {
+    level: "L3"
+  });
+  assert.ok(
+    uppercase["findings-detail"].some(
+      (entry) => entry.rule === "core:token-used-undeclared" && /--ghost/.test(entry.violation)
+    ),
+    `an uppercase VAR( reference to an undeclared token was not reported: ${uppercase.findings.join(" | ")}`
+  );
+});
+
+test("a url token's contents and a string's are not values, and no literal is read out of them", (t) => {
+  /*
+   * §4.3.6: everything between `url(` and `)` is one opaque locator. Chromium's CSSOM for
+   * `fill: url(#fade)` is `fill: url("#fade")` — a reference to an SVG gradient, and the only
+   * colour on the element is the one declared beside it. Read through the token boundary, `#fade`
+   * was a four-digit hexadecimal colour and the checker exited 1 against ordinary CSS; a file name
+   * carrying `red` was the same finding one spelling along.
+   */
+  assert.equal(maskOpaqueTokens("url(#fade) #ff0000"), "url(     ) #ff0000");
+  assert.equal(maskOpaqueTokens('"#ff0000" #00ff00'), '"       " #00ff00');
+  assert.equal(maskOpaqueTokens("\\75 rl(#fade) red"), "\\75 rl(     ) red", "an escaped url spelling was not masked");
+
+  for (const source of [
+    ".probe { fill: url(#fade); color: var(--color-text-body); }",
+    ".probe { background: url(/img/red-banner.png); color: var(--color-text-body); }",
+    '.probe { background: url("#gold"); color: var(--color-text-body); }',
+    ".probe { fill: url(#fade); stroke: url(#silver); }"
+  ]) {
+    const report = check(mutatedRun(t, [{ file: "probe.css", write: source }]), { level: "L3" });
+    assert.deepEqual(
+      report["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+      [],
+      `a locator inside a url token was read as a value: ${source}`
+    );
+    assert.equal(report.verdict, "PASS", `an ordinary url() left the run unclean: ${source}`);
+    assert.equal(report.level.verified, "L3");
+  }
+
+  // The control that keeps the rule a rule: the same literal outside any url token is still found.
+  const outside = check(mutatedRun(t, [{ file: "probe.css", write: ".probe { fill: #fade; }" }]), { level: "L3" });
+  assert.ok(
+    outside["findings-detail"].some(
+      (entry) => entry.rule === "core:literal-outside-token-layer" && /colour literal #fade/.test(entry.violation)
+    ),
+    `a colour literal outside a url token was lost with the masking: ${outside.findings.join(" | ")}`
+  );
+});
+
+test("an escaped quote or backslash in a string costs the file nothing", (t) => {
+  /*
+   * The fail-closed routing was right about the code points a later reader counts and wrong about
+   * these two. Nothing downstream splits a decoded value on a quote or a backslash, and
+   * `content: "say \"hi\""` is CSS that ships — Chromium builds it verbatim. Reporting it made the
+   * whole file unreadable, so every rule that read the file went UNJUDGEABLE and the run exited 4
+   * over a string a browser has no difficulty with.
+   */
+  for (const source of [
+    '.probe { content: "say \\"hi\\""; color: var(--color-text-body); }',
+    ".probe { content: 'it\\'s'; color: var(--color-text-body); }",
+    '.probe { content: "a\\\\b"; color: var(--color-text-body); }',
+    '.probe::after { content: "\\201C" attr(data-x) "\\201D"; color: var(--color-text-body); }'
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(scan.unreadable, [], `an ordinary string cost the file its verdict: ${source}`);
+    const report = check(mutatedRun(t, [{ file: "probe.css", write: source }]), { level: "L3" });
+    assert.deepEqual(report.inputs.unreadable, [], `an ordinary string reached the fail-safe: ${source}`);
+    assert.equal(report.verdict, "PASS", `an ordinary string left the run unclean: ${source}`);
+    assert.equal(report.exit, 0);
+    assert.equal(report.level.verified, "L3");
+  }
+
+  /*
+   * The half that stays: an escape spelling a code point a later reader *does* count is still kept
+   * as written and still reported, because decoding it would change what that reader counts. The
+   * comma a font-family list is split on is the case the face rules depend on.
+   */
+  for (const [source, expected] of [
+    ['.probe { font-family: "Foo\\2c Bar"; }', /string escape spelling ","/],
+    ['.probe { grid-area: "a\\28 b"; }', /string escape spelling "\("/],
+    ['.probe { grid-area: "a\\7b b"; }', /string escape spelling "\{"/]
+  ]) {
+    assert.match(
+      scanStylesheet(source).unreadable.join(" | "),
+      expected,
+      `an escape a later reader counts stopped being reported: ${source}`
+    );
+  }
+});
+
+test("the at-rules whose body shape is known are read, and only the unknown ones are guarded", (t) => {
+  /*
+   * `@function`, `@try` and `@position-fallback` all ship, and all three reached the guard for an
+   * at-rule this scanner can classify as neither rules nor declarations — a false unreadable that
+   * cost every rule reading the file its verdict, and exit 4, against ordinary CSS. Chromium
+   * applies the `.probe` rule beside each of them.
+   */
+  for (const source of [
+    "@function --double(--x) {\n  result: calc(var(--x) * 2);\n}\n.probe { color: var(--color-text-body); }",
+    "@position-fallback --pf {\n  @try { top: 1px; }\n}\n.probe { color: var(--color-text-body); }",
+    "@try { top: 1px; }\n.probe { color: var(--color-text-body); }"
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(scan.unreadable, [], `a shipped at-rule was reported unreadable: ${source}`);
+    const report = check(mutatedRun(t, [{ file: "probe.css", write: source }]), { level: "L3" });
+    assert.deepEqual(report.inputs.unreadable, [], `a shipped at-rule reached the fail-safe: ${source}`);
+    assert.deepEqual(
+      report["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+      [],
+      `a shipped at-rule raised a finding: ${source}`
+    );
+    assert.equal(report.verdict, "PASS", `a shipped at-rule left the run unclean: ${source}`);
+    assert.equal(report.level.verified, "L3");
+  }
+
+  /*
+   * An `@function` prelude binds its parameters, and a reference to one resolves from the caller's
+   * argument rather than from the token layer. Reading the body as declarations is what makes that
+   * reference visible at all, so the binding has to be read with it or the fix for the false
+   * unreadable buys a false VIOLATION instead.
+   */
+  assert.deepEqual(
+    varUses("@function --double(--x, --y) { result: calc(var(--x) + var(--y)); }\n.a { color: var(--brand); }")
+      .map((use) => use.name),
+    ["--brand"],
+    "an @function parameter was read as a reference to a ratified token"
+  );
+
+  // The guard itself is not weakened: an at-rule nobody can classify still costs the verdict,
+  // because guessing its body's shape is the false clean `@scope` already demonstrated.
+  assert.match(
+    scanStylesheet("@nonesuch (.probe) { color: #ff0000; }").unreadable.join(" | "),
+    /sits directly inside @nonesuch, whose body this scanner can read neither as rules nor as declarations/,
+    "an at-rule this scanner cannot classify stopped reaching the fail-safe"
+  );
+});
+
+test("CDO and CDC at the top level of a stylesheet are discarded, as a browser discards them", (t) => {
+  /*
+   * §5.4.1: where a rule would begin at the top level, `<!--` and `-->` are consumed and dropped —
+   * the legacy idiom that hid a stylesheet from an HTML parser that did not know the element.
+   * Chromium's CSSOM for each of these is `.probe { color: rgb(255, 0, 0); }` and nothing else.
+   * The ident rule read the `--` of a `-->` as an ident of its own and left the `>` as text no
+   * rule owned, so the file ended "unreadable" and every rule that read it went UNJUDGEABLE.
+   */
+  for (const source of [
+    ".probe { color: var(--color-text-body); } -->",
+    "<!-- .probe { color: var(--color-text-body); } -->",
+    "<!--\n.probe { color: var(--color-text-body); }\n-->\n"
+  ]) {
+    const scan = scanStylesheet(source);
+    assert.deepEqual(scan.blocks.map((block) => block.selector), [".probe"], `CDO/CDC broke the rule: ${source}`);
+    assert.deepEqual(scan.unreadable, [], `CDO/CDC was reported unreadable: ${source}`);
+    const report = check(mutatedRun(t, [{ file: "probe.css", write: source }]), { level: "L3" });
+    assert.deepEqual(report.inputs.unreadable, [], `CDO/CDC reached the fail-safe: ${source}`);
+    assert.equal(report.verdict, "PASS", `CDO/CDC left the run unclean: ${source}`);
+    assert.equal(report.level.verified, "L3");
+  }
+
+  /*
+   * Only at the top level, and only where a rule would begin. Inside a rule the same code points
+   * are ordinary preserved tokens and stay in the value, and part way through a prelude they stay
+   * in the prelude — dropping them there would be a scanner reading a file the browser does not.
+   */
+  const inside = scanStylesheet(".probe { grid-area: a-->b; color: #ff0000; }");
+  assert.deepEqual(
+    inside.blocks[0].declarations.map((d) => `${d.prop}=${d.value}`),
+    ["grid-area=a-->b", "color=#ff0000"],
+    "a CDC inside a declaration was discarded rather than kept as a value"
+  );
+  assert.deepEqual(inside.unreadable, []);
+});
+
+test("a contract naming a waiver file that resolves to nothing is reported, not read as no waivers", (t) => {
+  /*
+   * Naming no file and naming a file that is not there are two states, and only the first is "this
+   * run has no waivers". The second was read as the first, silently — so a contract could point at
+   * a waiver file nobody had written and every `waived` answer resting on it was resolved against a
+   * file that was never opened. The silent path is the one this checker exists to refuse.
+   */
+  const missing = check(mutatedRun(t, [{ file: "WAIVERS.md", remove: true }]), { level: "L3" });
+  const named = missing["findings-detail"].filter(
+    (finding) => finding.rule === "pds-check:l2-process-order" && /names the waiver file/.test(finding.violation)
+  );
+  assert.equal(named.length, 1, `a contract pointing at no readable waiver file was silent: ${missing.findings.join(" | ")}`);
+  assert.match(named[0].violation, /WAIVERS\.md/, "the report does not name the path the contract gave");
+  assert.match(named[0].path, /FINAL\.md$/, "the report does not name the contract that carries the field");
+  assert.notEqual(missing.verdict, "PASS", "a run whose waiver file could not be read certified clean");
+  assert.notEqual(missing.exit, 0);
+
+  // The two states that are not this one: a field naming nothing is a run with no waivers, and a
+  // field naming a file that is there is read.
+  const none = check(mutatedRun(t, [
+    { file: "FINAL.md", from: "waivers: WAIVERS.md", to: 'waivers: ""' },
+    { file: "WAIVERS.md", remove: true }
+  ]), { level: "L3" });
+  assert.deepEqual(
+    none["findings-detail"].filter((finding) => /names the waiver file/.test(finding.violation)),
+    [],
+    "a contract naming no waiver file was reported as one naming a missing file"
+  );
+  assert.equal(check(SOUND_RUN, { level: "L3" }).verdict, "PASS", "the sound run stopped verifying");
 });
 
 test("a terminated string beside a token-resolved rule stays clean", () => {

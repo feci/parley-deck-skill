@@ -1812,10 +1812,34 @@ function runCheck(options) {
       ? path.resolve(path.dirname(contract.path), contract.data.waivers)
       : null;
   const waiverPath = options.waiversPath || declaredWaivers;
-  if (waiverPath && fs.existsSync(waiverPath) && fs.statSync(waiverPath).isFile()) {
+  const waiverFileReadable = Boolean(waiverPath) && fs.existsSync(waiverPath) && fs.statSync(waiverPath).isFile();
+  if (waiverFileReadable) {
     waivers = loadWaivers(waiverPath);
   } else if (options.waiversPath) {
     throw new CheckError(`no such waiver file: ${options.waiversPath}`);
+  }
+  /*
+   * A contract that names a waiver file resolving to no readable file. Naming no file and naming
+   * a file that is not there are two different states, and only the first is "this run has no
+   * waivers": the second is a contract pointing at something nobody can read, and reading it as
+   * the first meant a `waived` answer resolved against a file that was never opened, silently.
+   * The silent path is the one this checker exists to refuse, so it is reported — and reported
+   * whether or not a level was claimed, because the defect is in the contract, not in a claim.
+   */
+  if (declaredWaivers && !waiverFileReadable && !options.waiversPath) {
+    report["findings-detail"].push({
+      rule: "pds-check:l2-process-order",
+      verdict: "VIOLATION",
+      class: "conformance",
+      severity: 4,
+      tier: tierWord("T0"),
+      "system-blind": false,
+      path: relative(contract.path, cwd),
+      absolutePath: contract.path,
+      line: 0,
+      violation: `names the waiver file ${contract.data.waivers}, which resolves to ${relative(declaredWaivers, cwd)} and is not a readable file`,
+      remedy: "write the waiver file the contract names, or clear the field; a named file nobody can read is not the same state as no file named, and this run will not read it as one"
+    });
   }
   if (waivers) {
     const systemPaths = [];

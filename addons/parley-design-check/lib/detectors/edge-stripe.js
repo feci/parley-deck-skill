@@ -12,7 +12,8 @@
 const { asWritten } = require("../css.js");
 
 const SIDE_BORDER = /^border-(top|right|bottom|left)(-width)?$/;
-const THICK = /(^|[^\d.])([3-9]|[1-9]\d+)(\.\d+)?px\b/;
+// A unit is an ident, and idents are ASCII case-insensitive (§3.3): `4PX` is `4px`.
+const THICK = /(^|[^\d.])([3-9]|[1-9]\d+)(\.\d+)?px\b/i;
 const ABSENT = /^\s*(none|0(px)?|hidden)\s*$/i;
 
 module.exports = {
@@ -25,7 +26,7 @@ module.exports = {
     for (const style of ctx.styles) {
       for (const block of style.blocks) {
         const rounded = block.declarations.some(
-          (declaration) => declaration.prop.startsWith("border") && declaration.prop.includes("radius") && !/^\s*0(px)?\s*$/.test(declaration.value)
+          (declaration) => declaration.prop.startsWith("border") && declaration.prop.includes("radius") && !/^\s*0(px)?\s*$/i.test(declaration.value)
         );
         if (!rounded) continue;
         const allSides = block.declarations.some(

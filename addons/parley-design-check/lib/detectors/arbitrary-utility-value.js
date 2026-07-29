@@ -11,7 +11,8 @@
 const { classAttributes } = require("../css.js");
 
 const ARBITRARY = /(^|[\s:])([a-z][a-z0-9-]*)-\[([^\]]+)\]/g;
-const THROUGH_TOKEN = /^var\(\s*--/;
+// `VAR(--x)` resolves through the token layer exactly as `var(--x)` does (§3.3).
+const THROUGH_TOKEN = /^var\(\s*--/i;
 
 module.exports = {
   rule: "web:arbitrary-utility-value",

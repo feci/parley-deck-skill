@@ -13,16 +13,24 @@
  * `border-radius: 11p\78` are all values a browser applies and all invisible to a regular
  * expression over the raw text. The message carries the written spelling beside the spelled
  * value, because that is what a reader has to search the file for.
+ *
+ * Two things follow from matching what a browser reads, and both were false verdicts until they
+ * did. A function name and a unit are idents, and idents are ASCII case-insensitive (§3.3), so
+ * `RGB(255, 0, 0)` and `11PX` are the literals their lowercase spellings are — matched
+ * case-sensitively they passed clean while the browser applied them. And a url token's contents
+ * are an opaque locator, not a value (§4.3.6), so `fill: url(#fade)` names an SVG gradient and
+ * not the colour `#fade` — matched through the token boundary it was a VIOLATION against
+ * ordinary CSS. The value is masked through the scanner's own tokeniser before any match runs.
  */
-const { asWritten } = require("../css.js");
+const { asWritten, maskOpaqueTokens } = require("../css.js");
 
 const COLOUR_PROPS = /^(color|background|background-color|border(-(top|right|bottom|left))?-color|outline-color|fill|stroke|caret-color|text-decoration-color|box-shadow|accent-color)$/;
 const SPACE_PROPS = /^(margin|padding)(-(top|right|bottom|left|inline|block)(-(start|end))?)?$|^(gap|row-gap|column-gap|inset)$/;
 const SIZE_PROPS = /^(font-size|border-radius|border(-(top|bottom))?-(left|right)-radius)$/;
 
-const COLOUR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(/;
+const COLOUR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(/i;
 const NAMED_COLOURS = /\b(white|black|red|blue|green|yellow|orange|purple|pink|gray|grey|silver|navy|teal|olive|maroon|lime|aqua|fuchsia|gold|beige|ivory|coral|salmon|khaki|indigo|violet|crimson|tomato|slategray|slategrey)\b/i;
-const LENGTH_LITERAL = /(^|[\s(,+*/-])\d*\.?\d+(px|rem|em|pt|ch|ex|vh|vw|vmin|vmax)\b/;
+const LENGTH_LITERAL = /(^|[\s(,+*/-])\d*\.?\d+(px|rem|em|pt|ch|ex|vh|vw|vmin|vmax)\b/i;
 const NEUTRAL = /^(0|0px|auto|none|inherit|initial|unset|revert|currentcolor|transparent|100%|fit-content|max-content|min-content)$/i;
 
 function governed(prop) {
@@ -34,11 +42,14 @@ function governed(prop) {
 
 function literalIn(kind, value) {
   if (NEUTRAL.test(value.trim())) return null;
+  // The url and string contents are blanked first: what is inside either is not a value, and a
+  // match there names a literal the browser never resolves.
+  const readable = maskOpaqueTokens(value);
   if (kind === "colour") {
-    const match = COLOUR_LITERAL.exec(value) || NAMED_COLOURS.exec(value);
+    const match = COLOUR_LITERAL.exec(readable) || NAMED_COLOURS.exec(readable);
     return match ? match[0].trim() : null;
   }
-  const match = LENGTH_LITERAL.exec(value);
+  const match = LENGTH_LITERAL.exec(readable);
   return match ? match[0].trim().replace(/^[\s(,+*/-]+/, "") : null;
 }
 
