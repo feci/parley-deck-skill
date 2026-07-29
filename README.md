@@ -16,8 +16,8 @@ for design, design enforcement, tracker-ready tickets, and parallel worktrees.
 
 ## What's in the box
 
-Installing this package installs five skills. The first is the protocol; the other four
-build on it. All five install by default — `--no-addons` takes just the core skill,
+The installer places five skills into each detected runtime. The first is the protocol; the
+other four build on it. All five install by default — `--no-addons` takes just the core skill,
 `--only <name>[,<name>]` picks specific add-ons.
 
 - **`parley-deck`** — the multi-agent cooperation protocol.
@@ -97,8 +97,9 @@ conflict Git can show.
 The worktree-allocation table in `IMPLEMENTATION.md` is the lock manifest. Before
 a second concurrent worktree is provisioned, its file set is compared with every
 claimed boundary; an intersection is refused unless an explicit override is
-recorded. Each implementer gets a sibling worktree and isolated runtime state.
-Use it when two or more sessions or Phase-5 implementers work in one repository
+recorded. Each implementer gets a sibling worktree, and the manifest records the
+per-worktree environment, port, database and cache overrides that isolating runtime
+state actually requires. Use it when two or more sessions or Phase-5 implementers work in one repository
 at once.
 
 ## Install
@@ -108,7 +109,7 @@ npx -y parley-deck-skill@latest install --target all
 npx -y parley-deck-skill@latest doctor --target all
 ```
 
-Restart your agent runtime afterwards so it reloads `SKILL.md`. The full command
+Restart any runtime that caches skills. The full command
 reference is in [Install, update, and remove](#install-update-and-remove).
 
 ## Use Parley Deck
@@ -137,21 +138,10 @@ shape of the request is the same.
 If your runtime does not support skills directly, attach `SKILL.md` and
 `references/COOPERATION.md` as instruction context. The skill is plain Markdown by design.
 
-## Why this exists
-
-Multi-agent workflows fail in predictable ways: one agent anchors the rest before they form
-their own view, disagreements dissolve into a long chat history, implementation starts before
-there is real consensus, reviews are informal and unowned, and vendor assumptions leak into
-the workflow.
-
-Parley Deck turns the conversation into project artifacts. Every participant writes its own
-files. Every round is explicit. Consensus is gated. Implementation and review are separate
-phases. Recovery is possible because the state lives in the repository.
-
 ## Install, update, and remove
 
-The installer uses an AionUI-style local runtime registry: it checks known user-level agent
-directories and CLI commands, then installs into the runtimes it detects. A marker-only
+The installer checks known user-level agent directories and CLI commands, then installs into
+the runtimes it detects. A marker-only
 directory created by this installer is not treated as a real runtime.
 
 Native targets are **fourteen named runtimes** — Codex, Claude Code, Antigravity CLI (plugin
@@ -253,25 +243,17 @@ parley-deck-skill/
 
 ## Related repositories, and what this one owes
 
-This repository is only the skill layer. `parley-deck` is the server app, protocol deck, A2A
-facilitator, UI and database; `parley-deck-cli` is the standalone CLI that orchestrates runs.
-The skill implements manual facilitation; deterministic automated orchestration belongs in
-those two.
+This repository is only the skill layer, and the skill implements **manual facilitation**:
+an agent follows it, invokes other CLI agents, and verifies canonical files. Deterministic
+automated orchestration is not part of it — that lives in the separate `parley-deck` server
+and `parley-deck-cli` repositories.
 
-Parley Deck did not invent the following ideas; it wired them into one quorum-gated protocol.
-**OpenRouter Fusion** → the compare-not-merge consensus lens. **OpenAI ExecPlans / PLANS.md** →
-a resume-from-the-document `FINAL.md` and a living `IMPLEMENTATION.md`. **RHO** → advisory,
-quorum-gated retrospective optimization. **kindly** → strict gates, stopping judgment,
-no-suppression dispositions, artifact-wins. **Preflight readiness** → protocol-freshness and
-roster liveness before each idea. `NOTICE.md` records the prior art studied for the design
-add-ons. Reference is for attribution and lineage only; no endorsement or affiliation is
-implied.
-
-## Status
-
-An early, practical skill for developers running multi-agent engineering workflows. Run one
-real discussion, then read what it left behind: `ideas/<slug>/` will contain the kickoff, one
-round file per agent, the consensus with its signoffs, `FINAL.md`, and `IMPLEMENTATION.md`.
+Parley Deck did not invent the ideas it runs on. The one lineage a shipped file records is
+**RHO** (Retrospective Harness Optimization), credited in `references/COOPERATION.md` §13,
+where RHO's single-model self-preference is deliberately replaced by the deck's multi-agent
+quorum. `NOTICE.md` records `hallmark` and `impeccable` as the prior art studied for the
+design add-ons. Reference is for attribution and lineage only; no endorsement, sponsorship,
+or affiliation is implied.
 
 ## License
 
