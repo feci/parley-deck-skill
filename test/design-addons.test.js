@@ -227,16 +227,15 @@ test("the package ships no addons/ directory", () => {
 // (idea skills-cli-install-path, review rounds 03-05.)
 function publishedTestCommands(markdown) {
   const found = new Set();
-  for (const line of markdown.split("\n")) {
-    const at = line.indexOf("node --test ");
-    if (at === -1) continue;
-    const command = line
-      .slice(at)
-      .split("`")[0]                   // an inline span ends at its closing backtick
+  // One global match over the whole document. Not line-by-line, because a line may publish
+  // more than one command; not container-aware, because containers are an open set. A command
+  // runs to the first backtick (an inline span's close) or end of line, whichever comes first.
+  for (const m of markdown.matchAll(/node --test ([^`\n]*)/g)) {
+    const command = `node --test ${m[1]}`
       .replace(/[)\].,;:]+\s*$/, "")   // trailing markdown/prose punctuation
       .trim()
       .replace(/\s+/g, " ");
-    if (command.length > "node --test ".length) found.add(command);
+    if (command.length > "node --test".length + 1) found.add(command);
   }
   return found;
 }
@@ -259,6 +258,8 @@ test("the published-command extractor is not fooled by any container", () => {
     "",
     "Prose mentioning `node --test prose/one.test.js` mid-sentence.",
     "",
+    "Two on one line: first `node --test pair/first.test.js`; then `node --test pair/second.test.js`.",
+    "",
     "```",
     "echo not-a-test-command",
     "```"
@@ -271,7 +272,9 @@ test("the published-command extractor is not fooled by any container", () => {
     "node --test b/dir",
     "node --test tilde/valid.test.js",
     "node --test indented/block.test.js",
-    "node --test prose/one.test.js"
+    "node --test prose/one.test.js",
+    "node --test pair/first.test.js",
+    "node --test pair/second.test.js"
   ]) {
     assert.ok(found.has(expected), `extractor missed: ${expected}`);
   }
