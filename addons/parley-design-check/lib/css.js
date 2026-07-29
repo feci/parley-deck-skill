@@ -873,14 +873,16 @@ function functionBinding(prelude, line, log) {
     /*
      * Everything after the name is the parameter's optional type and its optional default value.
      * A default is read as the declaration value it is — decoded first, because `\76 ar(--ghost)`
-     * is `var(--ghost)` to a browser — and every reference in it is collected as a use. No
-     * `<css-type>` can carry a `var()`, so reading the type with the default costs nothing and
-     * spares this parser one more place to be wrong about where a default begins.
+     * is `var(--ghost)` to a browser — and every reference in it is collected as a use, through
+     * the same `valueVarUses` an ordinary declaration goes through, so a `var()` written inside a
+     * string or a url token here is the text it is there. No `<css-type>` can carry a `var()`, so
+     * reading the type with the default costs nothing and spares this parser one more place to be
+     * wrong about where a default begins.
      */
     const rest = decodeDeclarationText(prelude.slice(name.end, to), (reason) =>
       note(`carries a parameter that ${reason}`)
     );
-    for (const match of rest.matchAll(VAR_REFERENCE)) uses.push({ name: match[1], line });
+    for (const used of valueVarUses(rest)) uses.push({ name: used, line });
   }
   return { formals, uses };
 }
@@ -1301,6 +1303,36 @@ function maskOpaqueTokens(text) {
   return out.join("");
 }
 
+/**
+ * Every `var(--name)` a value really references — the one collector for the declarations a block
+ * holds and for the defaults an `@function` prelude gives its parameters alike.
+ *
+ * A `var()` inside a string or inside a url token is text, not a reference. §4.3.5 and §4.3.6
+ * make each of them one opaque token, and substitution replaces a `var()` *function* token in the
+ * token stream — inside either of those there is none to replace. Chromium 150 parses
+ * `@function --quoted(--x: "var(--ghost)") returns <string>` as a real `CSSFunctionRule`, answers
+ * true to `CSS.supports("content", "--quoted()")`, and computes the pseudo-element content as the
+ * literal text `var(--ghost)`; the checker ran the expression over that text, reported `--ghost`
+ * as a reference to a token no ratified document declares, refused the L3 certificate and exited
+ * 1 over CSS a browser resolves without difficulty. `.a { content: "var(--nope)" }` and
+ * `background: url(var(--ghost))` were the same false finding in an ordinary declaration, where it
+ * had sat since the block model was built. A false finding is as damaging as a false clean — it
+ * is how a gate gets switched off.
+ *
+ * So the search reads a value through `maskOpaqueTokens`, the one masker `literal-outside-tokens`
+ * already reads one through, and the two callers share this collector instead of each running the
+ * expression over text of its own. Two readings of where a string ends are two chances to
+ * disagree, which is the whole reason the token table names one consumer per token; a collector
+ * that scans raw text re-decides that question by omission, and this file has now been repaired
+ * twice on exactly that surface.
+ *
+ * The masking runs *after* the decoding each caller does, never instead of it: `\76 ar(--ghost)`
+ * spells `var(--ghost)`, a browser resolves it, and it is still collected here.
+ */
+function valueVarUses(value) {
+  return [...maskOpaqueTokens(value).matchAll(VAR_REFERENCE)].map((match) => match[1]);
+}
+
 /** A `<style>` element, and the markup comment — the two markup spans that are not markup. */
 const STYLE_ELEMENT = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
 const MARKUP_COMMENT = /<!--[\s\S]*?-->/g;
@@ -1326,7 +1358,8 @@ function blankSpans(text, pattern) {
  * `--ghost` was then reported as a reference to an undeclared token although the browser
  * resolves nothing there and the rule's only value used a declared one. A false finding is as
  * damaging as a false clean — it is what makes a gate get switched off — so the search runs
- * over `declarations[].value` and never over selector, prelude or comment text.
+ * over `declarations[].value` and never over selector, prelude or comment text, and it runs
+ * through `valueVarUses`, which is where the value's opaque tokens stop being read as values.
  */
 function declarationVarUses(blocks) {
   const uses = [];
@@ -1336,9 +1369,9 @@ function declarationVarUses(blocks) {
     const binding = block.atBlock ? block.atBlock.binding : null;
     if (binding) uses.push(...binding.uses);
     for (const declaration of block.declarations) {
-      for (const match of declaration.value.matchAll(VAR_REFERENCE)) {
-        if (binding && binding.formals.has(match[1])) continue;
-        uses.push({ name: match[1], line: declaration.line });
+      for (const name of valueVarUses(declaration.value)) {
+        if (binding && binding.formals.has(name)) continue;
+        uses.push({ name, line: declaration.line });
       }
     }
   }
@@ -1382,6 +1415,15 @@ function styleAttributes(text) {
  * supported utility bracket was tried against that corpus and lost 1,799 of them across 203 files,
  * which is the false clean this rule exists to prevent. The markup comment is the one span that
  * resolves nothing wherever it appears, so it is blanked with the `<style>` bodies.
+ *
+ * That last sweep is therefore the one `var()` search in this file that does not go through
+ * `valueVarUses`, and deliberately: outside those spans the text is not CSS, so a quote in it is
+ * not a CSS string token and `stringToken` has no jurisdiction over it. `className="text-[var(--x)]"`
+ * and `const cl = "color:var(--error)"` are quoted in the *host* language and a browser resolves
+ * every one of them; masking them as if they were CSS strings loses 2,410 of the references this
+ * path finds, across 306 of the sweep corpus's 2,236 markup files. The spans that really are CSS — a
+ * `<style>` body and a `style` attribute — are parsed as CSS above and collected through
+ * `valueVarUses` with every other declaration, so the opaque-token rule reaches them there.
  */
 function markupVarUses(text) {
   const uses = [];

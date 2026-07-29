@@ -3080,6 +3080,120 @@ test("an @function binds its parameters and uses its defaults, and a default is 
   }
 });
 
+/*
+ * Round-09's MAJOR, filed by codex-1 and reproduced independently by hermes-1. Cycle 12 began
+ * collecting references from `@function` parameter defaults, which was right, and collected them
+ * from the segment's raw text, which was not: `var()` written inside a *string* became a reference
+ * to a token no ratified document declares. codex-1 confirmed the first fixture in Chromium 150 —
+ * a real `CSSFunctionRule`, `CSS.supports("content", "--quoted()")` true, and the computed
+ * pseudo-element content the literal text `var(--ghost)` — while the checker emitted
+ * `core:token-used-undeclared`, refused L3 and exited 1 against CSS the browser resolves.
+ *
+ * Each entry is a source and the references a browser really resolves out of it.
+ */
+const OPAQUE_VAR_REPRODUCERS = [
+  // codex-1, both spellings of an opaque default: a string, and the string a `url(` function takes.
+  ['@function --quoted(--x: "var(--ghost)") returns <string> {\n  result: var(--x);\n}\n.probe::before { content: --quoted(); }', []],
+  ['@function --pick(--x: url("var(--ghost)")) {\n  result: var(--x);\n}\n.probe { background: --pick(); }', []],
+  // hermes-1, the same text in an ordinary declaration — where this had sat since the block model.
+  ['.a { content: "var(--nope)"; color: var(--x); }', ["--x"]],
+  [".a { font-family: 'var(--nope)'; color: var(--x); }", ["--x"]],
+  /*
+   * §4.3.6: a `url(` whose first non-whitespace code point is not a quote consumes one url token,
+   * and the `var()` inside it is that token's locator text. Substitution replaces a `var()`
+   * *function token* in the stream and there is none left inside a url token to replace, so the
+   * browser requests the relative URL `var(--ghost)` and resolves no custom property at all.
+   */
+  [".a { background: url(var(--ghost)); color: var(--x); }", ["--x"]]
+];
+
+/*
+ * The controls, which are the other half of the oscillation. Cycle 12's fix — a reference in a
+ * parameter default is a use — must survive the masking, including where it stands beside a string
+ * in the same parameter list, and the decoding must still run before the masking.
+ */
+const OPAQUE_VAR_CONTROLS = [
+  ["@function --pick(--x: var(--color-text-body)) { result: var(--x); }", ["--color-text-body"]],
+  ['@function --f(--x: "var(--ghost)", --y: var(--gap)) { result: calc(var(--x) + var(--y)); }', ["--gap"]],
+  ["@function --pick(--x: \\76 ar(--ghost)) { result: var(--x); }", ["--ghost"]],
+  ['.a { content: "var(--nope)" var(--real); }', ["--real"]],
+  ['.probe { background: url("/img/x.png") no-repeat, var(--fade); }', ["--fade"]]
+];
+
+test("an opaque token's contents are not a var() reference, in a declaration or in an @function default", (t) => {
+  for (const [source, expected] of OPAQUE_VAR_REPRODUCERS) {
+    assert.deepEqual(
+      varUses(source).map((use) => use.name),
+      expected,
+      `text inside an opaque token was read as a reference: ${source}`
+    );
+    assert.deepEqual(scanStylesheet(source).unreadable, [], `an ordinary opaque token was reported unreadable: ${source}`);
+  }
+  for (const [source, expected] of OPAQUE_VAR_CONTROLS) {
+    assert.deepEqual(
+      varUses(source).map((use) => use.name),
+      expected,
+      `a reference the browser resolves was lost with the masking: ${source}`
+    );
+  }
+
+  /*
+   * The markup path keeps its deliberate asymmetry, and it is recorded here so it is not "fixed"
+   * next. A `<style>` body is CSS, so it goes through the same collector as every other
+   * declaration and the string in it references nothing. Everything outside those spans is not
+   * CSS, its quotes are the host language's rather than string tokens, and the line below builds
+   * an inline style a browser applies — 2,410 references across 306 files of the sweep corpus are
+   * of exactly that shape.
+   */
+  assert.deepEqual(
+    markupVarUses('<style>\n.a { content: "var(--nope)"; color: var(--real); }\n</style>').map((use) => use.name),
+    ["--real"],
+    "a string inside a <style> body was read as a reference"
+  );
+  assert.deepEqual(
+    markupVarUses('const cl = "color:var(--error)";\n').map((use) => use.name),
+    ["--error"],
+    "a reference a markup file builds inside its own string stopped being found"
+  );
+
+  /*
+   * End to end at `--level L3`, on the run that verifies. Each of these certified `VIOLATION` and
+   * exit 1 at `9121ec2` against CSS a browser resolves without difficulty.
+   */
+  for (const [name, source] of [
+    ["a quoted @function default", OPAQUE_VAR_REPRODUCERS[0][0]],
+    ["a url-quoted @function default", OPAQUE_VAR_REPRODUCERS[1][0]],
+    ["a string in an ordinary declaration", '.probe { content: "var(--ghost)"; color: var(--color-text-body); }'],
+    ["a url token's locator", ".probe { background: url(var(--ghost)); color: var(--color-text-body); }"]
+  ]) {
+    const clean = check(mutatedRun(t, [{ file: "probe.css", write: source }]), { level: "L3" });
+    assert.deepEqual(
+      clean["findings-detail"].map((finding) => `${finding.rule}: ${finding.violation}`),
+      [],
+      `${name} raised a finding`
+    );
+    assert.deepEqual(clean.inputs.unreadable, [], `${name} was reported unreadable`);
+    assert.equal(clean.verdict, "PASS", `${name} left the run unclean`);
+    assert.equal(clean.level.verified, "L3", `${name} cost the run its level`);
+    assert.equal(clean.exit, 0, `${name} exited non-zero`);
+  }
+
+  /*
+   * And the guard against the swing back: the round-08 reproducer, whose `var()` is real CSS
+   * outside any opaque token, must still lose the run its certificate. Masking that suppressed
+   * this would be the false clean cycle 12 closed, returning under a new name.
+   */
+  const real = check(mutatedRun(t, [{ file: "probe.css", write: FUNCTION_DEFAULT_REPRODUCER }]), { level: "L3" });
+  assert.ok(
+    real["findings-detail"].some(
+      (finding) => finding.rule === "core:token-used-undeclared" && /references --ghost/.test(finding.violation)
+    ),
+    `the masking suppressed a reference the browser resolves: ${JSON.stringify(real["findings-detail"])}`
+  );
+  assert.equal(real.verdict, "VIOLATION");
+  assert.notEqual(real.exit, 0);
+});
+
 test("CDO and CDC at the top level of a stylesheet are discarded, as a browser discards them", (t) => {
   /*
    * §5.4.1: where a rule would begin at the top level, `<!--` and `-->` are consumed and dropped —
