@@ -271,6 +271,11 @@ const { Parser } = require("commonmark");
 // and `--TEST` reaches node itself, which rejects it. SUPPORTED_COMMAND stays exact, so every
 // one of these is detected and then REFUSED rather than skipped. (round 17, hermes-1.)
 const shellWordView = (s) => s.replace(/[\\'"]/g, "");
+// Word-building constructs, in ONE place. Cycle 26 first added brace expansion to the code
+// pass only and left the prose pass with its own hard-coded copy of the older test — the exact
+// asymmetry round 19 had already been raised for. A predicate used by both passes cannot drift
+// between them. (round 20, codex-1.)
+const buildsWords = (s) => /[`$]/.test(s) || /\{[^{}]*(?:,|\.\.)[^{}]*\}/.test(s);
 const mentionsATestCommand = (s) => {
   const words = shellWordView(s);
   const named = /\bnode\b/i.test(s) || /\bnode\b/i.test(words);
@@ -280,8 +285,18 @@ const mentionsATestCommand = (s) => {
   // 23 assumed would always be spelled out somewhere. It is not: `n$(printf '')ode --test x`
   // and `n${PATH#"$PATH"}ode --test x` contain no `node` at all and run as exactly that.
   // So one recognisable half plus a word-building construct is enough to look; the grammar,
-  // which excludes both characters outright, then refuses. (round 19, codex-1.)
-  return /[`$]/.test(s) && (named || flagged);
+  // which excludes those characters outright, then refuses. (round 19, codex-1.)
+  //
+  // Brace expansion is a word-building construct that needs NONE of those characters:
+  // `n{o..o}de --test x` and `node --{test..test} x` build the missing word out of plain
+  // letters, and both ran for a reader while the guard stayed green. Cycle 24's rationale was
+  // that a construct can produce either word; its implementation only knew two constructs.
+  // (round 20, codex-1.)
+  //
+  // A canonical command whose TARGET uses braces — `node --test "test/{a,b}/*.test.js"` — is
+  // unaffected: both command words are literal there, so it is already a candidate on the line
+  // above, and the executor decides whether the target works.
+  return buildsWords(s) && (named || flagged);
 };
 
 // Inside a code node there is no container left to interpret, so splicing a backslash
@@ -455,7 +470,7 @@ function publishedTestCommands(markdown) {
       // A substitution can produce either word, so neither may be spelled out anywhere. One
       // recognisable half plus a word-building construct is enough — unless a single code node
       // already holds the whole command, which is the supported way to publish one.
-      if (!publishedWhole && /[`$]/.test(line) && mentionsATestCommand(line)) {
+      if (!publishedWhole && buildsWords(line) && mentionsATestCommand(line)) {
         record(line.trim(), "prose");
       }
     }
@@ -651,6 +666,10 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "Run $(echo n)ode --test prose/subst-binary.test.js now.",
     "",
+    "Run n{o..o}de --test prose/brace-binary.test.js now.",
+    "",
+    "Run node --{test..test} prose/brace-flag.test.js now.",
+    "",
     "node `--test` mixed/span.test.js",
     "",
     "no<span></span>de --test html/inline-node.test.js",
@@ -695,6 +714,8 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --t`echo e`st subst/flag.test.js",
     "n$(printf '')ode --test subst/binary.test.js",
     'n${PATH#"$PATH"}ode --test expansion/binary.test.js',
+    "n{o..o}de --test brace/binary.test.js",
+    "node --{test..test} brace/flag.test.js",
     "```",
     "",
     "<div>",
@@ -809,6 +830,13 @@ test("the published-command extractor captures whole commands, never fragments",
     // anywhere. Cycle 23 had gated the substitution rule behind seeing it.
     "n$(printf '')ode --test subst/binary.test.js",
     'n${PATH#"$PATH"}ode --test expansion/binary.test.js',
+    // round 20 (codex-1): brace expansion builds either word out of plain letters — no
+    // backslash, quote, backtick or dollar anywhere. Cycle 24's rationale was that a construct
+    // can produce either word; its implementation knew only two constructs.
+    "n{o..o}de --test brace/binary.test.js",
+    "node --{test..test} brace/flag.test.js",
+    "Run n{o..o}de --test prose/brace-binary.test.js now.",
+    "Run node --{test..test} prose/brace-flag.test.js now.",
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
