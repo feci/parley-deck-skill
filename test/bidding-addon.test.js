@@ -1134,3 +1134,33 @@ test("a filtered read reports the same recorded-selection fact as an unfiltered 
   // The narrowing itself must survive: the scoped read still inspects only what was asked.
   assert.deepEqual(scoped.targets[0].skills.map((s) => s.skill), ["parley-deck", "parley-bidding"]);
 });
+
+test("a symlink in a manifest-free add-on is caught before the first write", () => {
+  // codex-1 round 1 MAJOR: preflight walked the source only for manifested add-ons, so a
+  // manifest-free one failed inside the sequential write loop — after the core and every
+  // preceding add-on had been replaced. B5 requires zero writes for a predictable failure.
+  const home = tmpDir();
+  const stagedRoot = path.join(tmpDir(), "package");
+  fs.cpSync(path.join(root, "skills"), path.join(stagedRoot, "skills"), { recursive: true });
+  for (const file of ["package.json", "plugin.json", "gemini-extension.json"]) {
+    fs.cpSync(path.join(root, file), path.join(stagedRoot, file));
+  }
+  // A manifest-free add-on that sorts last, so every other unit would already be installed.
+  const broken = path.join(stagedRoot, "skills", "zz-broken");
+  fs.mkdirSync(broken, { recursive: true });
+  fs.writeFileSync(path.join(broken, "SKILL.md"), "---\nname: zz-broken\n---\n# broken\n");
+  fs.symlinkSync(path.join(root, "README.md"), path.join(broken, "link.md"));
+
+  const ctx = context(home, { target: "codex" });
+  ctx.packageRoot = stagedRoot;
+  const result = installer.installCommand(ctx);
+
+  assert.equal(result.ok, false);
+  assert.equal(
+    fs.existsSync(path.join(home, ".codex", "skills")),
+    false,
+    "a predictable source defect must produce zero writes, not a partial fleet"
+  );
+  const failed = result.actions[0].skills.find((s) => s.skill === "zz-broken");
+  assert.match(failed.message, /Refusing to copy symlink/);
+});

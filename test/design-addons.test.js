@@ -1109,6 +1109,12 @@ test("every `python3 scripts/*.py` command a shipped file publishes names a scri
     // A backslash continuation is how a long command is published readably, and the extractor
     // marks a spliced unit by re-appending the backslash. Drop that marker, then refuse any
     // backslash that remains — one inside the command would be escaping something.
+    //
+    // Stated plainly because the record previously claimed the opposite: a multi-line,
+    // backslash-continued command IS ACCEPTED here. That is a deliberate exception to F5's
+    // "shell syntax refused", and it is safe only because this arm never executes what it
+    // finds — a reader copying all the continued lines gets exactly the command shown. The
+    // node arm, which does execute, still refuses splices. (review round 1, codex-1 MINOR.)
     const joined = command.replace(/\s*\\$/, "").replace(/\s+/g, " ").trim();
     const match = joined.match(PUBLISHED_PYTHON);
     assert.ok(
@@ -1173,7 +1179,23 @@ test("the Python published-command grammar refuses composition and accepts place
   assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py build x && echo done"), false);
   assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py `printf build`"), false);
   assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py $ACTION"), false);
+  // The raw grammar refuses a trailing backslash…
   assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py build x \\"), false);
+  // …and the caller strips the extractor's splice sentinel first, so a published multi-line
+  // command is accepted. Asserted rather than left implied: the two shipped multi-line
+  // commands depend on it. (review round 1, codex-1 MINOR.)
+  const afterSentinelStrip = (command) => command.replace(/\s*\\$/, "").replace(/\s+/g, " ").trim();
+  assert.equal(
+    PUBLISHED_PYTHON.test(
+      afterSentinelStrip("python3 scripts/release_lint.py <release-dir>   --manifest <manifest.json> \\")
+    ),
+    true
+  );
+  // A backslash that is NOT the trailing sentinel still refuses.
+  assert.equal(
+    PUBLISHED_PYTHON.test(afterSentinelStrip("python3 scripts/manifest.py build a\\ b")),
+    false
+  );
   // A path outside scripts/, or one that is not a .py file, is not this form.
   assert.equal(PUBLISHED_PYTHON.test("python3 ../elsewhere.py"), false);
   assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.txt"), false);
