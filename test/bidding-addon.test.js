@@ -1193,3 +1193,44 @@ test("a symlink in the CORE source is caught before the first write too", () => 
   );
   assert.match(result.actions[0].skills[0].message, /Refusing to copy symlink/);
 });
+
+test("a blocker in the LAST target writes nothing in any earlier target", () => {
+  // codex-1 round 8: preflight ran inside each target, so a predictable blocker in the
+  // fourteenth target was found after thirteen had already been installed. B5 asks for every
+  // unit AND destination to be preflighted before the first write — across the whole plan.
+  const home = tmpDir();
+  const lastTargetSkills = path.join(home, ".aionrs", "skills");
+  fs.mkdirSync(path.join(lastTargetSkills, "parley-bidding"), { recursive: true });
+  fs.writeFileSync(path.join(lastTargetSkills, "parley-bidding", "SKILL.md"), "# not ours\n");
+
+  const result = installer.installCommand(
+    context(home, { target: "all", includeUndetected: true })
+  );
+  assert.equal(result.ok, false);
+  for (const dir of [".codex", ".claude", ".hermes", ".kimi-code", ".qwen", ".opencode"]) {
+    assert.equal(
+      fs.existsSync(path.join(home, dir, "skills", "parley-deck")),
+      false,
+      `${dir} must not have been written while a later target was blocked`
+    );
+  }
+});
+
+test("a dangling destination symlink is a filesystem entry, not absence", () => {
+  // `fs.existsSync` follows symlinks and answers false for a dangling one, so the entry
+  // bypassed ownership preflight and the rename failed with ENOTDIR mid-fleet.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  fs.symlinkSync(path.join(home, "nowhere"), path.join(skillsDir, "parley-worktrees"));
+
+  const result = installer.installCommand(context(home, { target: "codex" }));
+  assert.equal(result.ok, false);
+  assert.equal(
+    fs.existsSync(path.join(skillsDir, "parley-deck")),
+    false,
+    "no unit may be written when a destination entry blocks the plan"
+  );
+  const blocked = result.actions[0].skills.find((s) => s.skill === "parley-worktrees");
+  assert.equal(blocked.action, "blocked");
+});
