@@ -1006,3 +1006,80 @@ test("unrelated sibling directories are never mistaken for add-ons", () => {
     assert.deepEqual(skill.problems, [], `${skill.skill} must be unaffected by unrelated siblings`);
   }
 });
+
+test("the interpreter probe distinguishes working directories under a relative PATH", () => {
+  // codex-1 round 5: `spawnSync` got no cwd, so a relative PATH entry resolved against the
+  // process directory and a second call in a different directory reused the first verdict.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+
+  const stubDir = (version) => {
+    const dir = path.join(tmpDir(), "work");
+    fs.mkdirSync(path.join(dir, "bin"), { recursive: true });
+    const file = path.join(dir, "bin", "python3");
+    fs.writeFileSync(file, `#!/bin/sh\necho '${version}'\n`, "utf8");
+    fs.chmodSync(file, 0o755);
+    return dir;
+  };
+  const ask = (cwd) => {
+    const out = [];
+    installer.run(["doctor", "--target", "codex", "--json"], {
+      env: { HOME: home, PATH: "bin" }, // identical environment in both calls
+      cwd,
+      stdout: { write: (c) => out.push(c) },
+      stderr: { write: () => {} }
+    });
+    return JSON.parse(out.join("")).targets[0].skills.find((s) => s.skill === "parley-bidding").runtime;
+  };
+
+  const newer = ask(stubDir("3.12"));
+  const older = ask(stubDir("3.9"));
+  assert.equal(newer.ok, true);
+  assert.equal(older.ok, false, "the second directory must not inherit the first's verdict");
+  assert.match(older.detail, /python3 is 3\.9/);
+});
+
+test("paths narrows under a selector instead of expanding", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const names = (options) =>
+    installer.pathsCommand(context(home, { command: "paths", target: "codex", ...options }))
+      .targets[0].skills.map((s) => s.skill);
+
+  assert.equal(names({}).length, 6);
+  assert.deepEqual(names({ only: ["parley-bidding"] }), ["parley-deck", "parley-bidding"]);
+  assert.deepEqual(names({ noAddons: true }), ["parley-deck"]);
+});
+
+test("a marker with no skill identity is malformed for core and add-on alike", () => {
+  // codex-1 round 6: health exempted `skill === undefined` while installerOwnsDestination
+  // required exact equality, so deleting one field made doctor say valid+managed while both
+  // mutation commands refused the same directory. The released markers all carry the field,
+  // so the exemption protected nothing.
+  const home = tmpDir();
+  installed(home);
+  const dirs = {
+    "parley-deck": path.join(home, ".codex", "skills", "parley-deck"),
+    "parley-bidding": path.join(home, ".codex", "skills", "parley-bidding")
+  };
+  for (const dir of Object.values(dirs)) {
+    const marker = readMarker(dir);
+    delete marker.skill;
+    writeMarker(dir, marker);
+  }
+
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(result.ok, false);
+  for (const name of Object.keys(dirs)) {
+    const unit = result.targets[0].skills.find((s) => s.skill === name);
+    assert.equal(unit.status, "malformed", `${name} must not claim health without an identity`);
+    assert.equal(unit.managed, false);
+    assert.ok(unit.problems.some((p) => p.includes("no skill identity")));
+  }
+
+  // …and the mutations agree, which is the whole point.
+  const install = installer.installCommand(context(home, { target: "codex", only: ["parley-bidding"] }));
+  assert.equal(install.ok, false);
+  const uninstall = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+  assert.equal(uninstall.ok, false);
+});
