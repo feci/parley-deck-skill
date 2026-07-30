@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "de-doe",
+  "name": "Datenservice Öffentlicher Einkauf / Bekanntmachungsservice",
+  "kind": "official-discovery-and-open-data",
+  "official_url": "https://www.oeffentlichevergabe.de/",
+  "submission_capable": false,
+  "retain_origin_link": true,
+  "tested_as_of": "2026-07-22",
+  "notes": "Use for discovery. The authoritative origin platform controls documents, communication, and submission."
+}
+

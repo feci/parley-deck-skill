@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/parley-bidding/jurisdiction-profile.schema.json",
+  "title": "Jurisdiction workflow profile",
+  "type": "object",
+  "required": [
+    "schema_version", "id", "name", "status", "timezone",
+    "human_decision_fields", "official_discovery_sources", "release_markers",
+    "disclaimer"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "name": {"type": "string"},
+    "status": {"const": "workflow-aid-not-legal-advice"},
+    "timezone": {"type": "string"},
+    "human_decision_fields": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "official_discovery_sources": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "release_markers": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "disclaimer": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

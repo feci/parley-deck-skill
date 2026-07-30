@@ -23,6 +23,12 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      # `npm test` runs the parley-bidding add-on's Python suite and fails — never skips —
+      # when no interpreter is present. Pinned to the floor the add-on declares in its
+      # manifest, so CI proves that floor rather than only the newest interpreter.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
       - run: npm ci
       - run: npm test
       - run: npm run build:portable:windows

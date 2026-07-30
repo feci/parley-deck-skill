@@ -271,15 +271,23 @@ const { Parser } = require("commonmark");
 // and `--TEST` reaches node itself, which rejects it. SUPPORTED_COMMAND stays exact, so every
 // one of these is detected and then REFUSED rather than skipped. (round 17, hermes-1.)
 const shellWordView = (s) => s.replace(/[\\'"]/g, "");
+// A command shape: the binary word, and the token that makes it the command this guard cares
+// about. The node arm below is the original; the python3 arm reuses every line of the
+// extraction machinery rather than growing a second copy of it that could drift.
+const NODE_COMMAND = { binary: "\\bnode\\b", flag: "--test\\b" };
+const PYTHON_COMMAND = { binary: "\\bpython3\\b", flag: "\\bscripts/[A-Za-z0-9_.-]+\\.py\\b" };
+// Fresh objects per call: a /g regex carries lastIndex between uses, and a shared one would
+// make detection depend on how many strings were tested before it.
+const rx = (shape, key, flags = "i") => new RegExp(shape[key], flags);
 // Word-building constructs, in ONE place. Cycle 26 first added brace expansion to the code
 // pass only and left the prose pass with its own hard-coded copy of the older test — the exact
 // asymmetry round 19 had already been raised for. A predicate used by both passes cannot drift
 // between them. (round 20, codex-1.)
 const buildsWords = (s) => /[`$]/.test(s) || /\{[^{}]*(?:,|\.\.)[^{}]*\}/.test(s);
-const mentionsATestCommand = (s) => {
+const mentionsCommand = (s, shape) => {
   const words = shellWordView(s);
-  const named = /\bnode\b/i.test(s) || /\bnode\b/i.test(words);
-  const flagged = /--test\b/i.test(s) || /--test\b/i.test(words);
+  const named = rx(shape, "binary").test(s) || rx(shape, "binary").test(words);
+  const flagged = rx(shape, "flag").test(s) || rx(shape, "flag").test(words);
   if (named && flagged) return true;
   // A substitution or expansion can produce ANY word — including the BINARY NAME, which cycle
   // 23 assumed would always be spelled out somewhere. It is not: `n$(printf '')ode --test x`
@@ -303,6 +311,7 @@ const mentionsATestCommand = (s) => {
   // above, and the executor decides whether the target works.
   return buildsWords(s) && (named || flagged);
 };
+const mentionsATestCommand = (s) => mentionsCommand(s, NODE_COMMAND);
 
 // Inside a code node there is no container left to interpret, so splicing a backslash
 // continuation is exactly what a shell does. A unit assembled from more than one physical
@@ -408,7 +417,7 @@ function visibleTextOfHtml(html) {
 // before a span, and a checklist item with the span in parentheses. In both, the command is
 // wholly inside one span — which is the property that actually matters.
 // (idea skills-cli-install-path, review round 17, codex-1.)
-function publishedTestCommands(markdown) {
+function publishedCommands(markdown, shape) {
   const occurrences = [];
   const seen = new Set();
   const record = (command, origin) => {
@@ -418,7 +427,7 @@ function publishedTestCommands(markdown) {
     occurrences.push({ command, origin });
   };
   const addCode = ({ text, spliced }) => {
-    if (!mentionsATestCommand(text)) return;
+    if (!mentionsCommand(text, shape)) return;
     record(spliced ? text.trim() + " \\" : text.trim(), "code");
   };
 
@@ -467,16 +476,16 @@ function publishedTestCommands(markdown) {
         segments.set(owner, (segments.get(owner) || "") + line[i]);
       }
       const publishing = new Set(
-        [...segments.entries()].filter(([, text]) => mentionsATestCommand(text)).map(([id]) => id)
+        [...segments.entries()].filter(([, text]) => mentionsCommand(text, shape)).map(([id]) => id)
       );
       let residue = "";
       for (let i = 0; i < line.length; i += 1) {
         if (!publishing.has(owners[from + i])) residue += line[i];
       }
 
-      for (const m of view.matchAll(/\bnode\b/gi)) {
+      for (const m of view.matchAll(rx(shape, "binary", "gi"))) {
         const rest = view.slice(m.index);
-        const flag = rest.match(/--test\b/i);
+        const flag = rest.match(rx(shape, "flag"));
         if (!flag) continue;
         const nodeOwner = owners[from + toRaw[m.index]];
         const flagOwner = owners[from + toRaw[m.index + flag.index]];
@@ -487,7 +496,7 @@ function publishedTestCommands(markdown) {
       // A substitution can produce either word, so neither may be spelled out anywhere. One
       // recognisable half plus a word-building construct is enough — unless a single code node
       // already holds the whole command, which is the supported way to publish one.
-      if (buildsWords(residue) && mentionsATestCommand(residue)) {
+      if (buildsWords(residue) && mentionsCommand(residue, shape)) {
         record(residue.trim(), "prose");
       }
     }
@@ -579,6 +588,9 @@ function publishedTestCommands(markdown) {
   flushVisible();
   return occurrences;
 }
+
+const publishedTestCommands = (markdown) => publishedCommands(markdown, NODE_COMMAND);
+const publishedPythonCommands = (markdown) => publishedCommands(markdown, PYTHON_COMMAND);
 
 // The only shape this guard will execute: the command, its targets, and nothing else. Every
 // other published form — an environment prefix, a `cd … &&`, a command substitution, a pipe,
@@ -1037,4 +1049,135 @@ test("every `node --test` command a shipped file publishes runs tests and passes
     assert.equal(fail, 0, `published command failed: ${command}`);
     assert.ok(pass > 0, `published command ran zero tests, so it verifies nothing: ${command}`);
   }
+});
+
+// The Python arm of the same guard. Deliberately STATIC: it never runs what it finds.
+//
+// That is not timidity, it is the hazard model. `node --test <targets>` is idempotent and
+// reads nothing outside the repository, so executing a published one proves it works. The
+// bidding scripts take a bid workspace, a release directory and a jurisdiction profile, and
+// every published invocation carries `<placeholder>` arguments precisely because no such
+// paths exist here. Executing them would prove nothing and could write outside the repo.
+//
+// So `<` and `>` are accepted here where SUPPORTED_COMMAND refuses them: that refusal exists
+// because that guard hands the string to /bin/sh, where they redirect. Nothing is handed to a
+// shell here, so the characters carry no hazard — while `;` `|` `&` backtick and `$` are still
+// refused, because they mean the published line is not one self-contained command.
+//
+// What IS checked, and is worth more than a run: the script exists at the path published, and
+// its source compiles under the interpreter floor the add-on declares.
+const PUBLISHED_PYTHON = /^python3\s+(scripts\/[A-Za-z0-9_][A-Za-z0-9_.-]*\.py)(?:\s+[^`;|&$\\]*)?$/;
+
+test("every `python3 scripts/*.py` command a shipped file publishes names a script that exists and compiles", () => {
+  const { execFileSync, spawnSync } = require("node:child_process");
+  const published = [];
+  const walk = (dir, skillRoot) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full, skillRoot || full);
+        continue;
+      }
+      if (!entry.name.endsWith(".md")) continue;
+      for (const occurrence of publishedPythonCommands(fs.readFileSync(full, "utf8"))) {
+        published.push({ ...occurrence, file: full, skillRoot });
+      }
+    }
+  };
+  walk(path.join(root, "skills"), null);
+
+  assert.ok(
+    published.length >= 5,
+    `expected the bidding add-on's published Python commands, saw ${published.length}`
+  );
+
+  const compiled = new Set();
+  for (const { command, origin, file, skillRoot } of published) {
+    const where = path.relative(root, file);
+
+    // Provenance before form, exactly as the node arm does it: a command synthesized by
+    // rendering is one no reader can distinguish from prose, so it is refused rather than
+    // inspected. (idea skills-cli-install-path, review round 17, codex-1.)
+    assert.equal(
+      origin,
+      "code",
+      `a published Python command must be its own code span or code block, not text ` +
+        `synthesized by rendering. In ${where}: ${command}`
+    );
+
+    // A backslash continuation is how a long command is published readably, and the extractor
+    // marks a spliced unit by re-appending the backslash. Drop that marker, then refuse any
+    // backslash that remains — one inside the command would be escaping something.
+    const joined = command.replace(/\s*\\$/, "").replace(/\s+/g, " ").trim();
+    const match = joined.match(PUBLISHED_PYTHON);
+    assert.ok(
+      match,
+      `published command is not a bare \`python3 scripts/<name>.py [args]\` form, so this ` +
+        `guard refuses to interpret it. In ${where}: ${joined}`
+    );
+
+    const scriptRel = match[1];
+    const scriptAbs = path.join(skillRoot, scriptRel);
+    assert.ok(
+      fs.existsSync(scriptAbs),
+      `published command names a script that does not ship: ${scriptRel} (referenced in ${where})`
+    );
+
+    if (compiled.has(scriptAbs)) continue;
+    compiled.add(scriptAbs);
+
+    // Compile in memory. `py_compile` would write a .pyc into the shipped tree, and
+    // copyRecursive filters nothing — a generated cache file would land in every runtime.
+    const check = spawnSync(
+      "python3",
+      ["-B", "-c", "import sys; p = sys.argv[1]; compile(open(p, encoding='utf-8').read(), p, 'exec')", scriptAbs],
+      { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }
+    );
+    assert.ok(
+      !check.error,
+      `python3 is required to validate published Python commands and was not found. This is a ` +
+        `failure, not a skip: it would otherwise report green for scripts nothing checked.`
+    );
+    assert.equal(
+      check.status,
+      0,
+      `published script does not compile: ${scriptRel}\n${check.stderr}`
+    );
+  }
+
+  // No bytecode may be produced by the check itself.
+  const stray = [];
+  const scan = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "__pycache__") { stray.push(path.relative(root, full)); continue; }
+        scan(full);
+      } else if (entry.name.endsWith(".pyc") || entry.name.endsWith(".pyo")) {
+        stray.push(path.relative(root, full));
+      }
+    }
+  };
+  scan(path.join(root, "skills"));
+  assert.deepEqual(stray, [], `compiling published scripts must leave no bytecode behind`);
+});
+
+test("the Python published-command grammar refuses composition and accepts placeholders", () => {
+  // Placeholders are the published form and must be accepted — nothing is handed to a shell.
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py build <release-dir> --output <manifest.json>"), true);
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/bid_state.py show --workspace <bid-workspace>"), true);
+  // Composition, substitution and continuation are refused by name.
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py build x; rm -rf /"), false);
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py build x | tee log"), false);
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py build x && echo done"), false);
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py `printf build`"), false);
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py $ACTION"), false);
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.py build x \\"), false);
+  // A path outside scripts/, or one that is not a .py file, is not this form.
+  assert.equal(PUBLISHED_PYTHON.test("python3 ../elsewhere.py"), false);
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/manifest.txt"), false);
+  assert.equal(PUBLISHED_PYTHON.test("cd skills && python3 scripts/manifest.py build x"), false);
+  // Path traversal inside the arm is refused: the leading segment must be a plain name.
+  assert.equal(PUBLISHED_PYTHON.test("python3 scripts/../../etc/passwd.py"), false);
 });

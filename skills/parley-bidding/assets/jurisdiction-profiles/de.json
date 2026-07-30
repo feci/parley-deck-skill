@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "de",
+  "name": "Germany",
+  "status": "workflow-aid-not-legal-advice",
+  "timezone": "Europe/Berlin",
+  "human_decision_fields": [
+    "applicable-procurement-regime",
+    "bidder-eligibility-and-exclusions",
+    "declarant-authority-basis",
+    "signature-regime-and-validity",
+    "tax-and-vat-treatment",
+    "contract-deviations-and-acceptance",
+    "first-offer-risk",
+    "subcontractor-and-consortium-classification"
+  ],
+  "official_discovery_sources": [
+    "de-doe",
+    "eu-ted",
+    "de-service-bund"
+  ],
+  "release_markers": [
+    "[UNSICHER]"
+  ],
+  "disclaimer": "Record buyer-controlled requirements and cited official sources. Do not infer legal conclusions or universal defaults from this profile."
+}

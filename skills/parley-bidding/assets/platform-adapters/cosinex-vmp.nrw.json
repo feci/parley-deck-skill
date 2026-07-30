@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "cosinex-vmp.nrw",
+  "platform_family": "cosinex-vmp",
+  "deployment": "vergabe-nrw",
+  "official_base_url": "https://www.evergabe.nrw.de/",
+  "maturity": "research-only",
+  "tested_as_of": "2026-07-22",
+  "validation_scope": "Official public surface research only. No account, read-only session, staging, submission, receipt, or withdrawal behavior observed.",
+  "proof_ceiling": "P0",
+  "live_effects_authorized": false,
+  "max_file_size_bytes": null,
+  "documented_capabilities": [
+    "public-opportunity-surface"
+  ],
+  "observed_capabilities": [],
+  "operation_effects": {
+    "state_changing_read": "E1",
+    "send_message": "E3a",
+    "edit_field": "E4",
+    "stage_upload": "E5",
+    "final_submit": "E6",
+    "withdraw": "E7",
+    "amend": "E7",
+    "onboard": "E8"
+  },
+  "operation_effect_semantics": "minimum-hitl-class-if-operation-is-performed",
+  "stop_conditions": [
+    "any-live-mutation-while-research-only",
+    "assumed-account-portability-from-another-cosinex-deployment",
+    "reused-dtvp-ui-or-receipt-assumption",
+    "unexpected-ui-or-state"
+  ]
+}

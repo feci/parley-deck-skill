@@ -11,20 +11,30 @@ stay on disk, and recorded signoffs gate what becomes final.
 The working state lives in files in your repository that you can read, diff, and
 resume — not a chat log you have to trust.
 
-This package includes five skills: the core cooperation protocol and four add-ons
-for design, design enforcement, tracker-ready tickets, and parallel worktrees.
+This package includes six skills: the core cooperation protocol and five add-ons
+for design, design enforcement, tracker-ready tickets, parallel worktrees, and
+software-procurement bidding.
 
 ## What's in the box
 
-The installer places five skills into each detected runtime. The first is the protocol; the
-other four build on it. All five install by default — `--no-addons` takes just the core skill,
+The installer places six skills into each detected runtime. The first is the protocol; the
+other five build on it. All six install by default — `--no-addons` takes just the core skill,
 `--only <name>[,<name>]` picks specific add-ons.
 
 - **`parley-deck`** — the multi-agent cooperation protocol.
+- **`parley-bidding`** — evidence-backed bidding on software tenders, with the irreversible steps held by a human.
 - **`parley-design`** — collaborative design that refuses to read as machine-made.
 - **`parley-design-check`** — that doctrine's rules, enforced against files on disk.
 - **`parley-tracker`** — tickets a stakeholder, a reviewer, and an agent can all read.
 - **`parley-worktrees`** — parallel agents over one repo, without silent corruption.
+
+> [!IMPORTANT]
+> **`parley-bidding` installs by default, including on upgrade.** A routine
+> `install --force` places a procurement-portal skill into every runtime this installer
+> covers — including runtimes belonging to people who never asked for a bidding tool. What
+> expands is *availability*, not permission: every gate in the skill still binds, it performs
+> no portal action without an action-specific human approval, and it never handles
+> credentials. Use `--no-addons`, or `--only` without it, to leave it out.
 
 <!-- Base: codex-1. Graft: the closing "more than one model's first answer" line from kimi-1. -->
 
@@ -40,6 +50,31 @@ and `deliberation` tracks scale the route to the risk. Canonical files remain
 authoritative whether the working surface is a local directory, GitHub pull
 requests, or GitLab merge requests. Reach for it when the work is worth more than
 one model's first answer.
+
+### [`parley-bidding`](./skills/parley-bidding/SKILL.md) — bid on software tenders without ever guessing that it worked
+
+Public software procurement punishes the two failure modes agents are worst at: acting on
+content that reads like an instruction, and reporting success it cannot evidence. This add-on
+treats tender and portal text as untrusted evidence rather than direction, defaults to
+read-only, and classifies every operation by effect before it happens — from a passive read to
+the one irreversible submission — so each consequential step needs its own single-use human
+approval, bound to the exact payload, price, deadline and target it was granted for.
+
+It refuses to inflate proof. Upload is not submission and a green screen is not a receipt: a
+bid claims content-verified only when the submitted bytes match the frozen SHA-256 manifest,
+and an ambiguous outcome becomes `unknown-possibly-submitted` with no retry until a read-only
+reconciliation says what actually happened. Seven local, deterministic Python tools build the
+manifest, lint the package and the buyer's completeness requirements separately, and drive the
+lifecycle. None of them logs in, browses, uploads or submits — and the skill never handles a
+password, cookie, token or MFA code at all.
+
+It ships adapters for Cosinex/DTVP and NRW, subreport ELViS, and a manual profile whose proof
+ceiling is an operator's word. Adapter maturity never grants permission.
+
+> **Runtime availability, stated precisely.** The payload installs into and validates in every
+> runtime this installer covers — measured across all fourteen destinations. Whether a given
+> runtime then *exposes* it as an invocable skill is that runtime's own behaviour and is
+> **NOT TESTED** here.
 
 <!-- Base: kimi-1. Grafts: the alongside/never-instead relationship from hermes-1; the bounded-graft constraint from claude-1. -->
 
@@ -106,7 +141,7 @@ or Phase-5 implementers work in one repository at once.
 
 > [!TIP]
 > **One command, most agents.** The universal skill installer from
-> [`vercel-labs/skills`](https://github.com/vercel-labs/skills) installs all five skills into
+> [`vercel-labs/skills`](https://github.com/vercel-labs/skills) installs all six skills into
 > the coding agents it supports — a longer list than this package's own installer covers, and
 > theirs to state, not ours:
 >
@@ -252,6 +287,7 @@ parley-deck-skill/
 │   │   ├── SKILL.md              # canonical entrypoint for agents
 │   │   ├── references/           # COOPERATION.md, compatibility.json, WORKED_EXAMPLES.md
 │   │   └── agents/               # manifest.yaml (neutral), openai.yaml (Codex UI metadata)
+│   ├── parley-bidding/           # bidding: scripts/, references/, assets/ + parley-addon.json
 │   ├── parley-design/            # doctrine + PDS/1.0 (markdown only)
 │   ├── parley-design-check/      # the checker: bin/, lib/, test/
 │   ├── parley-tracker/

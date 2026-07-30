@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "benign-title-punctuation",
+      "field": "title",
+      "material": false,
+      "resolved": false,
+      "substantive_equivalence_evidence": "evidence/title-comparison.txt",
+      "expected_release_block": false
+    },
+    {
+      "id": "deadline-divergence",
+      "field": "deadline",
+      "material": true,
+      "resolved": false,
+      "expected_release_block": true
+    },
+    {
+      "id": "missing-binding-addendum",
+      "field": "document-version",
+      "material": true,
+      "resolved": false,
+      "expected_release_block": true
+    }
+  ]
+}

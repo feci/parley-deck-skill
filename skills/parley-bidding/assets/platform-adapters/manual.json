@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "manual",
+  "platform_family": "manual-checklist",
+  "deployment": "unsupported-platform",
+  "official_base_url": null,
+  "maturity": "research-only",
+  "tested_as_of": "not-applicable",
+  "validation_scope": "Not applicable: null adapter for human-operated unsupported platforms. It records checklist evidence only and never claims portal observation or validation.",
+  "proof_ceiling": "P0",
+  "live_effects_authorized": false,
+  "max_file_size_bytes": null,
+  "documented_capabilities": [],
+  "observed_capabilities": [],
+  "operation_effects": {
+    "state_changing_read": "E1",
+    "send_message": "E3a",
+    "edit_field": "E4",
+    "stage_upload": "E5",
+    "final_submit": "E6",
+    "withdraw": "E7",
+    "amend": "E7",
+    "onboard": "E8"
+  },
+  "operation_effect_semantics": "minimum-hitl-class-if-operation-is-performed",
+  "stop_conditions": [
+    "any-claim-of-agent-observed-portal-state",
+    "any-proof-claim-above-p0",
+    "any-credential-request-or-storage",
+    "ambiguous-final-action"
+  ]
+}

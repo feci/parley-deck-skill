@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "eu-ted",
+  "name": "Tenders Electronic Daily",
+  "kind": "official-eu-publication-and-discovery",
+  "official_url": "https://ted.europa.eu/",
+  "submission_capable": false,
+  "retain_origin_link": true,
+  "tested_as_of": "2026-07-22",
+  "notes": "Use the notice to reach and retain the authoritative origin procedure. TED publication does not make TED the submission channel."
+}
+

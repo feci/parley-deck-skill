@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/parley-bidding/platform-adapter.schema.json",
+  "title": "Platform adapter declaration",
+  "type": "object",
+  "required": [
+    "schema_version", "id", "platform_family", "deployment",
+    "official_base_url", "maturity", "tested_as_of", "validation_scope",
+    "proof_ceiling", "live_effects_authorized", "documented_capabilities",
+    "observed_capabilities", "operation_effects", "operation_effect_semantics",
+    "stop_conditions"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9.-]+$"},
+    "platform_family": {"type": "string", "minLength": 1},
+    "deployment": {"type": "string", "minLength": 1},
+    "official_base_url": {"type": ["string", "null"]},
+    "maturity": {
+      "enum": [
+        "research-only", "fixture-validated", "read-only-validated",
+        "demo-submission-validated", "live-submission-validated"
+      ]
+    },
+    "tested_as_of": {"type": "string", "minLength": 1},
+    "validation_scope": {"type": "string", "minLength": 1},
+    "proof_ceiling": {"enum": ["P0", "P1", "P2", "P3"]},
+    "live_effects_authorized": {"const": false},
+    "max_file_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+    "documented_capabilities": {"type": "array", "items": {"type": "string"}},
+    "observed_capabilities": {"type": "array", "items": {"type": "string"}},
+    "operation_effects": {
+      "type": "object",
+      "properties": {
+        "state_changing_read": {"const": "E1"},
+        "send_message": {"const": "E3a"},
+        "edit_field": {"const": "E4"},
+        "stage_upload": {"const": "E5"},
+        "final_submit": {"const": "E6"},
+        "withdraw": {"const": "E7"},
+        "amend": {"const": "E7"},
+        "onboard": {"const": "E8"}
+      },
+      "additionalProperties": false
+    },
+    "operation_effect_semantics": {
+      "const": "minimum-hitl-class-if-operation-is-performed"
+    },
+    "official_sources": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "stop_conditions": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

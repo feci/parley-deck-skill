@@ -57,8 +57,13 @@
     "build:portable": "node scripts/build-portable.js all",
     "build:portable:current": "node scripts/build-portable.js current",
     "build:portable:windows": "node scripts/build-portable.js windows",
-    "test": "node --test",
-    "pack:dry-run": "npm pack --dry-run"
+    "test": "node --test && node scripts/run-python-tests.js && node scripts/build-addon-manifest.js --check",
+    "pack:dry-run": "npm pack --dry-run",
+    "test:node": "node --test",
+    "test:python": "node scripts/run-python-tests.js",
+    "manifest:addons": "node scripts/build-addon-manifest.js",
+    "manifest:check": "node scripts/build-addon-manifest.js --check",
+    "prepack": "node scripts/build-addon-manifest.js --check"
   },
   "devDependencies": {
     "@yao-pkg/pkg": "^6.19.0",

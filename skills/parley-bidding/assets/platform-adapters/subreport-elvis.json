@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "subreport-elvis",
+  "platform_family": "subreport",
+  "deployment": "subreport-elvis-germany",
+  "official_base_url": "https://subreport.de/evergabe/subreport-elvis/",
+  "maturity": "research-only",
+  "tested_as_of": "2026-07-22",
+  "validation_scope": "Official documentation research only. No account, authenticated read, demo staging, live submission, receipt, withdrawal, or content-download behavior observed.",
+  "proof_ceiling": "P0",
+  "live_effects_authorized": false,
+  "max_file_size_bytes": 120000000,
+  "documented_capabilities": [
+    "document-access-by-elvis-id-without-registration",
+    "registered-communication-and-submission",
+    "bidder-questions-and-change-notifications",
+    "submission-receipt",
+    "withdrawal-or-exchange-before-opening",
+    "text-form",
+    "advanced-signature",
+    "qualified-signature",
+    "optional-signature-helper",
+    "120-mb-per-file-limit",
+    "official-demo-available"
+  ],
+  "observed_capabilities": [],
+  "operation_effects": {
+    "state_changing_read": "E1",
+    "send_message": "E3a",
+    "edit_field": "E4",
+    "stage_upload": "E5",
+    "final_submit": "E6",
+    "withdraw": "E7",
+    "amend": "E7",
+    "onboard": "E8"
+  },
+  "operation_effect_semantics": "minimum-hitl-class-if-operation-is-performed",
+  "official_sources": [
+    "https://subreport.de/evergabe/subreport-elvis/",
+    "https://subreport.de/evergabe/technische-voraussetzungen/"
+  ],
+  "stop_conditions": [
+    "any-live-mutation-while-research-only",
+    "account-or-terms-action-without-e8",
+    "signature-helper-or-certificate-action-without-e8",
+    "signature-variant-not-proven-for-procedure",
+    "file-exceeds-documented-limit",
+    "unexpected-ui-or-state"
+  ]
+}

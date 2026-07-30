@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/parley-bidding/bid-state.schema.json",
+  "title": "Parley bidding state",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "bid_id",
+    "lifecycle_state",
+    "adapter_maturity",
+    "proof",
+    "freeze",
+    "release_history",
+    "exception_context",
+    "open_workstreams",
+    "workstream_closures",
+    "bindings",
+    "approvals",
+    "history"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "bid_id": {"type": "string", "minLength": 1},
+    "lifecycle_state": {
+      "enum": [
+        "candidate", "triaged", "qualified", "declined", "acquired",
+        "inventoried", "reconciled", "analyzed", "drafting", "challenged",
+        "release-candidate", "release-frozen", "platform-bound", "staging",
+        "staged", "pre-submit-checked", "awaiting-final-approval", "submitting",
+        "submission-recorded", "blocked", "failed-before-submit", "session-lost",
+        "unknown-possibly-submitted", "verification-failed",
+        "amendment-pending", "withdrawn"
+      ]
+    },
+    "adapter_maturity": {
+      "enum": [
+        "research-only", "fixture-validated", "read-only-validated",
+        "demo-submission-validated", "live-submission-validated"
+      ]
+    },
+    "proof": {
+      "type": ["object", "null"],
+      "properties": {
+        "level": {"enum": ["P0", "P1", "P2", "P3"]},
+        "label": {
+          "enum": [
+            "operator-attested", "portal-visible",
+            "submission-confirmed", "content-verified"
+          ]
+        },
+        "adapter_id": {"type": ["string", "null"]},
+        "adapter_maturity": {"type": "string"},
+        "effective_ceiling": {"enum": ["P0", "P1", "P2", "P3"]},
+        "manifest_sha256": {"type": "string"},
+        "submitted_root": {"type": "string"},
+        "submitted_manifest_sha256": {"type": "string"},
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": {"type": "string"},
+              "value": {"type": "string"},
+              "path": {"type": "string"},
+              "sha256": {"type": "string"},
+              "manifest_sha256": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "level", "label", "adapter_id", "adapter_maturity",
+        "effective_ceiling", "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "freeze": {
+      "type": ["object", "null"],
+      "properties": {
+        "release_id": {"type": "string", "minLength": 1},
+        "manifest_path": {"type": "string", "minLength": 1},
+        "manifest_sha256": {"type": "string", "minLength": 64},
+        "bindings_fingerprint": {"type": "string", "minLength": 64},
+        "adapter_maturity": {"type": "string"},
+        "frozen_at": {"type": "string"},
+        "stale": {"type": "boolean"},
+        "stale_at": {"type": "string"},
+        "stale_reason": {"type": "string"}
+      },
+      "required": [
+        "release_id", "manifest_path", "manifest_sha256",
+        "bindings_fingerprint", "adapter_maturity", "frozen_at", "stale"
+      ],
+      "additionalProperties": false
+    },
+    "release_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "release_id", "manifest_sha256", "bindings_fingerprint",
+          "adapter_maturity", "frozen_at"
+        ],
+        "properties": {
+          "release_id": {"type": "string", "minLength": 1},
+          "manifest_sha256": {"type": "string", "minLength": 64},
+          "bindings_fingerprint": {"type": "string", "minLength": 64},
+          "adapter_maturity": {"type": "string"},
+          "frozen_at": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "exception_context": {"type": ["object", "null"]},
+    "open_workstreams": {
+      "type": "array",
+      "items": {"enum": ["qualification", "requirements", "commercial", "release"]},
+      "uniqueItems": true
+    },
+    "workstream_closures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stream", "closed_at", "closed_by", "evidence"],
+        "properties": {
+          "stream": {
+            "enum": ["qualification", "requirements", "commercial", "release"]
+          },
+          "closed_at": {"type": "string"},
+          "closed_by": {"type": "string"},
+          "evidence": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {"type": "string"},
+              "sha256": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "required": [
+        "deployment", "account", "bidder", "procedure", "lot_offer",
+        "deadline", "signature_regime", "price_digest", "visible_target",
+        "declarant_signatory", "authority_basis", "click_approver",
+        "commercial_approver", "declarations_digest",
+        "first_offer_risk_acknowledged"
+      ],
+      "properties": {
+        "deployment": {"type": ["string", "null"]},
+        "account": {"type": ["string", "null"]},
+        "bidder": {"type": ["string", "null"]},
+        "procedure": {"type": ["string", "null"]},
+        "lot_offer": {"type": ["string", "null"]},
+        "deadline": {"type": ["string", "null"]},
+        "signature_regime": {"type": ["string", "null"]},
+        "price_digest": {"type": ["string", "null"]},
+        "visible_target": {"type": ["string", "null"]},
+        "declarant_signatory": {"type": ["string", "null"]},
+        "authority_basis": {"type": ["string", "null"]},
+        "click_approver": {"type": ["string", "null"]},
+        "commercial_approver": {"type": ["string", "null"]},
+        "declarations_digest": {"type": ["string", "null"]},
+        "first_offer_risk_acknowledged": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "action_id", "effect", "payload_digest", "lifecycle_state",
+          "adapter_maturity", "frozen_release_id", "frozen_manifest_sha256",
+          "bindings", "fingerprint", "approved_by", "approver_role",
+          "approved_at", "status"
+        ],
+        "properties": {
+          "action_id": {"type": "string"},
+          "effect": {"enum": ["E0", "E1", "E2", "E3a", "E3b", "E4", "E5", "E6", "E7", "E8"]},
+          "payload_digest": {"type": ["string", "null"]},
+          "lifecycle_state": {"type": "string"},
+          "adapter_maturity": {"type": "string"},
+          "frozen_release_id": {"type": ["string", "null"]},
+          "frozen_manifest_sha256": {"type": ["string", "null"]},
+          "bindings": {"type": "object"},
+          "fingerprint": {"type": "string"},
+          "approved_by": {"type": "string"},
+          "approver_role": {"type": "string"},
+          "approved_at": {"type": "string"},
+          "status": {"enum": ["approved", "consumed", "stale"]},
+          "consumed_at": {"type": "string"},
+          "stale_at": {"type": "string"},
+          "stale_reason": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event", "at", "details"],
+        "properties": {
+          "event": {"type": "string"},
+          "at": {"type": "string"},
+          "details": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

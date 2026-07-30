@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "synthetic-weakened",
+  "platform_family": "synthetic",
+  "deployment": "test-only",
+  "official_base_url": null,
+  "maturity": "fixture-validated",
+  "tested_as_of": "2026-07-27",
+  "validation_scope": "Synthetic negative fixture.",
+  "proof_ceiling": "P1",
+  "live_effects_authorized": false,
+  "documented_capabilities": [],
+  "observed_capabilities": [],
+  "operation_effects": {
+    "state_changing_read": "E0",
+    "send_message": "E3a",
+    "edit_field": "E4",
+    "stage_upload": "E5",
+    "final_submit": "E5",
+    "withdraw": "E6",
+    "amend": "E7",
+    "onboard": "E4"
+  },
+  "stop_conditions": ["test-only"]
+}
+

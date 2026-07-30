@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "custom-development",
+      "engagement_type": "custom-software",
+      "active_dimensions": ["delivery", "architecture", "testing", "ip", "pricing"]
+    },
+    {
+      "id": "saas",
+      "engagement_type": "saas",
+      "active_dimensions": ["hosting", "security", "privacy", "sla", "exit", "licensing"]
+    },
+    {
+      "id": "integration-migration",
+      "engagement_type": "integration-and-migration",
+      "active_dimensions": ["apis", "data-mapping", "cutover", "reconciliation", "rollback"]
+    },
+    {
+      "id": "ai-data",
+      "engagement_type": "ai-and-data",
+      "active_dimensions": ["data-use", "model-quality", "human-oversight", "fallback", "ip"]
+    },
+    {
+      "id": "managed-service",
+      "engagement_type": "managed-service",
+      "active_dimensions": ["sla", "operations", "incident", "continuity", "exit"]
+    },
+    {
+      "id": "licensing",
+      "engagement_type": "licensing",
+      "active_dimensions": ["metrics", "term", "audit", "renewal", "support", "exit"]
+    }
+  ]
+}
+

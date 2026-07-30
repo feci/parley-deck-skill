@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "cosinex-vmp.dtvp",
+  "platform_family": "cosinex-vmp",
+  "deployment": "dtvp",
+  "official_base_url": "https://www.dtvp.de/",
+  "maturity": "live-submission-validated",
+  "tested_as_of": "2026-07-22",
+  "validation_scope": "One sanitized human-authorized live flow: identity/procedure binding, staging, portal-only completeness review, final action, durable receipt capture, submitted archive re-download, and raw-byte SHA-256 comparison. No customer data is bundled.",
+  "proof_ceiling": "P3",
+  "live_effects_authorized": false,
+  "max_file_size_bytes": null,
+  "documented_capabilities": [
+    "authenticated-procedure-access",
+    "bidder-communication",
+    "file-staging",
+    "final-submission",
+    "submission-receipt"
+  ],
+  "observed_capabilities": [
+    "account-bidder-procedure-binding",
+    "file-staging",
+    "portal-only-completeness-review",
+    "final-submission",
+    "durable-receipt",
+    "submitted-archive-download",
+    "raw-byte-content-verification"
+  ],
+  "operation_effects": {
+    "state_changing_read": "E1",
+    "send_message": "E3a",
+    "edit_field": "E4",
+    "stage_upload": "E5",
+    "final_submit": "E6",
+    "withdraw": "E7",
+    "amend": "E7",
+    "onboard": "E8"
+  },
+  "operation_effect_semantics": "minimum-hitl-class-if-operation-is-performed",
+  "stop_conditions": [
+    "deployment-or-domain-mismatch",
+    "account-bidder-procedure-lot-mismatch",
+    "deadline-or-signature-regime-uncertain",
+    "unexpected-ui-or-state",
+    "new-binding-publication",
+    "staged-payload-differs-from-frozen-release",
+    "ambiguous-final-action"
+  ]
+}

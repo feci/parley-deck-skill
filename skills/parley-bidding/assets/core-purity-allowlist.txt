@@ -1,0 +1,6 @@
+# Paths intentionally allowed to name a concrete platform or jurisdiction.
+scripts/adapter_validate.py
+references/discovery.md
+references/jurisdiction-de.md
+references/platform-cosinex-vmp.md
+references/platform-subreport-elvis.md

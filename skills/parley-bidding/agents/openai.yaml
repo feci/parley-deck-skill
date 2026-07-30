@@ -1,0 +1,4 @@
+interface:
+  display_name: "Parley Bidding"
+  short_description: "Evidence-backed software bids with HITL"
+  default_prompt: "Use $parley-bidding to qualify, prepare, release, and safely submit this software bid."

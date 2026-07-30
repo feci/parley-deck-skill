@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/parley-bidding/procedure-profile.schema.json",
+  "title": "Procedure profile",
+  "type": "object",
+  "required": [
+    "schema_version", "bid_id", "discovery_source", "authoritative_origin",
+    "submission_platform", "portal_binding", "authority", "procedure_id",
+    "deadline", "timezone", "signature_regime", "qualification_decision",
+    "qualification_conditions_closed", "negotiation_guaranteed",
+    "first_offer_risk_acknowledged", "origin_conflicts", "mandatory_documents"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "bid_id": {"type": "string", "minLength": 1},
+    "discovery_source": {
+      "type": "object",
+      "required": ["id", "notice_id", "url", "observed_at"]
+    },
+    "authoritative_origin": {
+      "type": "object",
+      "required": ["procedure_id", "url", "observed_at"]
+    },
+    "submission_platform": {
+      "type": "object",
+      "required": ["profile_id", "url"]
+    },
+    "portal_binding": {
+      "type": "object",
+      "required": ["account", "bidder", "visible_target"],
+      "properties": {
+        "account": {"type": "string"},
+        "bidder": {"type": "string"},
+        "visible_target": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "authority": {
+      "type": "object",
+      "required": [
+        "declarant_signatory", "authority_basis", "click_approver",
+        "commercial_approver", "declarations_digest"
+      ],
+      "properties": {
+        "declarant_signatory": {"type": "string"},
+        "authority_basis": {"type": "string"},
+        "click_approver": {"type": "string"},
+        "commercial_approver": {"type": "string"},
+        "declarations_digest": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "procedure_id": {"type": ["string", "null"], "minLength": 1},
+    "lot_offer": {"type": ["string", "null"]},
+    "deadline": {"type": ["string", "null"], "minLength": 1},
+    "timezone": {"type": ["string", "null"], "minLength": 1},
+    "signature_regime": {"type": ["string", "null"]},
+    "qualification_decision": {
+      "enum": ["pursue", "pursue-with-conditions", "decline"]
+    },
+    "qualification_conditions_closed": {"type": "boolean"},
+    "negotiation_guaranteed": {"type": "boolean"},
+    "first_offer_risk_acknowledged": {"type": "boolean"},
+    "origin_conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "material", "resolved"],
+        "properties": {
+          "field": {"type": "string"},
+          "material": {"type": "boolean"},
+          "resolved": {"type": "boolean"},
+          "evidence": {"type": "string"},
+          "substantive_equivalence_evidence": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "mandatory_documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path", "required", "released_version", "buyer_current_version",
+          "current_version_evidence", "current_version_observed_at"
+        ],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "required": {"type": "boolean"},
+          "sha256": {"type": ["string", "null"]},
+          "signature_required": {"type": "boolean"},
+          "signature_confirmed": {"type": "boolean"},
+          "released_version": {"type": ["string", "null"]},
+          "buyer_current_version": {"type": ["string", "null"]},
+          "current_version_evidence": {"type": ["string", "null"]},
+          "current_version_observed_at": {"type": ["string", "null"]}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

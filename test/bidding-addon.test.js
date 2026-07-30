@@ -1,0 +1,372 @@
+"use strict";
+
+// Coverage for the parley-bidding add-on and the payload-integrity mechanism it required.
+//
+// Before this existed, `validateInstalledPayload` asked one question of an add-on directory —
+// is SKILL.md there? — so a tree gutted down to that single file reported `valid`. Shipping a
+// 47-file procurement payload behind that check was the objection that made the manifest part
+// of this change rather than a follow-up.
+
+const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const test = require("node:test");
+
+const installer = require("../lib/installer");
+const addonManifest = require("../lib/addon-manifest");
+
+const root = path.resolve(__dirname, "..");
+const addonRoot = path.join(root, "skills", "parley-bidding");
+
+function tmpDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "parley-bidding-test-"));
+}
+
+function context(home, options) {
+  return {
+    options: {
+      command: "install",
+      target: "codex",
+      scope: "user",
+      project: null,
+      dest: null,
+      force: false,
+      dryRun: false,
+      yes: false,
+      json: false,
+      includeUndetected: false,
+      ...options
+    },
+    env: { HOME: home, PATH: "" },
+    cwd: home,
+    homeDir: home,
+    packageRoot: root
+  };
+}
+
+// Install once and return the installed add-on directory.
+function installed(home, options) {
+  const result = installer.installCommand(context(home, { target: "codex", ...options }));
+  assert.equal(result.ok, true, `install failed: ${JSON.stringify(result.actions && result.actions[0])}`);
+  return path.join(home, ".codex", "skills", "parley-bidding");
+}
+
+function doctorStatus(home, skill) {
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  const target = result.targets[0];
+  return target.skills.find((entry) => entry.skill === skill);
+}
+
+function readMarker(dir) {
+  return JSON.parse(fs.readFileSync(path.join(dir, installer.MARKER_FILE), "utf8"));
+}
+
+function writeMarker(dir, marker) {
+  fs.writeFileSync(path.join(dir, installer.MARKER_FILE), `${JSON.stringify(marker, null, 2)}\n`, "utf8");
+}
+
+// ---------------------------------------------------------------------------
+// The payload itself
+// ---------------------------------------------------------------------------
+
+test("the add-on ships a manifest describing every payload file but itself", () => {
+  const read = addonManifest.readManifest(addonRoot);
+  assert.equal(read.ok, true, read.error || "");
+  const files = Object.keys(read.manifest.files);
+  assert.equal(files.includes(addonManifest.MANIFEST_FILE), false, "the manifest must not list itself");
+  assert.equal(files.includes("SKILL.md"), true);
+  // The four load-bearing classes the design named as deletion tests.
+  assert.equal(files.includes("scripts/adapter_validate.py"), true);
+  assert.equal(files.includes("references/hitl-and-recovery.md"), true);
+  assert.ok(files.some((f) => f.startsWith("assets/schemas/")), "schemas must be covered");
+  assert.ok(files.some((f) => f.startsWith("assets/platform-adapters/")), "adapters must be covered");
+  assert.equal(addonManifest.verifyPayload(addonRoot).ok, true);
+});
+
+test("the shipped manifest declares an interpreter floor and no second version number", () => {
+  const { manifest } = addonManifest.readManifest(addonRoot);
+  assert.equal(manifest.runtime.python, ">=3.10");
+  // The package version is the only version. A hand-maintained one here would drift.
+  assert.equal("version" in manifest, false);
+  assert.equal("semver" in manifest, false);
+});
+
+test("the add-on carries no nested .gitignore and no generated cache", () => {
+  const offenders = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "__pycache__") offenders.push(path.relative(root, full));
+        else walk(full);
+        continue;
+      }
+      if (entry.name === ".gitignore" || entry.name.endsWith(".pyc") || entry.name.endsWith(".pyo")) {
+        offenders.push(path.relative(root, full));
+      }
+    }
+  };
+  walk(addonRoot);
+  assert.deepEqual(offenders, []);
+});
+
+test("no shipped file still refers to the add-on by its pre-integration name", () => {
+  const offenders = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (fs.readFileSync(full, "utf8").includes("software-bidding")) {
+        offenders.push(path.relative(root, full));
+      }
+    }
+  };
+  walk(addonRoot);
+  assert.deepEqual(offenders, []);
+});
+
+test("the consent paragraph reaches both documents an agent is guaranteed to load", () => {
+  const required =
+    "Parley Deck's generic external-backend disclosure default never satisfies E3b. " +
+    "Before any tender-derived brief, excerpt, file or data class is sent, obtain " +
+    "tender-scoped E3b approval for the exact roster, providers, packet/allowlist, " +
+    "redactions and restrictions. No Parley consensus, signoff or default approval " +
+    "satisfies E3b, E5, E6, E7 or E8.";
+  for (const rel of ["SKILL.md", "references/parley-integration.md"]) {
+    const text = fs.readFileSync(path.join(addonRoot, rel), "utf8");
+    assert.ok(text.includes(required), `${rel} is missing the ratified E3b consent paragraph`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Installation, and the marker that anchors the requirement
+// ---------------------------------------------------------------------------
+
+test("installing records the manifest's aggregate and its own hash in the add-on marker", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  const marker = readMarker(dir);
+
+  assert.equal(marker.markerSchema, 2);
+  assert.equal(marker.skill, "parley-bidding");
+  assert.equal(marker.addon, true);
+  assert.equal(marker.manifest.aggregate, addonManifest.readManifest(addonRoot).manifest.aggregate);
+  assert.equal(marker.manifest.sha256, addonManifest.manifestFileHash(addonRoot));
+  assert.equal(doctorStatus(home, "parley-bidding").status, "valid");
+});
+
+test("an add-on that ships no manifest records manifest:false and stays healthy", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const dir = path.join(home, ".codex", "skills", "parley-worktrees");
+  const marker = readMarker(dir);
+  assert.equal(marker.manifest, false);
+  assert.equal(doctorStatus(home, "parley-worktrees").status, "valid");
+});
+
+test("a legacy marker with no schema keeps validating on required files alone", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  const marker = readMarker(dir);
+  delete marker.markerSchema;
+  delete marker.manifest;
+  writeMarker(dir, marker);
+  // An older installer wrote markers like this. Re-installing upgrades them; until then the
+  // install is not reported broken for a field its installer never knew about.
+  assert.equal(doctorStatus(home, "parley-bidding").status, "valid");
+});
+
+// ---------------------------------------------------------------------------
+// The gutted tree, and every way the anchor can be attacked
+// ---------------------------------------------------------------------------
+
+test("a tree gutted to SKILL.md is malformed, not valid", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  for (const entry of fs.readdirSync(dir)) {
+    if (entry === "SKILL.md" || entry === installer.MARKER_FILE) continue;
+    fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+  }
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.length > 0);
+});
+
+test("deleting any single load-bearing file is malformed", () => {
+  for (const victim of [
+    "scripts/adapter_validate.py",
+    "assets/schemas/bid-state.schema.json",
+    "references/hitl-and-recovery.md",
+    "assets/platform-adapters/manual.json"
+  ]) {
+    const home = tmpDir();
+    const dir = installed(home);
+    fs.rmSync(path.join(dir, victim));
+    const status = doctorStatus(home, "parley-bidding");
+    assert.equal(status.status, "malformed", `deleting ${victim} must be detected`);
+    assert.ok(
+      status.problems.some((p) => p.includes(victim)),
+      `the report must name ${victim}, got ${JSON.stringify(status.problems)}`
+    );
+  }
+});
+
+test("mutating a single byte is malformed", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  const victim = path.join(dir, "references", "evidence-and-state.md");
+  const bytes = fs.readFileSync(victim);
+  bytes[0] = bytes[0] === 0x41 ? 0x42 : 0x41;
+  fs.writeFileSync(victim, bytes);
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.startsWith("modified: references/evidence-and-state.md")));
+});
+
+test("an added file the manifest does not declare is malformed", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.mkdirSync(path.join(dir, "scripts", "__pycache__"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "scripts", "__pycache__", "common.pyc"), "junk");
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("__pycache__")));
+});
+
+test("deleting the manifest after installation is malformed, not a downgrade to SKILL.md-only", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.rmSync(path.join(dir, addonManifest.MANIFEST_FILE));
+  const status = doctorStatus(home, "parley-bidding");
+  // This is the case the marker exists for: without it, the add-on would fall back to the
+  // SKILL.md-only rule and report healthy.
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("marker records that one was installed")));
+});
+
+test("corrupting the manifest is malformed", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.writeFileSync(path.join(dir, addonManifest.MANIFEST_FILE), "{ not json");
+  assert.equal(doctorStatus(home, "parley-bidding").status, "malformed");
+});
+
+test("removing the manifest field from a current-schema marker is malformed, never legacy", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  const marker = readMarker(dir);
+  delete marker.manifest;
+  writeMarker(dir, marker); // markerSchema stays 2
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes('missing its "manifest" field')));
+});
+
+test("an internally consistent manifest+payload replacement is still detected", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+
+  // Rewrite a file AND re-derive the manifest so the two agree with each other. Payload
+  // verification alone passes here by construction; only the marker catches it.
+  const victim = path.join(dir, "SKILL.md");
+  fs.writeFileSync(victim, "# replaced\n");
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, addonManifest.MANIFEST_FILE), "utf8"));
+  manifest.files["SKILL.md"] = `sha256:${crypto.createHash("sha256").update(fs.readFileSync(victim)).digest("hex")}`;
+  manifest.aggregate = addonManifest.aggregateDigest(manifest.files);
+  fs.writeFileSync(path.join(dir, addonManifest.MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  assert.equal(addonManifest.verifyPayload(dir).ok, true, "the swap is self-consistent by construction");
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("declares a different payload")));
+});
+
+test("a manifest appearing where none was installed is reported, not silently trusted", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const dir = path.join(home, ".codex", "skills", "parley-worktrees");
+  const manifest = addonManifest.computeManifest(dir, {});
+  fs.writeFileSync(path.join(dir, addonManifest.MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  const status = doctorStatus(home, "parley-worktrees");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("marker records that none was installed")));
+});
+
+test("a marker from a newer installer is reported rather than guessed at", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  const marker = readMarker(dir);
+  marker.markerSchema = 99;
+  writeMarker(dir, marker);
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("newer parley-deck-skill")));
+});
+
+// ---------------------------------------------------------------------------
+// Install-time behaviour
+// ---------------------------------------------------------------------------
+
+test("a corrupt source payload fails before any destination is written", () => {
+  // Stage a package root whose add-on payload disagrees with its manifest, then install from
+  // it. B5: a predictable failure must produce zero writes, not a half-installed fleet.
+  const home = tmpDir();
+  const stagedRoot = path.join(tmpDir(), "package");
+  fs.cpSync(path.join(root, "skills"), path.join(stagedRoot, "skills"), { recursive: true });
+  for (const file of ["package.json", "plugin.json", "gemini-extension.json"]) {
+    fs.cpSync(path.join(root, file), path.join(stagedRoot, file));
+  }
+  fs.rmSync(path.join(stagedRoot, "skills", "parley-bidding", "scripts", "adapter_validate.py"));
+
+  const ctx = context(home, { target: "codex" });
+  ctx.packageRoot = stagedRoot;
+  const result = installer.installCommand(ctx);
+
+  assert.equal(result.ok, false);
+  const skillsDir = path.join(home, ".codex", "skills");
+  assert.equal(fs.existsSync(skillsDir), false, "a failed preflight must write nothing at all");
+  const failed = result.actions[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(failed.action, "failed");
+  assert.match(failed.message, /Source payload does not match parley-addon\.json/);
+});
+
+test("reinstalling over a malformed tree repairs it", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.rmSync(path.join(dir, "scripts", "adapter_validate.py"));
+  assert.equal(doctorStatus(home, "parley-bidding").status, "malformed");
+
+  installer.installCommand(context(home, { target: "codex", force: true }));
+  assert.equal(doctorStatus(home, "parley-bidding").status, "valid");
+});
+
+test("--only parley-bidding installs the add-on and its manifest", () => {
+  const home = tmpDir();
+  const result = installer.installCommand(context(home, { target: "codex", only: ["parley-bidding"] }));
+  assert.equal(result.ok, true);
+  const skillsDir = path.join(home, ".codex", "skills");
+  assert.deepEqual(result.actions[0].skills.map((s) => s.skill), ["parley-deck", "parley-bidding"]);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-bidding", addonManifest.MANIFEST_FILE)), true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-design")), false);
+  assert.equal(doctorStatus(home, "parley-bidding").status, "valid");
+});
+
+test("--no-addons installs no bidding payload at all", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  assert.equal(fs.existsSync(path.join(home, ".codex", "skills", "parley-bidding")), false);
+});
+
+test("uninstall removes the add-on tree", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  assert.equal(fs.existsSync(dir), true);
+  const result = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+  assert.equal(result.ok, true);
+  assert.equal(fs.existsSync(dir), false);
+});
