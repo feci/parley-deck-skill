@@ -288,10 +288,15 @@ const mentionsATestCommand = (s) => {
   // which excludes those characters outright, then refuses. (round 19, codex-1.)
   //
   // Brace expansion is a word-building construct that needs NONE of those characters:
-  // `n{o..o}de --test x` and `node --{test..test} x` build the missing word out of plain
-  // letters, and both ran for a reader while the guard stayed green. Cycle 24's rationale was
-  // that a construct can produce either word; its implementation only knew two constructs.
-  // (round 20, codex-1.)
+  // `n{o..o}de --test x` expands to `node --test x` in both sh and zsh (measured), and ran for
+  // a reader while the guard stayed green. Cycle 24's rationale was that a construct can
+  // produce either word; its implementation only knew two constructs. (round 20, codex-1.)
+  //
+  // A literal brace form that does NOT expand — `node --{test..test} x`, since that is not a
+  // valid range — is admitted here too and conservatively refused: node rejects the literal
+  // flag with exit 9, so it is a broken published command either way. Saying it "expands"
+  // would be false, and the reproduction that proves the class is the binary arm alone.
+  // (round 20, hermes-1, correcting round 20, codex-1; restated in round 21, codex-1.)
   //
   // A canonical command whose TARGET uses braces — `node --test "test/{a,b}/*.test.js"` — is
   // unaffected: both command words are literal there, so it is already a candidate on the line
