@@ -273,8 +273,15 @@ const { Parser } = require("commonmark");
 const shellWordView = (s) => s.replace(/[\\'"]/g, "");
 const mentionsATestCommand = (s) => {
   const words = shellWordView(s);
-  if (!/\bnode\b/i.test(s) && !/\bnode\b/i.test(words)) return false;
-  return /--test\b/i.test(s) || /--test\b/i.test(words) || /[`$]/.test(s);
+  const named = /\bnode\b/i.test(s) || /\bnode\b/i.test(words);
+  const flagged = /--test\b/i.test(s) || /--test\b/i.test(words);
+  if (named && flagged) return true;
+  // A substitution or expansion can produce ANY word — including the BINARY NAME, which cycle
+  // 23 assumed would always be spelled out somewhere. It is not: `n$(printf '')ode --test x`
+  // and `n${PATH#"$PATH"}ode --test x` contain no `node` at all and run as exactly that.
+  // So one recognisable half plus a word-building construct is enough to look; the grammar,
+  // which excludes both characters outright, then refuses. (round 19, codex-1.)
+  return /[`$]/.test(s) && (named || flagged);
 };
 
 // Inside a code node there is no container left to interpret, so splicing a backslash
@@ -642,6 +649,8 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "```bash",
     "node --t`echo e`st subst/flag.test.js",
+    "n$(printf '')ode --test subst/binary.test.js",
+    'n${PATH#"$PATH"}ode --test expansion/binary.test.js',
     "```",
     "",
     "<div>",
@@ -743,6 +752,10 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --te''st quote/splice.test.js",
     "node --TEST case/flag.test.js",
     "node --t`echo e`st subst/flag.test.js",
+    // round 19 (codex-1): the substitution builds the BINARY NAME, so `node` is not spelled
+    // anywhere. Cycle 23 had gated the substitution rule behind seeing it.
+    "n$(printf '')ode --test subst/binary.test.js",
+    'n${PATH#"$PATH"}ode --test expansion/binary.test.js',
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
@@ -768,6 +781,8 @@ test("the published-command extractor captures whole commands, never fragments",
   assert.equal(SUPPORTED_COMMAND.test("node --te''st quote/splice.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --TEST case/flag.test.js"), false);
   assert.equal(SUPPORTED_COMMAND.test("node --t`echo e`st subst/flag.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("n$(printf '')ode --test subst/binary.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test('n${PATH#"$PATH"}ode --test expansion/binary.test.js'), false);
   // A HARD break is a real line break: the reader sees and copies two lines, which is not a
   // published one-line command. It must not be spliced into one. (round 17, hermes-1.)
   assert.equal(found.has("node --test hardbreak/one.test.js"), false);
