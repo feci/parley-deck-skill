@@ -932,3 +932,77 @@ test("install refuses a foreign-marked destination without --force", () => {
   assert.equal(result.ok, false);
   assert.equal(fs.existsSync(sentinel), true, "a foreign manager's tree must not be replaced without --force");
 });
+
+test("doctor, install and uninstall give the same ownership answer", () => {
+  // codex-1 round 5: health checked only the marker's package name, so a marker naming a
+  // DIFFERENT skill read valid+managed while both mutation commands refused the same
+  // directory. One destination cannot be healthy-and-owned and unowned at once.
+  const home = tmpDir();
+  const dir = installed(home);
+  const marker = readMarker(dir);
+  marker.skill = "parley-design"; // same installer, wrong identity
+  writeMarker(dir, marker);
+
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.equal(status.managed, false);
+  assert.ok(status.problems.some((p) => p.includes("identifies this directory as")));
+
+  const blockedInstall = installer
+    .installCommand(context(home, { target: "codex", only: ["parley-bidding"] }))
+    .actions[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(blockedInstall.action, "blocked", "install must refuse it, as health now says");
+
+  const blockedUninstall = installer
+    .uninstallCommand(context(home, { command: "uninstall", target: "codex", only: ["parley-bidding"] }))
+    .actions[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(blockedUninstall.action, "blocked");
+});
+
+test("a read command's --only is a filter, not a claim about the recorded selection", () => {
+  // codex-1 round 5: on a healthy full install, `doctor --only parley-bidding` labelled the
+  // four other RECORDED add-ons "not part of the recorded selection", failed health, and
+  // advised deleting them. A narrowing flag must narrow.
+  // Asserted on the per-unit verdicts rather than on doctor.ok: this context declares an
+  // empty PATH, so the interpreter is legitimately unreachable and would fail health for a
+  // reason that has nothing to do with selection.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const noProblems = (result) => {
+    for (const skill of result.targets[0].skills) {
+      assert.deepEqual(skill.problems, [], `${skill.skill} must have no problems`);
+      assert.equal(skill.selected, true, `${skill.skill} is in the recorded selection`);
+      assert.notEqual(skill.status, "valid-unselected");
+    }
+  };
+  noProblems(installer.doctorCommand(context(home, { command: "doctor", target: "codex" })));
+
+  const filtered = installer.doctorCommand(
+    context(home, { command: "doctor", target: "codex", only: ["parley-bidding"] })
+  );
+  assert.deepEqual(filtered.targets[0].skills.map((s) => s.skill), ["parley-deck", "parley-bidding"]);
+  noProblems(filtered);
+
+  const noAddons = installer.doctorCommand(
+    context(home, { command: "doctor", target: "codex", noAddons: true })
+  );
+  assert.deepEqual(noAddons.targets[0].skills.map((s) => s.skill), ["parley-deck"]);
+  noProblems(noAddons);
+});
+
+test("unrelated sibling directories are never mistaken for add-ons", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const skillsDir = path.join(home, ".codex", "skills");
+  for (const name of ["totally-unrelated-skill", "parley-bidding-archive"]) {
+    fs.mkdirSync(path.join(skillsDir, name), { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, name, "SKILL.md"), "# not ours\n");
+  }
+  const doctor = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  const names = doctor.targets[0].skills.map((s) => s.skill);
+  assert.equal(names.includes("totally-unrelated-skill"), false);
+  assert.equal(names.includes("parley-bidding-archive"), false);
+  for (const skill of doctor.targets[0].skills) {
+    assert.deepEqual(skill.problems, [], `${skill.skill} must be unaffected by unrelated siblings`);
+  }
+});
