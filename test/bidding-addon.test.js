@@ -8,6 +8,7 @@
 // of this change rather than a follow-up.
 
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -369,4 +370,131 @@ test("uninstall removes the add-on tree", () => {
   const result = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
   assert.equal(result.ok, true);
   assert.equal(fs.existsSync(dir), false);
+});
+
+// ---------------------------------------------------------------------------
+// Review round 1: the marker is itself part of the payload's health
+//
+// codex-1 (MAJOR), hermes-1 (CRITICAL) and kimi-1 (CRITICAL) all measured the same hole and
+// all three BLOCKed on it. codex-1's ratified amendment condition 1 had already said it: "An
+// expected installed unit with a missing or unreadable marker must also be unhealthy." Every
+// negative test above preserved the marker, which is exactly why they passed.
+// ---------------------------------------------------------------------------
+
+test("an expected unit whose marker was deleted is malformed, not valid", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.rmSync(path.join(dir, installer.MARKER_FILE));
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("no parley-deck-skill install marker")));
+});
+
+test("an unreadable marker is distinguished from a missing one", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.writeFileSync(path.join(dir, installer.MARKER_FILE), "{ not json");
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("unreadable or is not valid JSON")));
+  // kimi-1 asked for the two to be separately diagnosable, not one code with a cause field.
+  assert.equal(status.problems.some((p) => p.includes("no parley-deck-skill install marker")), false);
+});
+
+test("a marker written by some other tool is malformed", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  writeMarker(dir, { name: "some-other-installer", skill: "parley-bidding" });
+  const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.ok(status.problems.some((p) => p.includes("not parley-deck-skill")));
+});
+
+test("the double deletion — gut the tree and remove the marker with it — is caught", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  for (const entry of fs.readdirSync(dir)) {
+    if (entry === "SKILL.md") continue;
+    fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+  }
+  assert.deepEqual(fs.readdirSync(dir), ["SKILL.md"]);
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(result.ok, false, "doctor must not report ok for a gutted, unmarked tree");
+  const status = result.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(status.status, "malformed");
+});
+
+// ---------------------------------------------------------------------------
+// B6: payload-valid and operationally-available are different questions
+// ---------------------------------------------------------------------------
+
+// The interpreter probe is cached per process and reads the real environment, so these run in
+// a child node with a PATH we control.
+function doctorInChildWithPath(pathValue, stubs) {
+  const home = tmpDir();
+  const binDir = path.join(home, "stub-bin");
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.symlinkSync(process.execPath, path.join(binDir, "node"));
+  for (const [name, body] of Object.entries(stubs || {})) {
+    const file = path.join(binDir, name);
+    fs.writeFileSync(file, body, "utf8");
+    fs.chmodSync(file, 0o755);
+  }
+  const script = `
+    const fs = require("fs"), path = require("path"), os = require("os");
+    const installer = require(${JSON.stringify(path.join(root, "lib", "installer"))});
+    const ctx = (home, o) => ({
+      options: { command: "install", target: "codex", scope: "user", project: null, dest: null,
+                 force: false, dryRun: false, yes: false, json: false, includeUndetected: false, ...o },
+      env: { HOME: home, PATH: "" }, cwd: home, homeDir: home,
+      packageRoot: ${JSON.stringify(root)}
+    });
+    const h = fs.mkdtempSync(path.join(os.tmpdir(), "b6-"));
+    installer.installCommand(ctx(h, { target: "codex" }));
+    const r = installer.doctorCommand(ctx(h, { command: "doctor", target: "codex" }));
+    const bidding = r.targets[0].skills.find((s) => s.skill === "parley-bidding");
+    const other = r.targets[0].skills.find((s) => s.skill === "parley-worktrees");
+    process.stdout.write(JSON.stringify({ ok: r.ok, bidding, other }));
+  `;
+  const run = spawnSync(path.join(binDir, "node"), ["-e", script], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: pathValue === "stub" ? binDir : pathValue }
+  });
+  assert.equal(run.status, 0, `child failed: ${run.stderr}`);
+  return JSON.parse(run.stdout);
+}
+
+test("a byte-valid payload whose declared interpreter is absent is valid but unavailable", () => {
+  const out = doctorInChildWithPath("stub");
+  // Payload validity and operational availability are separate answers, per B6.
+  assert.equal(out.bidding.status, "valid");
+  assert.equal(out.bidding.runtime.ok, false);
+  assert.match(out.bidding.runtime.detail, /python3 is not available/);
+  assert.equal(out.bidding.runtime.requirement, ">=3.10");
+  // …but health fails, so `doctor` exits non-zero.
+  assert.equal(out.ok, false);
+});
+
+test("an interpreter below the declared floor fails health", () => {
+  const out = doctorInChildWithPath("stub", {
+    python3: "#!/bin/sh\necho '3.9'\n"
+  });
+  assert.equal(out.bidding.status, "valid");
+  assert.equal(out.bidding.runtime.ok, false);
+  assert.match(out.bidding.runtime.detail, /python3 is 3\.9, but this skill requires >=3\.10/);
+  assert.equal(out.ok, false);
+});
+
+test("an interpreter at the declared floor passes health", () => {
+  const out = doctorInChildWithPath("stub", {
+    python3: "#!/bin/sh\necho '3.10'\n"
+  });
+  assert.equal(out.bidding.runtime.ok, true);
+  assert.equal(out.ok, true);
+});
+
+test("an add-on that declares no runtime requirement is unaffected", () => {
+  const out = doctorInChildWithPath("stub");
+  assert.equal(out.other.status, "valid");
+  assert.equal(out.other.runtime, null);
 });

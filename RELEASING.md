@@ -5,11 +5,21 @@ This repository publishes a portable `SKILL.md` package plus a small dependency-
 ## Preflight
 
 ```bash
-npm test
-npm pack --dry-run
+npm test                                    # node tests, the Python leg, and the manifest check
+npm pack --dry-run                          # prepack re-verifies every shipped add-on payload
 npm run build:portable:current
 node bin/parley-deck-skill.js install --target all --dry-run
 node bin/parley-deck-skill.js doctor --target all --json
+```
+
+`npm test` requires `python3` (3.10 or newer) and **fails** without it: the `parley-bidding`
+add-on ships seven Python tools that would otherwise be released untested.
+
+If an add-on's payload changed, regenerate its manifest before packing — `npm test` and
+`prepack` both refuse a stale one:
+
+```bash
+npm run manifest:addons
 ```
 
 Ask a second model to review the final diff before publishing. Use this checklist:
