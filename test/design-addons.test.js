@@ -526,7 +526,13 @@ function publishedTestCommands(markdown) {
         // Dropping every `~~` run cannot hide a command, only reveal one, so the gap is closed
         // in the fail-closed direction rather than by adopting a second dialect.
         // (round 17, kimi-1.)
-        emit(node.literal.replace(/~~/g, ""), -1);
+        //
+        // A newline inside a TEXT literal can only have come from an entity — `&#10;` or
+        // `&NewLine;` — because CommonMark gives a real line break its own node. HTML renders
+        // that newline as whitespace, so the reader sees one line and copies one command, while
+        // splitting on it here made the scanner judge two. Only a hard break is a break.
+        // (round 20, hermes-1.)
+        emit(node.literal.replace(/~~/g, "").replace(/\n/g, " "), -1);
         break;
       case "softbreak":
         // CommonMark 6.7: a soft break renders as a SPACE. Emitting a newline split one
@@ -681,6 +687,10 @@ test("the published-command extractor captures whole commands, never fragments",
     "Run n{o..o}de --test prose/brace-binary.test.js now.",
     "",
     "Run node --{test..test} prose/brace-flag.test.js now.",
+    "",
+    "Run node&#10;--test entity/numeric.test.js now.",
+    "",
+    "Run node&NewLine;--test entity/named.test.js now.",
     "",
     'Verify: `node --test "fixture/shared-span.test.js"` — or run n$(printf \'\')ode --test shared/line.test.js instead.',
     "",
@@ -846,13 +856,24 @@ test("the published-command extractor captures whole commands, never fragments",
     // anywhere. Cycle 23 had gated the substitution rule behind seeing it.
     "n$(printf '')ode --test subst/binary.test.js",
     'n${PATH#"$PATH"}ode --test expansion/binary.test.js',
-    // round 20 (codex-1): brace expansion builds either word out of plain letters — no
-    // backslash, quote, backtick or dollar anywhere. Cycle 24's rationale was that a construct
-    // can produce either word; its implementation knew only two constructs.
+    // round 20 (codex-1): brace expansion builds a word out of plain letters — no backslash,
+    // quote, backtick or dollar anywhere. `n{o..o}de` really does expand to `node` in both sh
+    // and zsh (measured). Cycle 24's rationale was that a construct can produce either word;
+    // its implementation knew only two constructs.
     "n{o..o}de --test brace/binary.test.js",
+    // hermes-1 (round 20) checked the flag-arm form and it does NOT expand — `{test..test}` is
+    // not a valid range, so the shell passes it through literally and node rejects the flag
+    // with exit 9. It is still a broken published command and still refused, but for that
+    // reason rather than for expansion. Keeping it, correctly labelled, is worth more than
+    // dropping a case that a review measured.
     "node --{test..test} brace/flag.test.js",
     "Run n{o..o}de --test prose/brace-binary.test.js now.",
     "Run node --{test..test} prose/brace-flag.test.js now.",
+    // round 20 (hermes-1): a newline inside a text literal can only have come from an entity,
+    // and HTML renders it as whitespace — one line to the reader, two to a scanner that split
+    // on it. Only a hard break is a break.
+    "node --test entity/numeric.test.js now.",
+    "node --test entity/named.test.js now.",
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
