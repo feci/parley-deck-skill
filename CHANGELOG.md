@@ -31,6 +31,15 @@ Notable changes per release. Dates are release dates.
   verifies every shipped add-on manifest. A missing interpreter **fails** rather than skips.
 - A CI workflow that runs on every push and pull request, across Python 3.10 and 3.13. Before
   this, tests ran only after a release was published.
+- `doctor` and `status` report operational availability separately from payload validity. An
+  add-on whose manifest declares an interpreter it cannot find is reported `valid` **and**
+  `unavailable`, and `doctor` exits non-zero. `paths` does not probe — it answers where a skill
+  would go, and must not execute a `PATH`-resolved program to do it.
+
+  The probe looks for **`python3` specifically**, and is resolved against the environment the
+  caller passes, not the parent process's. On a Windows host where only `python` exists, or
+  where `python3` is the Store app-execution alias, the add-on is reported unavailable. That is
+  the fail-safe direction and matches how the skill's own published commands invoke it.
 
 ### Changed
 
@@ -43,6 +52,11 @@ Notable changes per release. Dates are release dates.
 - The published-command documentation guard was generalized from a hardcoded `node --test`
   pair to a `{binary, flag}` shape, and gained a **static** `python3 scripts/*.py` arm that
   checks the referenced script exists and compiles, without executing it.
+
+- An installed skill directory with no readable `parley-deck-skill` install marker is now
+  reported `malformed` rather than `valid`. This includes trees copied by a third-party skill
+  installer, which do not write our marker: `doctor` reports them as not installed by this tool.
+  The payload is untouched and still usable; only this tool's verdict about it changed.
 
 ### Compatibility
 

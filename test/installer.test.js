@@ -539,7 +539,11 @@ test("doctor reports add-on skills per target", () => {
   installer.installCommand(context(home, { target: "codex" }));
 
   const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
-  assert.equal(result.ok, true);
+  // This test is about the skill LIST, not runtime health. `doctor`'s ok now also covers
+  // operational availability, and this context declares an empty PATH, so the declared Python
+  // interpreter is legitimately unreachable here. Asserting `result.ok` made the test depend on
+  // the machine's system python3 — it passed on 3.14 and failed on macOS's default 3.9.6.
+  // (review round 2, hermes-1 MAJOR.)
   assert.deepEqual(result.targets[0].skills.map((skill) => skill.skill), ["parley-deck", "parley-bidding", "parley-design", "parley-design-check", "parley-tracker", "parley-worktrees"]);
   for (const skill of result.targets[0].skills) {
     assert.equal(skill.status, "valid");

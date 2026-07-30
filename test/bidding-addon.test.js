@@ -446,7 +446,7 @@ function doctorInChildWithPath(pathValue, stubs) {
     const ctx = (home, o) => ({
       options: { command: "install", target: "codex", scope: "user", project: null, dest: null,
                  force: false, dryRun: false, yes: false, json: false, includeUndetected: false, ...o },
-      env: { HOME: home, PATH: "" }, cwd: home, homeDir: home,
+      env: { HOME: home, PATH: process.env.PATH }, cwd: home, homeDir: home,
       packageRoot: ${JSON.stringify(root)}
     });
     const h = fs.mkdtempSync(path.join(os.tmpdir(), "b6-"));
@@ -498,3 +498,128 @@ test("an add-on that declares no runtime requirement is unaffected", () => {
   assert.equal(out.other.status, "valid");
   assert.equal(out.other.runtime, null);
 });
+
+// ---------------------------------------------------------------------------
+// Review round 2: the probe must answer for the environment the caller declared
+// ---------------------------------------------------------------------------
+
+test("run() honors the caller's environment rather than the parent process's PATH", () => {
+  // The direct regression test for codex-1's round-2 MAJOR. This process has a working
+  // python3; the caller declares an empty PATH. Probing the parent environment reported
+  // healthy for an environment that cannot run the payload at all.
+  assert.equal(probePython3IsAvailableHere(), true, "this test needs a python3 in the parent env");
+
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+
+  const out = [];
+  const err = [];
+  const exitCode = installer.run(["doctor", "--target", "codex", "--json"], {
+    env: { ...process.env, HOME: home, PATH: "" },
+    cwd: home,
+    stdout: { write: (chunk) => out.push(chunk) },
+    stderr: { write: (chunk) => err.push(chunk) }
+  });
+
+  const result = JSON.parse(out.join(""));
+  const bidding = result.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(bidding.status, "valid", "the payload itself is fine");
+  assert.equal(bidding.runtime.ok, false, "…but it is unreachable in the declared environment");
+  assert.equal(result.ok, false);
+  assert.notEqual(exitCode.exitCode, 0, `expected a non-zero exit, got ${JSON.stringify(exitCode)}`);
+});
+
+test("the interpreter probe is memoized per PATH, not once per process", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const read = (pathValue) => {
+    const out = [];
+    installer.run(["doctor", "--target", "codex", "--json"], {
+      env: { ...process.env, HOME: home, PATH: pathValue },
+      cwd: home,
+      stdout: { write: (c) => out.push(c) },
+      stderr: { write: () => {} }
+    });
+    const parsed = JSON.parse(out.join(""));
+    return parsed.targets[0].skills.find((s) => s.skill === "parley-bidding").runtime;
+  };
+  // Two different environments in one process must get two different answers. A single
+  // process-global cache would hand the second call the first call's verdict.
+  //
+  // Both arms are stubbed rather than relying on the host's python3: the machine running this
+  // may ship 3.9 (macOS does), which would fail the floor for reasons that have nothing to do
+  // with memoization. (review round 2, hermes-1 — the same environment-dependence that made
+  // the pre-existing doctor test pass here and fail on 3.9.)
+  const stubDir = path.join(home, "floor-bin");
+  fs.mkdirSync(stubDir, { recursive: true });
+  const stub = path.join(stubDir, "python3");
+  fs.writeFileSync(stub, "#!/bin/sh\necho '3.12'\n", "utf8");
+  fs.chmodSync(stub, 0o755);
+
+  const withPython = read(stubDir);
+  const withoutPython = read("");
+  assert.equal(withPython.ok, true, `expected the stub to satisfy the floor: ${JSON.stringify(withPython)}`);
+  assert.equal(withoutPython.ok, false);
+  // …and the first answer must not have been reused for the second environment.
+  assert.match(withPython.detail, /python3 3\.12/);
+  assert.match(withoutPython.detail, /not available/);
+});
+
+test("paths does not launch an interpreter", () => {
+  // `paths` answers "where would this go". codex-1 measured it spawning python3 through a
+  // stub that wrote a sentinel; a path-discovery command must not execute a PATH-resolved
+  // program at all.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const binDir = path.join(home, "sentinel-bin");
+  const sentinel = path.join(home, "python3-was-run");
+  fs.mkdirSync(binDir, { recursive: true });
+  const stub = path.join(binDir, "python3");
+  fs.writeFileSync(stub, `#!/bin/sh\n: > ${JSON.stringify(sentinel)}\necho '3.99'\n`, "utf8");
+  fs.chmodSync(stub, 0o755);
+
+  const out = [];
+  installer.run(["paths", "--target", "codex", "--json"], {
+    env: { ...process.env, HOME: home, PATH: binDir },
+    cwd: home,
+    stdout: { write: (c) => out.push(c) },
+    stderr: { write: () => {} }
+  });
+  assert.equal(fs.existsSync(sentinel), false, "paths must not spawn the declared interpreter");
+
+  const parsed = JSON.parse(out.join(""));
+  const bidding = parsed.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(bidding.runtime, null, "paths reports no runtime verdict because it took none");
+
+  // …while doctor, in the same environment, does probe and does report one.
+  const doctorOut = [];
+  installer.run(["doctor", "--target", "codex", "--json"], {
+    env: { ...process.env, HOME: home, PATH: binDir },
+    cwd: home,
+    stdout: { write: (c) => doctorOut.push(c) },
+    stderr: { write: () => {} }
+  });
+  assert.equal(fs.existsSync(sentinel), true, "doctor is the command that asks");
+});
+
+test("status reports an unavailable runtime in text, not only in JSON", () => {
+  // codex-1: `status` performed the probe and then discarded the answer, so the two commands
+  // disagreed about the same directory.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const out = [];
+  installer.run(["status", "--target", "codex"], {
+    env: { ...process.env, HOME: home, PATH: "" },
+    cwd: home,
+    stdout: { write: (c) => out.push(c) },
+    stderr: { write: () => {} }
+  });
+  const text = out.join("");
+  assert.match(text, /addon parley-bidding: valid/);
+  assert.match(text, /unavailable: python3 is not available, but this skill requires >=3\.10/);
+});
+
+function probePython3IsAvailableHere() {
+  const run = spawnSync("python3", ["-c", "import sys; print(sys.version_info[0])"], { encoding: "utf8" });
+  return !run.error && run.status === 0;
+}
