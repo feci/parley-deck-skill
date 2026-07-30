@@ -253,10 +253,29 @@ const { Parser } = require("commonmark");
 // Detection stays deliberately BROADER than acceptance. Every false green in seventeen rounds
 // came from the two being the same pattern: whatever the grammar would refuse, detection also
 // failed to see, so the command was skipped — and skipping reads as success.
-// Case-insensitive on purpose: macOS mounts a case-insensitive filesystem by default, so
-// `Node --test x` really runs there. SUPPORTED_COMMAND stays exact, so such a line is detected
-// and then REFUSED rather than skipped. (round 17, hermes-1.)
-const mentionsATestCommand = (s) => /\bnode\b/i.test(s) && /--test\b/.test(s);
+// DETECTION READS THE SHELL'S WORDS, NOT THE PAGE'S CHARACTERS.
+//
+// The page shows characters; the shell builds words out of them. `node --\test x`,
+// `nod\e --test x` and `node --te''st x` contain no literal `--test` or no literal `node`, and
+// each runs exactly as `node --test x` when copied. Detection that matched the characters
+// skipped all three — and skipping reads as success, which is the same failure this guard has
+// had at every layer. (round 18, kimi-1.)
+//
+// Removing the shell's quoting characters is a cheap, fail-closed view of that word list: it
+// can only reveal a command, never conceal one. A substitution can produce ANY word, so a unit
+// naming `node` that also carries a backtick or `$` is treated as a candidate on that ground
+// alone — those characters are already excluded by the grammar, so the refusal path exists;
+// only detection had to reach them.
+//
+// Case-insensitive on both tokens: macOS mounts a case-insensitive filesystem, so `Node` runs;
+// and `--TEST` reaches node itself, which rejects it. SUPPORTED_COMMAND stays exact, so every
+// one of these is detected and then REFUSED rather than skipped. (round 17, hermes-1.)
+const shellWordView = (s) => s.replace(/[\\'"]/g, "");
+const mentionsATestCommand = (s) => {
+  const words = shellWordView(s);
+  if (!/\bnode\b/i.test(s) && !/\bnode\b/i.test(words)) return false;
+  return /--test\b/i.test(s) || /--test\b/i.test(words) || /[`$]/.test(s);
+};
 
 // Inside a code node there is no container left to interpret, so splicing a backslash
 // continuation is exactly what a shell does. A unit assembled from more than one physical
@@ -296,6 +315,18 @@ function visibleTextOfHtml(html) {
       continue;
     }
     let next = -1;
+    // A script, style or template BODY is never shown either, wherever it sits. Skipping only
+    // blocks that START with one left a script nested in a <div> policed as page text.
+    // (round 18, kimi-1.)
+    const opens = /^<\s*(script|style|template)\b/i.exec(html.slice(i));
+    if (opens) {
+      const close = new RegExp(`</\\s*${opens[1]}\\s*>`, "i").exec(html.slice(i));
+      next = close ? i + close.index + close[0].length : -1;
+      if (next !== -1) {
+        i = next;
+        continue;
+      }
+    }
     if (html.startsWith("<!--", i)) next = skipTo(i + 4, "-->");
     else if (html.startsWith("<![CDATA[", i)) next = skipTo(i + 9, "]]>");
     else if (html.startsWith("<?", i)) next = skipTo(i + 2, "?>");
@@ -458,8 +489,7 @@ function publishedTestCommands(markdown) {
         // Script and style bodies are the exception in the other direction: their CONTENT is
         // never shown either, so policing it fails the build over text no reader can reach.
         // (round 17, kimi-1.)
-        const hidden = /^\s*<\s*(script|style|template)\b/i.test(node.literal);
-        emit(hidden ? "" : visibleTextOfHtml(node.literal), -1);
+        emit(visibleTextOfHtml(node.literal), -1);
         flushVisible();
         break;
       }
@@ -602,6 +632,22 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "`Node --test case/upper.test.js`",
     "",
+    "Escaped flag: `node --\\test escape/flag.test.js`",
+    "",
+    "Escaped binary: `nod\\e --test escape/binary.test.js`",
+    "",
+    "Quote splice: `node --te''st quote/splice.test.js`",
+    "",
+    "Uppercase flag: `node --TEST case/flag.test.js`",
+    "",
+    "```bash",
+    "node --t`echo e`st subst/flag.test.js",
+    "```",
+    "",
+    "<div>",
+    '<script> var c = "node --test invisible/nested-script.test.js"; </script>',
+    "</div>",
+    "",
     'no<span title="1 > 0"></span>de --test quoted/gt-inline.test.js',
     "",
     "node --t<!-- a > b -->est quoted/gt-comment.test.js",
@@ -689,6 +735,14 @@ test("the published-command extractor captures whole commands, never fragments",
     // detection is case-insensitive so the grammar gets to refuse this rather than skip it —
     // macOS is case-insensitive, so `Node` really runs there
     "Node --test case/upper.test.js",
+    // round 18 (kimi-1): the page shows characters, the shell builds words. None of these
+    // contains a literal `node --test`, and every one of them runs as exactly that when
+    // copied. Detection now reads the shell's word view, so each is seen and then refused.
+    "node --\\test escape/flag.test.js",
+    "nod\\e --test escape/binary.test.js",
+    "node --te''st quote/splice.test.js",
+    "node --TEST case/flag.test.js",
+    "node --t`echo e`st subst/flag.test.js",
   ]) {
     assert.ok(found.has(expected), `extractor missed or fragmented: ${JSON.stringify(expected)}`);
   }
@@ -708,10 +762,19 @@ test("the published-command extractor captures whole commands, never fragments",
   assert.equal(originOf("node --test html/inline-node.test.js"), "prose");
   assert.equal(originOf("node --test html/block.test.js"), "prose");
   assert.equal(SUPPORTED_COMMAND.test("Node --test case/upper.test.js"), false);
+  // the shell builds these words; the grammar refuses every one of them on sight
+  assert.equal(SUPPORTED_COMMAND.test("node --\\test escape/flag.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("nod\\e --test escape/binary.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("node --te''st quote/splice.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("node --TEST case/flag.test.js"), false);
+  assert.equal(SUPPORTED_COMMAND.test("node --t`echo e`st subst/flag.test.js"), false);
   // A HARD break is a real line break: the reader sees and copies two lines, which is not a
   // published one-line command. It must not be spliced into one. (round 17, hermes-1.)
   assert.equal(found.has("node --test hardbreak/one.test.js"), false);
-  assert.equal([...found].some((c) => c.includes("echo")), false);
+  // The fenced line that is not a command at all is not captured. (Checked by identity, not by
+  // searching for "echo": a command CAN legitimately contain the word, as the substitution
+  // probe above does.)
+  assert.equal(found.has("echo not-a-test-command"), false);
 
   // Text no reader can reach is neither run nor policed. Failing the build over a maintenance
   // comment is noise; EXECUTING a command out of image alt text is the opposite of what a
@@ -720,6 +783,7 @@ test("the published-command extractor captures whole commands, never fragments",
     "node --test invisible/comment.test.js",
     "node --test invisible/script.test.js",
     "node --test invisible/alt.test.js",
+    "node --test invisible/nested-script.test.js",
   ]) {
     assert.equal(
       found.has(invisible),
