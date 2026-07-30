@@ -447,15 +447,27 @@ function publishedTestCommands(markdown) {
       }
 
       // Which code nodes contribute to this line, and does any ONE of them hold a whole command
-      // on its own? If so the command is properly published in a single copyable element and
-      // the code pass already has it; the synthesis rule below must not fire on it as well.
+      // on its own? Such a node publishes its command properly and the code pass already has
+      // it, so the synthesis rule must not fire on it a second time.
+      //
+      // But it must be EXCLUDED, not used to silence the line. Cycle 25 suppressed the rule
+      // line-wide, so one correct span made a second, substitution-built command in the same
+      // sentence invisible — and a soft-wrapped paragraph is one line, so ordinary prose
+      // wrapping was enough to trigger it. What remains after removing those spans is what the
+      // rule looks at. (round 20, kimi-1.)
       const segments = new Map();
       for (let i = 0; i < line.length; i += 1) {
         const owner = owners[from + i];
         if (owner === -1) continue;
         segments.set(owner, (segments.get(owner) || "") + line[i]);
       }
-      const publishedWhole = [...segments.values()].some(mentionsATestCommand);
+      const publishing = new Set(
+        [...segments.entries()].filter(([, text]) => mentionsATestCommand(text)).map(([id]) => id)
+      );
+      let residue = "";
+      for (let i = 0; i < line.length; i += 1) {
+        if (!publishing.has(owners[from + i])) residue += line[i];
+      }
 
       for (const m of view.matchAll(/\bnode\b/gi)) {
         const rest = view.slice(m.index);
@@ -470,8 +482,8 @@ function publishedTestCommands(markdown) {
       // A substitution can produce either word, so neither may be spelled out anywhere. One
       // recognisable half plus a word-building construct is enough — unless a single code node
       // already holds the whole command, which is the supported way to publish one.
-      if (!publishedWhole && buildsWords(line) && mentionsATestCommand(line)) {
-        record(line.trim(), "prose");
+      if (buildsWords(residue) && mentionsATestCommand(residue)) {
+        record(residue.trim(), "prose");
       }
     }
     visible = "";
@@ -670,6 +682,10 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "Run node --{test..test} prose/brace-flag.test.js now.",
     "",
+    'Verify: `node --test "fixture/shared-span.test.js"` — or run n$(printf \'\')ode --test shared/line.test.js instead.',
+    "",
+    "Run `node --test \"fixture/with-dollar.test.js\"` with `$FOO` set.",
+    "",
     "node `--test` mixed/span.test.js",
     "",
     "no<span></span>de --test html/inline-node.test.js",
@@ -847,6 +863,18 @@ test("the published-command extractor captures whole commands, never fragments",
   assert.equal(originOf("node --test rendered/escape.test.js"), "prose");
   assert.equal(originOf("node --\\test prose/escape-flag.test.js now."), "prose");
   assert.equal(originOf("Run $(echo n)ode --test prose/subst-binary.test.js now."), "prose");
+
+  // round 20 (kimi-1): a correctly published span on the same line must NOT silence the
+  // synthesis rule for the rest of it. Cycle 25 suppressed the whole line, and since a
+  // soft-wrapped paragraph is one line, ordinary prose wrapping was enough to hide a second,
+  // substitution-built command. The span is excluded; what remains is still judged.
+  const shared = occurrences.filter((o) => o.command.includes("shared/line.test.js"));
+  assert.ok(shared.length > 0, "a substitution-built command sharing a line with a valid span must still be seen");
+  assert.ok(shared.every((o) => o.origin === "prose"), "…and it is not a published code node");
+  assert.equal(originOf('node --test "fixture/shared-span.test.js"'), "code");
+  // …while a line that merely mentions an unrelated `$FOO` beside a properly published command
+  // stays untouched: the residue names neither half.
+  assert.equal(originOf('node --test "fixture/with-dollar.test.js"'), "code");
   assert.equal(originOf("node --test rendered/emphasis.test.js"), "prose");
   // A command wholly inside one span keeps its code provenance even mid-sentence — that is
   // what two shipped documents rely on, and the reason this rule is occurrence-level.
