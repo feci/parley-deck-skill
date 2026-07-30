@@ -731,3 +731,73 @@ function probePython3IsAvailableHere() {
   const run = spawnSync("python3", ["-c", "import sys; print(sys.version_info[0])"], { encoding: "utf8" });
   return !run.error && run.status === 0;
 }
+
+test("valid-unmanaged never grants ownership: install and uninstall stay fail-closed", () => {
+  // codex-1's condition on the ruling: "Do not synthesize a marker and do not let install,
+  // update, or uninstall treat the directory as owned."
+  const unmanaged = () => {
+    const home = tmpDir();
+    const dir = installed(home);
+    fs.rmSync(path.join(dir, installer.MARKER_FILE));
+    assert.equal(doctorStatus(home, "parley-bidding").status, "valid-unmanaged");
+    return { home, dir };
+  };
+
+  const a = unmanaged();
+  const blockedInstall = installer
+    .installCommand(context(a.home, { target: "codex" }))
+    .actions[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(blockedInstall.action, "blocked");
+  assert.equal(fs.existsSync(path.join(a.dir, installer.MARKER_FILE)), false, "no marker was synthesized");
+
+  const b = unmanaged();
+  const blockedUninstall = installer
+    .uninstallCommand(context(b.home, { command: "uninstall", target: "codex" }))
+    .actions[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(blockedUninstall.action, "blocked");
+  assert.equal(fs.existsSync(b.dir), true, "an unmanaged tree is not removed without --force");
+
+  const c = unmanaged();
+  const forced = installer
+    .installCommand(context(c.home, { target: "codex", force: true }))
+    .actions[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(forced.action, "replaced");
+  assert.equal(doctorStatus(c.home, "parley-bidding").status, "valid", "--force reclaims it as managed");
+});
+
+test("the core unit never becomes valid-unmanaged", () => {
+  // The core skill's payload is assembled from several package entries rather than one
+  // directory, so it ships no manifest and there is nothing to verify against.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  fs.rmSync(path.join(home, ".codex", "skills", "parley-deck", installer.MARKER_FILE));
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(result.targets[0].skills[0].skill, "parley-deck");
+  assert.equal(result.targets[0].skills[0].status, "malformed");
+});
+
+test("ruling (b) adds no laundering weakness that (a) did not already have", () => {
+  // A payload rewritten together with its manifest verifies by construction. Under the
+  // ratified rule that reads `valid-unmanaged`; with a forged marker beside it, it reads
+  // plain `valid` — the same reachable outcome, because the marker is unsigned and writable.
+  // Measured rather than argued. (round 3, kimi-1's security-delta reasoning.)
+  const launder = (forgeMarker) => {
+    const home = tmpDir();
+    const dir = installed(home);
+    fs.writeFileSync(path.join(dir, "SKILL.md"), "# replaced\n");
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, addonManifest.MANIFEST_FILE), "utf8"));
+    manifest.files["SKILL.md"] = `sha256:${crypto.createHash("sha256").update(fs.readFileSync(path.join(dir, "SKILL.md"))).digest("hex")}`;
+    manifest.aggregate = addonManifest.aggregateDigest(manifest.files);
+    fs.writeFileSync(path.join(dir, addonManifest.MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    if (forgeMarker) {
+      const marker = readMarker(dir);
+      marker.manifest = { aggregate: manifest.aggregate, sha256: addonManifest.manifestFileHash(dir) };
+      writeMarker(dir, marker);
+    } else {
+      fs.rmSync(path.join(dir, installer.MARKER_FILE));
+    }
+    return doctorStatus(home, "parley-bidding").status;
+  };
+  assert.equal(launder(false), "valid-unmanaged");
+  assert.equal(launder(true), "valid");
+});
