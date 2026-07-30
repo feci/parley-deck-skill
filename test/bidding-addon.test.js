@@ -776,11 +776,14 @@ test("the core unit never becomes valid-unmanaged", () => {
   assert.equal(result.targets[0].skills[0].status, "malformed");
 });
 
-test("ruling (b) adds no laundering weakness that (a) did not already have", () => {
-  // A payload rewritten together with its manifest verifies by construction. Under the
-  // ratified rule that reads `valid-unmanaged`; with a forged marker beside it, it reads
-  // plain `valid` — the same reachable outcome, because the marker is unsigned and writable.
-  // Measured rather than argued. (round 3, kimi-1's security-delta reasoning.)
+test("a laundered tree cannot reach valid-unmanaged", () => {
+  // Round 3 accepted `valid-unmanaged` on the argument that a self-consistent rewrite was
+  // reachable under the old rule too. Round 4 (codex-1 MAJOR) showed the predicate was
+  // weaker than that argument assumed: it verified the payload against whichever manifest
+  // sat beside it, so ANY self-consistent tree qualified — including one that had quietly
+  // dropped `runtime` and with it the interpreter check. The proof is now anchored to the
+  // packaged source's manifest bytes, so a rewritten tree is malformed. With a forged marker
+  // it still reads `valid`, because the marker is unsigned — that part was always true.
   const launder = (forgeMarker) => {
     const home = tmpDir();
     const dir = installed(home);
@@ -798,6 +801,109 @@ test("ruling (b) adds no laundering weakness that (a) did not already have", () 
     }
     return doctorStatus(home, "parley-bidding").status;
   };
-  assert.equal(launder(false), "valid-unmanaged");
+  assert.equal(launder(false), "malformed");
   assert.equal(launder(true), "valid");
+});
+
+test("an installed manifest that drops the runtime field cannot pass as the packaged one", () => {
+  // codex-1's exact probe: delete only `runtime` from the installed manifest, leave every
+  // file hash and the aggregate untouched. verifyPayload still returns ok — and B6's
+  // interpreter check disappears with the field. One edit, no rehashing, health green.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const dir = path.join(skillsDir, "parley-bidding");
+  fs.cpSync(addonRoot, dir, { recursive: true });
+
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, addonManifest.MANIFEST_FILE), "utf8"));
+  delete manifest.runtime;
+  fs.writeFileSync(path.join(dir, addonManifest.MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  assert.equal(addonManifest.verifyPayload(dir).ok, true, "the tree is self-consistent by construction");
+
+  const result = installer.doctorCommand(
+    context(home, { command: "doctor", target: "codex", only: ["parley-bidding"] })
+  );
+  const status = result.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(status.status, "malformed", "a manifest that is not the packaged one earns no verdict of health");
+  assert.equal(result.ok, false);
+});
+
+test("a marker path that is a directory or a dangling symlink is present, not absent", () => {
+  // Round 3's precision: only an ENTIRELY absent marker qualifies for valid-unmanaged.
+  // `fileExists` reported a directory and a dangling symlink as absent. (round 4, codex-1.)
+  for (const [label, make] of [
+    ["directory", (p) => fs.mkdirSync(p)],
+    ["dangling symlink", (p) => fs.symlinkSync(path.join(path.dirname(p), "nowhere"), p)]
+  ]) {
+    const home = tmpDir();
+    const dir = installed(home);
+    fs.rmSync(path.join(dir, installer.MARKER_FILE));
+    make(path.join(dir, installer.MARKER_FILE));
+    const status = doctorStatus(home, "parley-bidding");
+    assert.equal(status.status, "malformed", `a ${label} at the marker path must not read as absent`);
+    assert.ok(status.problems.some((p) => p.includes("unreadable")));
+  }
+});
+
+test("--no-addons does not hide an add-on that is still on disk", () => {
+  // codex-1 round 4: after a universal install, the documented opt-out (`--no-addons`) wrote
+  // only the core and recorded a core-only selection. The bidding directory stayed on disk
+  // and vanished from health output — so a green `doctor` was not evidence that the opt-out
+  // had taken effect, which is exactly what the README tells users to rely on.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  // Simulate the README-first universal copy: payload present, no marker of ours.
+  fs.cpSync(addonRoot, path.join(skillsDir, "parley-bidding"), { recursive: true });
+
+  const result = installer.installCommand(context(home, { target: "codex", noAddons: true, force: true }));
+  assert.equal(result.ok, true);
+  assert.equal(fs.existsSync(path.join(skillsDir, "parley-bidding")), true, "the opt-out does not delete it");
+
+  const doctor = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  const bidding = doctor.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.ok(bidding, "the still-installed skill must remain visible to doctor");
+  assert.equal(bidding.selected, false);
+  assert.ok(bidding.problems.some((p) => p.includes("not part of the recorded selection")));
+  assert.equal(doctor.ok, false, "health must not be green while an excluded skill is installed");
+});
+
+test("an excluding --only leaves the same trail visible", () => {
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  fs.cpSync(addonRoot, path.join(skillsDir, "parley-bidding"), { recursive: true });
+
+  installer.installCommand(context(home, { target: "codex", only: ["parley-design"], force: true }));
+  const doctor = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  const names = doctor.targets[0].skills.map((s) => s.skill);
+  assert.ok(names.includes("parley-bidding"), `bidding must still be reported, saw ${names.join(", ")}`);
+  assert.equal(doctor.ok, false);
+});
+
+test("uninstall is atomic across the selected set", () => {
+  // Measured before the fix: a managed core plus an unmanaged add-on removed the core and
+  // then refused the add-on. (review round 4, codex-1 MAJOR.)
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.rmSync(path.join(dir, installer.MARKER_FILE)); // makes bidding unmanaged
+  const coreDir = path.join(home, ".codex", "skills", "parley-deck");
+
+  const result = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+  assert.equal(result.ok, false);
+  assert.equal(fs.existsSync(coreDir), true, "nothing may be removed when one unit is refused");
+  assert.equal(fs.existsSync(dir), true);
+});
+
+test("install refuses a foreign-marked destination without --force", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  writeMarker(dir, { name: "other-installer", skill: "parley-bidding" });
+  const sentinel = path.join(dir, "FOREIGN-SENTINEL");
+  fs.writeFileSync(sentinel, "x");
+
+  const result = installer.installCommand(context(home, { target: "codex", only: ["parley-bidding"] }));
+  assert.equal(result.ok, false);
+  assert.equal(fs.existsSync(sentinel), true, "a foreign manager's tree must not be replaced without --force");
 });
