@@ -1164,3 +1164,32 @@ test("a symlink in a manifest-free add-on is caught before the first write", () 
   const failed = result.actions[0].skills.find((s) => s.skill === "zz-broken");
   assert.match(failed.message, /Refusing to copy symlink/);
 });
+
+test("a symlink in the CORE source is caught before the first write too", () => {
+  // codex-1 round 8: the first version of the copyability preflight ran only when
+  // `unit.addon` was truthy, so the core — assembled from several package entries rather than
+  // one directory — was excluded, while the comment claimed "every source unit".
+  const home = tmpDir();
+  const stagedRoot = path.join(tmpDir(), "package");
+  fs.cpSync(path.join(root, "skills"), path.join(stagedRoot, "skills"), { recursive: true });
+  for (const file of ["package.json", "plugin.json", "gemini-extension.json"]) {
+    fs.cpSync(path.join(root, file), path.join(stagedRoot, file));
+  }
+  // A symlink inside the CORE skill's own reference directory.
+  fs.symlinkSync(
+    path.join(root, "README.md"),
+    path.join(stagedRoot, "skills", "parley-deck", "references", "linked.md")
+  );
+
+  const ctx = context(home, { target: "codex" });
+  ctx.packageRoot = stagedRoot;
+  const result = installer.installCommand(ctx);
+
+  assert.equal(result.ok, false);
+  assert.equal(
+    fs.existsSync(path.join(home, ".codex", "skills")),
+    false,
+    "a defect in the core source must also produce zero writes"
+  );
+  assert.match(result.actions[0].skills[0].message, /Refusing to copy symlink/);
+});
