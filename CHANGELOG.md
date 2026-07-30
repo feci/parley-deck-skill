@@ -74,6 +74,13 @@ Notable changes per release. Dates are release dates.
   add-ons unaffected. The payloads are untouched and fully usable either way — this is a
   verdict about what this tool can vouch for, not about the files.
 
+- **`valid-unselected`.** Read-only commands now report an add-on directory that is on disk
+  but absent from the recorded install selection, instead of omitting it. `--no-addons` and an
+  excluding `--only` write only what they select — they do not remove what is already there —
+  so previously a green `doctor` was not evidence that the opt-out had taken effect. It fails
+  health with the remedy named. The payload verdict stays separate: a tree this tool installed
+  is `valid-unselected`, not `malformed`.
+
 - `status` remains informational and always exits 0, even when it prints an `integrity:` or
   `unavailable:` line. **`doctor` is the health gate** and is the command to use in scripts and
   CI; it exits non-zero on any problem.

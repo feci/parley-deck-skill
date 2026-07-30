@@ -865,8 +865,33 @@ test("--no-addons does not hide an add-on that is still on disk", () => {
   const bidding = doctor.targets[0].skills.find((s) => s.skill === "parley-bidding");
   assert.ok(bidding, "the still-installed skill must remain visible to doctor");
   assert.equal(bidding.selected, false);
+  assert.equal(bidding.status, "valid-unselected");
   assert.ok(bidding.problems.some((p) => p.includes("not part of the recorded selection")));
   assert.equal(doctor.ok, false, "health must not be green while an excluded skill is installed");
+});
+
+test("an add-on installed by an earlier --only run is unselected, not malformed", () => {
+  // Being outside the recorded selection says nothing about the files. A tree this tool
+  // installed itself, still byte-valid and still marked, must not be called malformed just
+  // because a later `--only` run named something else.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", only: ["parley-tracker"] }));
+  installer.installCommand(context(home, { target: "codex", only: ["parley-design"], force: true }));
+
+  const doctor = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  const tracker = doctor.targets[0].skills.find((s) => s.skill === "parley-tracker");
+  assert.equal(tracker.status, "valid-unselected");
+  assert.equal(tracker.managed, true, "it is still an install this tool owns");
+  assert.equal(tracker.selected, false);
+  assert.deepEqual(tracker.missing, []);
+  // Health still fails: the installed state does not match what was recorded.
+  assert.equal(doctor.ok, false);
+
+  // …and naming both puts it right.
+  installer.installCommand(context(home, { target: "codex", only: ["parley-tracker", "parley-design"], force: true }));
+  const after = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  assert.equal(after.targets[0].skills.find((s) => s.skill === "parley-tracker").status, "valid");
+  assert.equal(after.ok, true);
 });
 
 test("an excluding --only leaves the same trail visible", () => {
