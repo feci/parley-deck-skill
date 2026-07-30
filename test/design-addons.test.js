@@ -415,14 +415,48 @@ function publishedTestCommands(markdown) {
     for (const line of visible.split("\n")) {
       const from = lineStart;
       lineStart += line.length + 1;
-      for (const m of line.matchAll(/\bnode\b/gi)) {
-        const rest = line.slice(m.index);
-        const flag = rest.match(/--test\b/);
+
+      // The rendered page is read with the SHELL'S WORDS here too. Cycle 23 taught the code
+      // pass to do that and left this one matching raw characters, so the prose arm of the very
+      // same finding stayed invisible: `Run node --\test x now.` renders with the backslash
+      // intact, the reader copies it, and the shell drops it. (round 19, kimi-1.)
+      //
+      // The word view is built with an index map back into the raw line, so an occurrence found
+      // in it can still be attributed to the code node — or to no code node — that produced it.
+      let view = "";
+      const toRaw = [];
+      for (let i = 0; i < line.length; i += 1) {
+        if (line[i] === "\\" || line[i] === "'" || line[i] === '"') continue;
+        view += line[i];
+        toRaw.push(i);
+      }
+
+      // Which code nodes contribute to this line, and does any ONE of them hold a whole command
+      // on its own? If so the command is properly published in a single copyable element and
+      // the code pass already has it; the synthesis rule below must not fire on it as well.
+      const segments = new Map();
+      for (let i = 0; i < line.length; i += 1) {
+        const owner = owners[from + i];
+        if (owner === -1) continue;
+        segments.set(owner, (segments.get(owner) || "") + line[i]);
+      }
+      const publishedWhole = [...segments.values()].some(mentionsATestCommand);
+
+      for (const m of view.matchAll(/\bnode\b/gi)) {
+        const rest = view.slice(m.index);
+        const flag = rest.match(/--test\b/i);
         if (!flag) continue;
-        const nodeOwner = owners[from + m.index];
-        const flagOwner = owners[from + m.index + flag.index];
+        const nodeOwner = owners[from + toRaw[m.index]];
+        const flagOwner = owners[from + toRaw[m.index + flag.index]];
         if (nodeOwner !== -1 && nodeOwner === flagOwner) continue;
-        record(rest.trim(), "prose");
+        record(line.slice(toRaw[m.index]).trim(), "prose");
+      }
+
+      // A substitution can produce either word, so neither may be spelled out anywhere. One
+      // recognisable half plus a word-building construct is enough — unless a single code node
+      // already holds the whole command, which is the supported way to publish one.
+      if (!publishedWhole && /[`$]/.test(line) && mentionsATestCommand(line)) {
+        record(line.trim(), "prose");
       }
     }
     visible = "";
@@ -607,6 +641,16 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "node --**test** rendered/emphasis.test.js",
     "",
+    "Run node --\\test prose/escape-flag.test.js now.",
+    "",
+    "Run nod\\e --test prose/escape-binary.test.js now.",
+    "",
+    "Run node --te''st prose/quote-splice.test.js now.",
+    "",
+    "Run node --TEST prose/upper-flag.test.js now.",
+    "",
+    "Run $(echo n)ode --test prose/subst-binary.test.js now.",
+    "",
     "node `--test` mixed/span.test.js",
     "",
     "no<span></span>de --test html/inline-node.test.js",
@@ -719,6 +763,15 @@ test("the published-command extractor captures whole commands, never fragments",
     // sees them; the reader copies a runnable command off the page.
     "node --test rendered/escape.test.js",
     "node --test rendered/emphasis.test.js",
+    // round 19 (kimi-1): cycle 23 taught the CODE pass to read the shell's words and left the
+    // PROSE pass matching raw characters, so the prose arm of the same finding stayed invisible.
+    // The backslash survives rendering into the copy; the shell drops it.
+    "node --\\test prose/escape-flag.test.js now.",
+    "nod\\e --test prose/escape-binary.test.js now.",
+    "node --te''st prose/quote-splice.test.js now.",
+    "node --TEST prose/upper-flag.test.js now.",
+    // and a substitution can build the binary in prose too, where no half is spelled out
+    "Run $(echo n)ode --test prose/subst-binary.test.js now.",
     // round 17 (codex-1): the command belongs to no single code node — half of it is prose and
     // half a span, or a tag splits a token and vanishes on render. Each piece is harmless; the
     // visible line is a runnable, broken command.
@@ -764,6 +817,8 @@ test("the published-command extractor captures whole commands, never fragments",
   // published in a code node and refused when it merely renders out of prose.
   assert.equal(originOf('node --test "a/*.test.js"'), "code");
   assert.equal(originOf("node --test rendered/escape.test.js"), "prose");
+  assert.equal(originOf("node --\\test prose/escape-flag.test.js now."), "prose");
+  assert.equal(originOf("Run $(echo n)ode --test prose/subst-binary.test.js now."), "prose");
   assert.equal(originOf("node --test rendered/emphasis.test.js"), "prose");
   // A command wholly inside one span keeps its code provenance even mid-sentence — that is
   // what two shipped documents rely on, and the reason this rule is occurrence-level.
