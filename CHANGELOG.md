@@ -53,10 +53,30 @@ Notable changes per release. Dates are release dates.
   pair to a `{binary, flag}` shape, and gained a **static** `python3 scripts/*.py` arm that
   checks the referenced script exists and compiles, without executing it.
 
-- An installed skill directory with no readable `parley-deck-skill` install marker is now
-  reported `malformed` rather than `valid`. This includes trees copied by a third-party skill
-  installer, which do not write our marker: `doctor` reports them as not installed by this tool.
-  The payload is untouched and still usable; only this tool's verdict about it changed.
+- **A third verdict, `valid-unmanaged`.** An installed skill directory with no readable
+  install marker is no longer automatically `malformed`. Where the packaged skill ships a
+  manifest and the installed tree's manifest fully verifies, the payload is *provably* intact
+  and the only missing fact is provenance — so it is reported `valid-unmanaged` with
+  `managed: false`, and it does not fail health. `doctor --json` carries both the status and
+  the boolean, so automation that requires tool-managed installs can still insist on one.
+
+  A marker that is present but unreadable, or one naming another installer, stays `malformed`:
+  that is corrupted management metadata, not "never installed by this tool". A tree with
+  neither a marker nor the manifest its packaged source ships also stays `malformed` — that is
+  the gutting signal.
+
+  **Known residual.** Only `parley-bidding` ships a manifest today, so a skill installed by a
+  third-party installer that does *not* ship one has nothing to verify against and is reported
+  `malformed` with the reason stated. Installing all six skills with the universal `skills` CLI
+  therefore reports one `valid-unmanaged` and five `malformed`, and `doctor` exits 1. Closing
+  that means shipping manifests for the remaining skills; it is tracked as a follow-up and is
+  deliberately not done here, because the ratified design for this change holds the other
+  add-ons unaffected. The payloads are untouched and fully usable either way — this is a
+  verdict about what this tool can vouch for, not about the files.
+
+- `status` remains informational and always exits 0, even when it prints an `integrity:` or
+  `unavailable:` line. **`doctor` is the health gate** and is the command to use in scripts and
+  CI; it exits non-zero on any problem.
 
 ### Compatibility
 

@@ -75,6 +75,10 @@ ceiling is an operator's word. Adapter maturity never grants permission.
 > runtime this installer covers — measured across all fourteen destinations. Whether a given
 > runtime then *exposes* it as an invocable skill is that runtime's own behaviour and is
 > **NOT TESTED** here.
+>
+> `parley-bidding` is the one skill that ships a `parley-addon.json` integrity manifest, so it
+> is the one whose payload `doctor` can verify even when another installer put it there. See
+> the changelog for what `valid-unmanaged` means and for the residual affecting the other five.
 
 <!-- Base: kimi-1. Grafts: the alongside/never-instead relationship from hermes-1; the bounded-graft constraint from claude-1. -->
 

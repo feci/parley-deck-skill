@@ -381,13 +381,121 @@ test("uninstall removes the add-on tree", () => {
 // negative test above preserved the marker, which is exactly why they passed.
 // ---------------------------------------------------------------------------
 
-test("an expected unit whose marker was deleted is malformed, not valid", () => {
+test("an intact tree whose marker was deleted is valid-unmanaged, not malformed", () => {
+  // Ratified in review round 3 as option (b), unanimously. The manifest still verifies, so
+  // calling the payload malformed would contradict this package's own strongest evidence.
+  // What is lost is provenance, not integrity — and that is what the verdict now says.
   const home = tmpDir();
   const dir = installed(home);
   fs.rmSync(path.join(dir, installer.MARKER_FILE));
   const status = doctorStatus(home, "parley-bidding");
+  assert.equal(status.status, "valid-unmanaged");
+  assert.equal(status.managed, false);
+  assert.deepEqual(status.problems, []);
+  assert.equal(status.marker, null, "marker: null still distinguishes it for automation");
+  // It is a provenance fact, not a health defect. (This context declares an empty PATH, so
+  // the interpreter is legitimately unreachable — assert on the verdicts, which is what the
+  // ruling is about, rather than on an exit code the runtime probe also governs.)
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  for (const skill of result.targets[0].skills) {
+    assert.notEqual(skill.status, "malformed", `${skill.skill} must not be malformed`);
+  }
+});
+
+test("a faithfully copied tree with no marker at all is valid-unmanaged", () => {
+  // The measured case: another skill installer copies the payload, manifest included, and
+  // writes no marker of ours. This is the README's first-recommended install path.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  fs.cpSync(addonRoot, path.join(skillsDir, "parley-bidding"), { recursive: true });
+
+  const result = installer.doctorCommand(
+    context(home, { command: "doctor", target: "codex", only: ["parley-bidding"] })
+  );
+  const status = result.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(status.status, "valid-unmanaged");
+  assert.equal(status.managed, false);
+  assert.equal(addonManifest.verifyPayload(path.join(skillsDir, "parley-bidding")).ok, true);
+});
+
+test("an unmarked tree whose payload does not match its manifest is still malformed", () => {
+  // The other half of the ruling: no marker AND no proof means no verdict of health.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const dir = path.join(skillsDir, "parley-bidding");
+  fs.cpSync(addonRoot, dir, { recursive: true });
+  fs.rmSync(path.join(dir, "scripts", "adapter_validate.py"));
+
+  const result = installer.doctorCommand(
+    context(home, { command: "doctor", target: "codex", only: ["parley-bidding"] })
+  );
+  const status = result.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(status.status, "malformed");
+  assert.equal(result.ok, false);
+});
+
+test("an unmarked tree gutted to SKILL.md is still malformed", () => {
+  // The round-1 guarantee that must survive the ruling: neither marker nor manifest, where
+  // the packaged source ships one, is the gutting signal.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const dir = path.join(skillsDir, "parley-bidding");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.copyFileSync(path.join(addonRoot, "SKILL.md"), path.join(dir, "SKILL.md"));
+
+  const result = installer.doctorCommand(
+    context(home, { command: "doctor", target: "codex", only: ["parley-bidding"] })
+  );
+  const status = result.targets[0].skills.find((s) => s.skill === "parley-bidding");
   assert.equal(status.status, "malformed");
   assert.ok(status.problems.some((p) => p.includes("no parley-deck-skill install marker")));
+  assert.equal(result.ok, false);
+});
+
+test("an unreadable or foreign marker never qualifies as unmanaged", () => {
+  // The ruling applies ONLY to an entirely absent marker: corrupted or foreign management
+  // metadata is tampering, not "never installed by this tool". (round 3, kimi-1.)
+  for (const [label, body] of [["unreadable", "{ not json"], ["foreign", JSON.stringify({ name: "other" })]]) {
+    const home = tmpDir();
+    const dir = installed(home);
+    fs.writeFileSync(path.join(dir, installer.MARKER_FILE), body);
+    const status = doctorStatus(home, "parley-bidding");
+    assert.equal(status.status, "malformed", `${label} marker must stay malformed`);
+    assert.equal(status.managed, false);
+  }
+});
+
+test("an unmanaged unit is still probed for its declared runtime", () => {
+  const home = tmpDir();
+  const dir = installed(home);
+  fs.rmSync(path.join(dir, installer.MARKER_FILE));
+  const out = [];
+  installer.run(["doctor", "--target", "codex", "--json"], {
+    env: { ...process.env, HOME: home, PATH: "" },
+    cwd: home,
+    stdout: { write: (c) => out.push(c) },
+    stderr: { write: () => {} }
+  });
+  const parsed = JSON.parse(out.join(""));
+  const status = parsed.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(status.status, "valid-unmanaged");
+  assert.equal(status.runtime.ok, false, "availability reporting is unchanged for unmanaged units");
+  assert.equal(parsed.ok, false, "…and an unavailable runtime still fails health");
+});
+
+test("a broken interpreter shim does not satisfy the floor", () => {
+  // codex-1 round 3: `4.not-a-version` parsed to 4.0 and passed `>=3.10` — fail-open on the
+  // one check whose job is to fail closed.
+  const out = doctorInChildWithPath("stub", { python3: "#!/bin/sh\necho '4.not-a-version'\n" });
+  assert.equal(out.bidding.runtime.ok, false);
+  assert.match(out.bidding.runtime.detail, /not available/);
+  assert.equal(out.ok, false);
 });
 
 test("an unreadable marker is distinguished from a missing one", () => {
