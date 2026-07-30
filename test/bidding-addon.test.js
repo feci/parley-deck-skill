@@ -405,10 +405,14 @@ test("an intact tree whose marker was deleted is valid-unmanaged, not malformed"
 test("a faithfully copied tree with no marker at all is valid-unmanaged", () => {
   // The measured case: another skill installer copies the payload, manifest included, and
   // writes no marker of ours. This is the README's first-recommended install path.
+  // A full install first, so the recorded selection DOES include bidding — otherwise the tree
+  // would be both unselected and unmanaged, and the test would not isolate the fact it names.
   const home = tmpDir();
   const skillsDir = path.join(home, ".codex", "skills");
-  fs.mkdirSync(skillsDir, { recursive: true });
-  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  installer.installCommand(context(home, { target: "codex" }));
+  // Now replace that unit with a faithful copy carrying no marker of ours, which is what a
+  // third-party skill installer leaves behind.
+  fs.rmSync(path.join(skillsDir, "parley-bidding"), { recursive: true, force: true });
   fs.cpSync(addonRoot, path.join(skillsDir, "parley-bidding"), { recursive: true });
 
   const result = installer.doctorCommand(
@@ -417,7 +421,25 @@ test("a faithfully copied tree with no marker at all is valid-unmanaged", () => 
   const status = result.targets[0].skills.find((s) => s.skill === "parley-bidding");
   assert.equal(status.status, "valid-unmanaged");
   assert.equal(status.managed, false);
+  assert.equal(status.selected, true, "it is in the recorded selection; only its provenance is unknown");
   assert.equal(addonManifest.verifyPayload(path.join(skillsDir, "parley-bidding")).ok, true);
+});
+
+test("a tree that is both unselected and unmanaged reports the selection fact first", () => {
+  // Both are true. The selection mismatch is the actionable one and wins the status;
+  // `managed: false` still carries the provenance fact for anything that needs it.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  fs.cpSync(addonRoot, path.join(skillsDir, "parley-bidding"), { recursive: true });
+
+  const status = installer
+    .doctorCommand(context(home, { command: "doctor", target: "codex" }))
+    .targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(status.status, "valid-unselected");
+  assert.equal(status.selected, false);
+  assert.equal(status.managed, false);
 });
 
 test("an unmarked tree whose payload does not match its manifest is still malformed", () => {
@@ -1082,4 +1104,33 @@ test("a marker with no skill identity is malformed for core and add-on alike", (
   assert.equal(install.ok, false);
   const uninstall = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
   assert.equal(uninstall.ok, false);
+});
+
+test("a filtered read reports the same recorded-selection fact as an unfiltered one", () => {
+  // kimi-1 round 6: `selected` was derived from the flag that chose what to inspect, so a
+  // scoped probe of the very unit the opt-out excluded answered `selected: true, valid, ok`
+  // while the unflagged gate answered `valid-unselected` and failed. Checking the opt-out
+  // with a scoped probe is exactly how someone would check it.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  installer.installCommand(context(home, { target: "codex" }));
+  // Re-install selecting only design: bidding stays on disk, outside the recorded selection.
+  installer.installCommand(context(home, { target: "codex", only: ["parley-design"], force: true }));
+
+  const unflagged = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  const residualUnflagged = unflagged.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(residualUnflagged.selected, false);
+  assert.equal(residualUnflagged.status, "valid-unselected");
+
+  const scoped = installer.doctorCommand(
+    context(home, { command: "doctor", target: "codex", only: ["parley-bidding"] })
+  );
+  const residualScoped = scoped.targets[0].skills.find((s) => s.skill === "parley-bidding");
+  assert.equal(residualScoped.selected, false, "the same recorded fact, whichever command asks");
+  assert.equal(residualScoped.status, "valid-unselected");
+  assert.equal(scoped.ok, false);
+
+  // The narrowing itself must survive: the scoped read still inspects only what was asked.
+  assert.deepEqual(scoped.targets[0].skills.map((s) => s.skill), ["parley-deck", "parley-bidding"]);
 });
