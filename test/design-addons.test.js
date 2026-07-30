@@ -276,6 +276,55 @@ function codeNodeUnits(literal) {
   return out;
 }
 
+// Remove raw-HTML markup, keeping the text a reader actually sees. A regex cannot do this:
+// `<span title="1 > 0">` ends at the SECOND `>`, and `<!-- a > b -->` at `-->`. Getting that
+// wrong left debris inside a word and made a rendered command invisible (round 18, codex-1).
+//
+// An unterminated `<` is kept as literal text rather than swallowing the rest of the block:
+// keeping it can only produce an extra refusal, dropping it could hide a command.
+function visibleTextOfHtml(html) {
+  const skipTo = (from, close) => {
+    const at = html.indexOf(close, from);
+    return at === -1 ? -1 : at + close.length;
+  };
+  let out = "";
+  let i = 0;
+  while (i < html.length) {
+    if (html[i] !== "<") {
+      out += html[i];
+      i += 1;
+      continue;
+    }
+    let next = -1;
+    if (html.startsWith("<!--", i)) next = skipTo(i + 4, "-->");
+    else if (html.startsWith("<![CDATA[", i)) next = skipTo(i + 9, "]]>");
+    else if (html.startsWith("<?", i)) next = skipTo(i + 2, "?>");
+    else {
+      let j = i + 1;
+      let quote = null;
+      while (j < html.length) {
+        const c = html[j];
+        if (quote) {
+          if (c === quote) quote = null;
+        } else if (c === '"' || c === "'") {
+          quote = c;
+        } else if (c === ">") {
+          break;
+        }
+        j += 1;
+      }
+      next = j < html.length ? j + 1 : -1;
+    }
+    if (next === -1) {
+      out += html[i];
+      i += 1;
+      continue;
+    }
+    i = next;
+  }
+  return out;
+}
+
 // Returns an ARRAY of { command, origin } occurrences, origin being "code" or "prose".
 //
 // An array, not a map keyed by text: the same command string can be published twice with
@@ -392,17 +441,26 @@ function publishedTestCommands(markdown) {
         emit("\n", -1);
         break;
       case "html_inline":
+        // An inline raw-HTML node is ONE complete piece of markup — a tag, a comment, a
+        // declaration — so the whole literal is dropped. It is never page text.
+        //
+        // It used to be tag-stripped with /<[^>]*>/, which cannot tell a tag terminator from a
+        // `>` inside a quoted attribute: `no<span title="1 > 0"></span>de` left attribute
+        // debris between `no` and `de`, the word `node` never formed, and the command went
+        // undetected. Dropping the node needs no such judgement. (round 18, codex-1.)
+        emit("", -1);
+        break;
       case "html_block": {
-        // Tags are markup, not page text — and stripping them is the point: `no<span></span>de`
-        // reads as the word "node" to every reader. An earlier revision appended the raw tags,
-        // which hid exactly this shape instead of exposing it.
+        // A block carries markup AND the text between it, so the markup has to be removed
+        // rather than the node dropped — with a scanner that understands quoted attributes and
+        // comments, for the same reason.
         //
         // Script and style bodies are the exception in the other direction: their CONTENT is
         // never shown either, so policing it fails the build over text no reader can reach.
         // (round 17, kimi-1.)
         const hidden = /^\s*<\s*(script|style|template)\b/i.test(node.literal);
-        emit(hidden ? "" : node.literal.replace(/<[^>]*>/g, ""), -1);
-        if (node.type === "html_block") flushVisible();
+        emit(hidden ? "" : visibleTextOfHtml(node.literal), -1);
+        flushVisible();
         break;
       }
       default:
@@ -544,6 +602,12 @@ test("the published-command extractor captures whole commands, never fragments",
     "",
     "`Node --test case/upper.test.js`",
     "",
+    'no<span title="1 > 0"></span>de --test quoted/gt-inline.test.js',
+    "",
+    "node --t<!-- a > b -->est quoted/gt-comment.test.js",
+    "",
+    '<div title="a > b">no<span></span>de --test quoted/gt-block.test.js</div>',
+    "",
     "```",
     "echo not-a-test-command",
     "```",
@@ -615,6 +679,13 @@ test("the published-command extractor captures whole commands, never fragments",
     // reader. Emitting a newline had split it into two the scanner judged separately, and the
     // command was neither run nor refused.
     "node --test softbreak/one.test.js",
+    // round 18 (codex-1): /<[^>]*>/ cannot tell a tag terminator from a `>` inside a quoted
+    // attribute, nor from one inside a comment. The debris it left inside the word kept the
+    // command invisible. An inline node is dropped whole; a block is scanned with quote and
+    // comment awareness.
+    "node --test quoted/gt-inline.test.js",
+    "node --test quoted/gt-comment.test.js",
+    "node --test quoted/gt-block.test.js",
     // detection is case-insensitive so the grammar gets to refuse this rather than skip it —
     // macOS is case-insensitive, so `Node` really runs there
     "Node --test case/upper.test.js",
