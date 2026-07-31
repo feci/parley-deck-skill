@@ -1234,3 +1234,42 @@ test("a dangling destination symlink is a filesystem entry, not absence", () => 
   const blocked = result.actions[0].skills.find((s) => s.skill === "parley-worktrees");
   assert.equal(blocked.action, "blocked");
 });
+
+test("health does not call a dangling destination symlink missing", () => {
+  // Cycle 10 converted only the install path, so `skillUnitStatus` still answered "missing"
+  // for an entry that is plainly there. `missing` invites an install that preflight refuses.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  fs.symlinkSync(path.join(home, "nowhere"), path.join(skillsDir, "parley-deck"));
+
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+  const core = result.targets[0].skills.find((s) => s.skill === "parley-deck");
+  assert.notEqual(core.status, "missing", "a dangling entry is present but unusable");
+  assert.equal(core.status, "malformed");
+  assert.equal(result.ok, false);
+});
+
+test("a forced uninstall removes a dangling destination symlink", () => {
+  // Reported "missing", exited 0, and left the link in place — while --force is exactly the
+  // flag reached for to clear a destination the installer will not otherwise touch.
+  const home = tmpDir();
+  const skillsDir = path.join(home, ".codex", "skills");
+  fs.mkdirSync(skillsDir, { recursive: true });
+  const dest = path.join(skillsDir, "parley-deck");
+  fs.symlinkSync(path.join(home, "nowhere"), dest);
+
+  const unforced = installer.uninstallCommand(
+    context(home, { command: "uninstall", target: "codex" })
+  );
+  const refused = unforced.actions[0].skills.find((s) => s.skill === "parley-deck");
+  assert.equal(refused.action, "blocked", "unowned entry needs --force, it is not absence");
+  assert.equal(fs.lstatSync(dest).isSymbolicLink(), true);
+
+  installer.uninstallCommand(context(home, { command: "uninstall", target: "codex", force: true }));
+  assert.throws(
+    () => fs.lstatSync(dest),
+    (error) => error.code === "ENOENT",
+    "--force must actually remove the entry"
+  );
+});
