@@ -1301,6 +1301,177 @@ test("a destination parent that is a symlink to a real directory is not an obsta
   assert.equal(fs.existsSync(path.join(real, "skills", "parley-deck", "SKILL.md")), true);
 });
 
+// Four cycles preflighted whether a destination can be CREATED and whether it may be TOUCHED.
+// Whether the tree already there can be DISPOSED OF was never asked, and both mutation paths
+// depend on it. Node's recursive rm empties bottom-up, so one 0555 directory anywhere in the
+// tree defeats it. (round 10: kimi-1 MAJOR, codex-1 MAJOR, hermes-1 MAJOR.)
+function freeze(dir) {
+  const entries = [dir];
+  const seen = [];
+  while (entries.length > 0) {
+    const current = entries.pop();
+    seen.push(current);
+    if (fs.lstatSync(current).isDirectory()) {
+      for (const name of fs.readdirSync(current)) entries.push(path.join(current, name));
+    }
+  }
+  for (const entry of seen.reverse()) {
+    fs.chmodSync(entry, fs.lstatSync(entry).isDirectory() ? 0o555 : 0o444);
+  }
+  return () => {
+    for (const entry of seen) {
+      try {
+        fs.chmodSync(entry, fs.lstatSync(entry).isDirectory() ? 0o755 : 0o644);
+      } catch (_error) {
+        /* already gone */
+      }
+    }
+  };
+}
+
+test("a frozen owned destination in the last target blocks the whole install", () => {
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "all", includeUndetected: true })).ok, true);
+  const thaw = freeze(path.join(home, ".aionrs", "skills", "parley-deck"));
+  try {
+    const result = installer.installCommand(context(home, { target: "all", includeUndetected: true }));
+    assert.equal(result.ok, false);
+    const written = result.actions.flatMap((a) =>
+      a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+    );
+    assert.equal(written.length, 0, `wrote ${written.length} units before failing`);
+    const residue = fs
+      .readdirSync(path.join(home, ".codex", "skills"))
+      .filter((name) => name.includes(".bak"));
+    assert.deepEqual(residue, [], "a blocked plan leaves no backup debris");
+  } finally {
+    thaw();
+  }
+});
+
+test("one unreadable subdirectory deep in an owned destination blocks the install", () => {
+  // Kills any "check the destination root's mode" shortcut: the root stays writable.
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "all", includeUndetected: true })).ok, true);
+  const buried = path.join(home, ".aionrs", "skills", "parley-bidding", "references");
+  assert.equal(fs.existsSync(buried), true);
+  fs.chmodSync(buried, 0o000);
+  try {
+    const result = installer.installCommand(context(home, { target: "all", includeUndetected: true }));
+    assert.equal(result.ok, false);
+    const written = result.actions.flatMap((a) =>
+      a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+    );
+    assert.equal(written.length, 0, `wrote ${written.length} units before failing`);
+  } finally {
+    fs.chmodSync(buried, 0o755);
+  }
+});
+
+test("a frozen owned add-on blocks the whole uninstall, core included", () => {
+  // Round 4 forbade exactly this end state — "removed the core and then refused the add-on" —
+  // and it was reachable again with no flag and one chmodded directory.
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "codex" })).ok, true);
+  const thaw = freeze(path.join(home, ".codex", "skills", "parley-bidding"));
+  try {
+    const result = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+    assert.equal(result.ok, false);
+    const removed = result.actions.flatMap((a) => a.skills.filter((s) => s.action === "removed"));
+    assert.equal(removed.length, 0, `removed ${removed.length} units before failing`);
+    assert.equal(fs.existsSync(path.join(home, ".codex", "skills", "parley-deck")), true);
+  } finally {
+    thaw();
+  }
+});
+
+test("uninstall is fleet-wide: a foreign marker in the last target deletes nothing", () => {
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "all", includeUndetected: true })).ok, true);
+  const marker = path.join(home, ".aionrs", "skills", "parley-deck", installer.MARKER_FILE);
+  const parsed = JSON.parse(fs.readFileSync(marker, "utf8"));
+  parsed.name = "some-other-installer";
+  fs.writeFileSync(marker, JSON.stringify(parsed, null, 2));
+
+  const result = installer.uninstallCommand(
+    context(home, { command: "uninstall", target: "all", includeUndetected: true })
+  );
+  assert.equal(result.ok, false);
+  const removed = result.actions.flatMap((a) => a.skills.filter((s) => s.action === "removed"));
+  assert.equal(removed.length, 0, `removed ${removed.length} units across the fleet`);
+  assert.equal(fs.existsSync(path.join(home, ".codex", "skills", "parley-deck")), true);
+});
+
+test("--force does not let uninstall delete a fleet it cannot finish", () => {
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "all", includeUndetected: true })).ok, true);
+  const skillsDir = path.join(home, ".aionrs", "skills");
+  fs.chmodSync(skillsDir, 0o555);
+  try {
+    const result = installer.uninstallCommand(
+      context(home, { command: "uninstall", target: "all", includeUndetected: true, force: true })
+    );
+    assert.equal(result.ok, false);
+    const removed = result.actions.flatMap((a) => a.skills.filter((s) => s.action === "removed"));
+    assert.equal(removed.length, 0, `removed ${removed.length} units across the fleet`);
+  } finally {
+    fs.chmodSync(skillsDir, 0o755);
+  }
+});
+
+test("a committed replacement survives a backup cleanup it cannot finish", () => {
+  // The post-commit guard, reached directly: preflight makes this unreachable through the
+  // command, which is why the guard is for what preflight cannot see. Before it, the unit
+  // reported `failed` while sitting correctly installed on disk.
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "codex" })).ok, true);
+  const dest = path.join(home, ".codex", "skills", "parley-bidding");
+  const thaw = freeze(dest);
+  try {
+    const ctx = context(home, { target: "codex" });
+    const target = installer.resolveTargets(ctx)[0];
+    const unit = { skill: "parley-bidding", dest, kind: "addon", addon: { root: addonRoot } };
+    const result = installer.installSkillUnit(target, unit, ctx);
+
+    assert.equal(result.ok, true, "the replacement committed; it must not report failure");
+    assert.equal(result.action, "replaced");
+    assert.match(result.warning, /previous copy could not be removed/);
+    assert.equal(fs.existsSync(path.join(dest, "SKILL.md")), true);
+  } finally {
+    thaw();
+    for (const name of fs.readdirSync(path.join(home, ".codex", "skills"))) {
+      if (name.includes(".bak")) freeze(path.join(home, ".codex", "skills", name))();
+    }
+  }
+});
+
+test("a 2.0.0 marker stays legacy, but one that kept its manifest does not", () => {
+  // The legacy exemption fired on an absent markerSchema alone, so deleting that single field
+  // from a current marker silently turned off byte validation. (round 10, codex-1 MAJOR.)
+  const genuine = tmpDir();
+  installer.installCommand(context(genuine, { target: "codex" }));
+  const genuineMarker = path.join(genuine, ".codex", "skills", "parley-bidding", installer.MARKER_FILE);
+  const legacy = JSON.parse(fs.readFileSync(genuineMarker, "utf8"));
+  delete legacy.markerSchema;
+  delete legacy.manifest;
+  fs.writeFileSync(genuineMarker, JSON.stringify(legacy, null, 2));
+  assert.equal(doctorStatus(genuine, "parley-bidding").status, "valid", "2.0.0 markers still upgrade cleanly");
+
+  const stripped = tmpDir();
+  installer.installCommand(context(stripped, { target: "codex" }));
+  const strippedDest = path.join(stripped, ".codex", "skills", "parley-bidding");
+  const strippedMarker = path.join(strippedDest, installer.MARKER_FILE);
+  const current = JSON.parse(fs.readFileSync(strippedMarker, "utf8"));
+  assert.notEqual(current.manifest, undefined);
+  delete current.markerSchema;
+  fs.writeFileSync(strippedMarker, JSON.stringify(current, null, 2));
+  fs.appendFileSync(path.join(strippedDest, "SKILL.md"), "\ntampered\n");
+
+  const unit = doctorStatus(stripped, "parley-bidding");
+  assert.equal(unit.status, "malformed");
+  assert.match(unit.problems.join(" "), /manifest but declares no markerSchema/);
+});
+
 test("health does not call a dangling destination symlink missing", () => {
   // Cycle 10 converted only the install path, so `skillUnitStatus` still answered "missing"
   // for an entry that is plainly there. `missing` invites an install that preflight refuses.
