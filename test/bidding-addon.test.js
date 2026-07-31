@@ -1652,6 +1652,71 @@ test("case-only spellings of one home are one destination in a single plan", () 
   assert.equal(written.length, 0, `wrote ${written.length} units into one directory twice`);
 });
 
+test("a firmlink respelling of one directory is one destination", () => {
+  // `/private/x` and `/System/Volumes/Data/private/x` are the same objects; `lstat` calls both
+  // directories and `realpath` preserves both spellings, so the symlink-only touchpoint check
+  // and the realpath-string containment check were both silent. Comparison is on physical
+  // identity now. (round 17: codex-1 MAJOR, kimi-1.)
+  const base = `/private/tmp/parley-firmlink-${process.pid}`;
+  const alt = `/System/Volumes/Data${base}`;
+  fs.mkdirSync(path.join(base, "KM"), { recursive: true });
+  try {
+    const direct = fs.statSync(base);
+    const respelled = fs.statSync(alt);
+    if (direct.dev !== respelled.dev || direct.ino !== respelled.ino) return; // no firmlink here
+    const ctx = {
+      ...context(base, { target: "all", includeUndetected: true, noAddons: true }),
+      env: {
+        HOME: base,
+        PATH: "",
+        KIMI_CODE_HOME: path.join(base, "KM"),
+        CODEX_HOME: path.join(alt, "KM", "skills", "parley-deck")
+      }
+    };
+    const result = installer.installCommand(ctx);
+    assert.equal(result.ok, false, "two spellings of one nested pair must not both install");
+    const written = result.actions.flatMap((a) =>
+      a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+    );
+    assert.equal(written.length, 0, `wrote ${written.length} units through a firmlink respelling`);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a symlink chain whose middle hop sits inside a destination refuses the plan", () => {
+  // The entry is outside both destinations; only an intermediate hop is inside one. Recording
+  // the entry alone missed it: ok:true, the earlier unit left dangling, files orphaned at the
+  // chain's end. (round 17, hermes-1 MAJOR.)
+  const home = tmpDir();
+  const kimiHome = path.join(home, "KM");
+  const seed = {
+    ...context(home, { target: "kimi", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  };
+  assert.equal(installer.installCommand(seed).ok, true);
+
+  const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+  const away = path.join(home, "away");
+  fs.mkdirSync(away, { recursive: true });
+  fs.symlinkSync(away, path.join(kimiCore, "redirect"));
+  const outside = path.join(home, "B");
+  fs.mkdirSync(outside, { recursive: true });
+  fs.symlinkSync(path.join(kimiCore, "redirect"), path.join(outside, "skills"));
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome, CODEX_HOME: outside }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false);
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units through a dependent chain`);
+  assert.equal(fs.existsSync(path.join(away, "parley-deck")), false, "nothing may reach the chain's end");
+});
+
 test("a destination reached through another destination refuses the plan", () => {
   // The final paths do not overlap — the symlink points elsewhere — so cycle 19's containment
   // check was silent. But the later commit renames the directory holding the link, so the
