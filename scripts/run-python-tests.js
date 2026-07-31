@@ -71,9 +71,22 @@ function resolveInterpreter() {
         "otherwise be released untested. Install Python 3.10 or newer and re-run."
     );
   }
-  const [major, minor] = probe.stdout.trim().split(".").map(Number);
+  // Both of these used to fail OPEN: an unparseable `python3 --version` produced NaN, which
+  // compares false against every floor, and a malformed `runtime.python` produced a null floor
+  // that skipped the comparison entirely. Either way the gate that exists to stop an untested
+  // interpreter reported success. (review round 16: codex-1 MINOR, kimi-1 MINOR.)
+  const reported = probe.stdout.trim();
+  const parsed = /^(\d+)\.(\d+)$/.exec(reported);
+  if (!parsed) {
+    fail(`python3 reported an unreadable version: ${JSON.stringify(reported)}`);
+  }
+  const major = Number(parsed[1]);
+  const minor = Number(parsed[2]);
   const floor = declaredPythonFloor();
-  if (floor && (major < floor.major || (major === floor.major && minor < floor.minor))) {
+  if (!floor) {
+    fail(`the add-on declares no usable runtime.python floor; refusing to test against an unbounded interpreter`);
+  }
+  if (major < floor.major || (major === floor.major && minor < floor.minor)) {
     fail(`python3 is ${major}.${minor}, but the add-on declares ${floor.spec}`);
   }
   return `${major}.${minor}`;

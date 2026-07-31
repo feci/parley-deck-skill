@@ -1652,6 +1652,55 @@ test("case-only spellings of one home are one destination in a single plan", () 
   assert.equal(written.length, 0, `wrote ${written.length} units into one directory twice`);
 });
 
+test("a destination reached through another destination refuses the plan", () => {
+  // The final paths do not overlap — the symlink points elsewhere — so cycle 19's containment
+  // check was silent. But the later commit renames the directory holding the link, so the
+  // earlier unit's destination ceases to exist after it reported `installed`. Measured before
+  // the fix: ok:true, reported destination absent, orphan tree at the link's old target.
+  // (round 16, codex-1 MAJOR.)
+  const home = tmpDir();
+  const kimiHome = path.join(home, "KM");
+  const seed = {
+    ...context(home, { target: "kimi", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  };
+  assert.equal(installer.installCommand(seed).ok, true);
+
+  const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+  const away = path.join(home, "away");
+  fs.mkdirSync(away, { recursive: true });
+  fs.symlinkSync(away, path.join(kimiCore, "redirect"));
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome, CODEX_HOME: path.join(kimiCore, "redirect") }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false);
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units into a dependent plan`);
+  assert.equal(
+    fs.existsSync(path.join(away, "skills", "parley-deck")),
+    false,
+    "nothing may be written through the dependent path"
+  );
+  const blocked = result.actions
+    .flatMap((a) => a.skills)
+    .find((s) => /resolving one passes through the other/.test(s.message || ""));
+  assert.ok(blocked, "the refusal must name the dependency");
+});
+
+test("uninstall --dry-run carries the same per-action flag install does", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const dry = installer.uninstallCommand(
+    context(home, { command: "uninstall", target: "codex", dryRun: true })
+  );
+  assert.equal(dry.actions[0].dryRun, true);
+});
+
 test("a destination nested inside another destination refuses the plan", () => {
   // Staging creates parents, so one unit can materialize another's destination between planning
   // and commit: measured ok:true, inner `installed`, outer `replaced`, inner install gone from
