@@ -1235,31 +1235,59 @@ test("a dangling destination symlink is a filesystem entry, not absence", () => 
   assert.equal(blocked.action, "blocked");
 });
 
-test("--force does not suppress an impossible destination parent", () => {
-  // --force overrides whose tree may be replaced. It was also suppressing the only check that
-  // looked at the path at all, so an uncreatable destination stopped being caught in preflight:
-  // 78 units across 13 targets were written before `aionrs` failed. (round 9, codex-1 MAJOR.)
-  for (const force of [false, true]) {
-    const home = tmpDir();
-    fs.mkdirSync(path.join(home, ".aionrs"), { recursive: true });
-    fs.writeFileSync(path.join(home, ".aionrs", "skills"), "not a directory\n");
-
-    const result = installer.installCommand(
-      context(home, { target: "all", includeUndetected: true, force })
-    );
-    assert.equal(result.ok, false, `force=${force}`);
-
-    const written = (result.actions || []).flatMap((action) =>
-      (action.skills || []).filter((s) => s.action === "installed" || s.action === "replaced")
-    );
-    assert.equal(written.length, 0, `force=${force} wrote ${written.length} units before failing`);
-
-    const blocked = result.actions
-      .find((action) => action.target === "aionrs")
-      .skills.find((s) => s.action === "blocked");
-    assert.match(blocked.message, /is not a directory/);
+// --force overrides whose tree may be replaced. It was also suppressing the only preflight
+// check that looked at the destination path at all, so an uncreatable destination stopped being
+// caught: 78 units across 13 targets were written before `aionrs` failed. Both arms are the
+// same defect one door apart — the second survived the first fix because `statSync` succeeds on
+// a mode-000 directory. (round 9: codex-1 MAJOR, then kimi-1 MAJOR.)
+const IMPOSSIBLE_PARENTS = [
+  {
+    name: "a regular file where the skills directory must be",
+    plant: (skillsDir) => {
+      fs.mkdirSync(path.dirname(skillsDir), { recursive: true });
+      fs.writeFileSync(skillsDir, "not a directory\n");
+    },
+    restore: () => {},
+    expect: /is not a directory/
+  },
+  {
+    name: "a directory this process cannot enter or write",
+    plant: (skillsDir) => {
+      fs.mkdirSync(skillsDir, { recursive: true });
+      fs.chmodSync(skillsDir, 0o000);
+    },
+    restore: (skillsDir) => fs.chmodSync(skillsDir, 0o755),
+    expect: /is not writable/
   }
-});
+];
+
+for (const scenario of IMPOSSIBLE_PARENTS) {
+  for (const force of [false, true]) {
+    test(`--force=${force} still refuses ${scenario.name}`, () => {
+      const home = tmpDir();
+      const skillsDir = path.join(home, ".aionrs", "skills");
+      scenario.plant(skillsDir);
+      try {
+        const result = installer.installCommand(
+          context(home, { target: "all", includeUndetected: true, force })
+        );
+        assert.equal(result.ok, false);
+
+        const written = (result.actions || []).flatMap((action) =>
+          (action.skills || []).filter((s) => s.action === "installed" || s.action === "replaced")
+        );
+        assert.equal(written.length, 0, `wrote ${written.length} units before failing`);
+
+        const blocked = result.actions
+          .find((action) => action.target === "aionrs")
+          .skills.find((s) => s.action === "blocked");
+        assert.match(blocked.message, scenario.expect);
+      } finally {
+        scenario.restore(skillsDir);
+      }
+    });
+  }
+}
 
 test("a destination parent that is a symlink to a real directory is not an obstacle", () => {
   // The check resolves with `stat`, not `lstat`, so a symlinked home layout still installs.
