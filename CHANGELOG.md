@@ -103,6 +103,14 @@ Notable changes per release. Dates are release dates.
   `unavailable:` line. **`doctor` is the health gate** and is the command to use in scripts and
   CI; it exits non-zero on any problem.
 
+### Known limits
+
+Installer mutations are single-writer in 2.1.0. Do not run two `install`/`uninstall` commands,
+or another skill manager targeting any of the same skills roots, at the same time. Wait for one
+command to finish before starting the next. Concurrent processes are not isolated; an
+overlapping rollback can invalidate a command that already reported success. After any suspected
+overlap, serialize further commands, run `doctor`, and reinstall the intended selection.
+
 ### Compatibility
 
 Install markers written by 2.0.0 carry **neither** a schema version nor a manifest record, and
