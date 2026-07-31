@@ -1625,19 +1625,79 @@ test("aliased runtime roots are caught before anything exists to realpath", () =
   );
 });
 
-test("case-only spellings of one directory are one destination", () => {
-  // On a case-insensitive volume realpath preserves the caller's spelling, so two case-only
-  // variants produced two keys for one directory. (round 14, codex-1 MAJOR.)
+test("case-only spellings of one home are one destination in a single plan", () => {
+  // The previous version of this test installed ONE generic target and then ran doctor through
+  // another spelling — it never put two targets in one plan, so it passed at the commit it was
+  // written to discriminate. codex-1 caught that; this version fails there. (round 15.)
   const home = tmpDir();
-  const real = path.join(home, "RuntimeHome");
-  fs.mkdirSync(path.join(real, "skills"), { recursive: true });
-  const a = installer.installCommand(context(home, { target: "generic", dest: path.join(home, "RuntimeHome", "skills", "parley-deck") }));
-  assert.equal(a.ok, true);
-  const lower = path.join(home, "runtimehome", "skills", "parley-deck");
-  const sameFile = fs.existsSync(lower);
-  if (!sameFile) return; // case-sensitive volume: nothing to assert
-  const b = installer.doctorCommand(context(home, { command: "doctor", target: "generic", dest: lower }));
-  assert.equal(b.targets[0].skills[0].status, "valid", "the same directory under either spelling");
+  const upper = path.join(home, "RuntimeHome");
+  fs.mkdirSync(path.join(upper, "skills"), { recursive: true });
+  if (!fs.existsSync(path.join(home, "runtimehome", "skills"))) return; // case-sensitive volume
+
+  const env = {
+    HOME: home,
+    PATH: "",
+    CODEX_HOME: upper,
+    KIMI_CODE_HOME: path.join(home, "runtimehome")
+  };
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true }),
+    env
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false, "two spellings of one directory must not both install");
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units into one directory twice`);
+});
+
+test("a destination nested inside another destination refuses the plan", () => {
+  // Staging creates parents, so one unit can materialize another's destination between planning
+  // and commit: measured ok:true, inner `installed`, outer `replaced`, inner install gone from
+  // disk, surviving marker naming the outer target. (round 15, codex-1 MAJOR.)
+  for (const reversed of [false, true]) {
+    const home = tmpDir();
+    const outer = path.join(home, "OUTER");
+    const inner = path.join(outer, "skills", "parley-deck");
+    const env = {
+      HOME: home,
+      PATH: "",
+      CODEX_HOME: reversed ? outer : inner,
+      KIMI_CODE_HOME: reversed ? inner : outer
+    };
+    const ctx = { ...context(home, { target: "all", includeUndetected: true }), env };
+    const result = installer.installCommand(ctx);
+
+    assert.equal(result.ok, false, `reversed=${reversed}`);
+    const written = result.actions.flatMap((a) =>
+      a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+    );
+    assert.equal(written.length, 0, `reversed=${reversed} wrote ${written.length} units`);
+    const blocked = result.actions
+      .flatMap((a) => a.skills)
+      .find((s) => s.action === "blocked" && /overlaps another in this plan/.test(s.message || ""));
+    assert.ok(blocked, `reversed=${reversed} must name the overlap`);
+  }
+});
+
+test("uninstall dry-run and real agree unit by unit, not only on ok", () => {
+  // Both codex-1 and kimi-1 found the same divergence: the real-only preflight flattened every
+  // non-blocked unit to `skipped`, including absent ones the fleet path records as `missing`.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const foreign = path.join(home, ".codex", "skills", "parley-bidding", installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(foreign, "utf8"));
+  marker.name = "someone-else";
+  fs.writeFileSync(foreign, JSON.stringify(marker, null, 2));
+  fs.rmSync(path.join(home, ".codex", "skills", "parley-tracker"), { recursive: true, force: true });
+
+  const dry = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex", dryRun: true }));
+  const real = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+  assert.equal(dry.ok, real.ok);
+  const shape = (r) =>
+    r.actions[0].skills.map((s) => `${s.skill}:${s.ok}:${s.action}`).join("|");
+  assert.equal(shape(dry), shape(real), "every unit must carry the same verdict in both modes");
 });
 
 test("every read of the manifest shares the regular-file rule", () => {

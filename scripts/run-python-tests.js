@@ -21,6 +21,8 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
+const addonManifest = require("../lib/addon-manifest");
+
 const REPO_ROOT = path.resolve(__dirname, "..");
 const ADDON_ROOT = path.join(REPO_ROOT, "skills", "parley-bidding");
 const TESTS_DIR = path.join(ADDON_ROOT, "scripts", "tests");
@@ -43,16 +45,19 @@ function fail(message) {
   process.exit(1);
 }
 
-// The interpreter floor is declared once, by the add-on, in its manifest.
+// The interpreter floor is declared once, by the add-on, in its manifest — and it is read
+// through the shared parser, which enforces the regular-file rule. Reading the file directly
+// made this a fourth manifest reader outside that rule, and its catch-all turned a symlinked or
+// unparseable manifest into "no declared floor", so the suite reported 54/54 against a manifest
+// the module itself refuses. (review round 15, codex-1 MINOR.)
 function declaredPythonFloor() {
-  try {
-    const manifest = JSON.parse(fs.readFileSync(path.join(ADDON_ROOT, "parley-addon.json"), "utf8"));
-    const spec = manifest.runtime && manifest.runtime.python;
-    const match = typeof spec === "string" ? spec.match(/^>=\s*(\d+)\.(\d+)$/) : null;
-    return match ? { major: Number(match[1]), minor: Number(match[2]), spec } : null;
-  } catch (_error) {
-    return null;
+  const read = addonManifest.readManifest(ADDON_ROOT);
+  if (!read.ok) {
+    fail(`${ADDON_ROOT}: ${read.error}`);
   }
+  const spec = read.manifest.runtime && read.manifest.runtime.python;
+  const match = typeof spec === "string" ? spec.match(/^>=\s*(\d+)\.(\d+)$/) : null;
+  return match ? { major: Number(match[1]), minor: Number(match[2]), spec } : null;
 }
 
 function resolveInterpreter() {
