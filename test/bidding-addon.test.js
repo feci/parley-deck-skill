@@ -1652,6 +1652,107 @@ test("case-only spellings of one home are one destination in a single plan", () 
   assert.equal(written.length, 0, `wrote ${written.length} units into one directory twice`);
 });
 
+test("a firmlink respelling with an existing inner parent is still one nesting", () => {
+  // This is the arm that decided the model: realpath strings miss it (two spellings), scalar
+  // dev:ino keys miss it (different anchors), and the union of the two misses it as well —
+  // which is why the identity chain replaced all three rather than joining them. It had no
+  // regression until now. (round 19, kimi-1 MINOR.)
+  const base = `/private/tmp/parley-skew-${process.pid}`;
+  const alt = `/System/Volumes/Data${base}`;
+  const kimiHome = path.join(base, "KM");
+  fs.mkdirSync(kimiHome, { recursive: true });
+  try {
+    const direct = fs.statSync(base);
+    const respelled = fs.statSync(alt);
+    if (direct.dev !== respelled.dev || direct.ino !== respelled.ino) return; // no firmlink here
+
+    const seed = {
+      ...context(base, { target: "kimi", includeUndetected: true, noAddons: true }),
+      env: { HOME: base, PATH: "", KIMI_CODE_HOME: kimiHome }
+    };
+    assert.equal(installer.installCommand(seed).ok, true);
+    const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+    fs.mkdirSync(path.join(kimiCore, "existing", "parent", "skills"), { recursive: true });
+
+    const ctx = {
+      ...context(base, { target: "all", includeUndetected: true, noAddons: true }),
+      env: {
+        HOME: base,
+        PATH: "",
+        KIMI_CODE_HOME: kimiHome,
+        CODEX_HOME: path.join(`/System/Volumes/Data${kimiCore}`, "existing", "parent")
+      }
+    };
+    const result = installer.installCommand(ctx);
+    assert.equal(result.ok, false, "a respelling with an existing inner parent must be caught");
+    const written = result.actions.flatMap((a) =>
+      a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+    );
+    assert.equal(written.length, 0, `wrote ${written.length} units`);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a raw symlink target's intermediate directories are dependencies too", () => {
+  // `path.join` collapses `name/..` lexically, so a target that walks INTO another destination
+  // and back out again reduced to its endpoint and the dependency vanished. The link only works
+  // while `transient` exists inside the managed tree. (round 19, codex-1 MAJOR.)
+  const home = tmpDir();
+  const kimiHome = path.join(home, "KM");
+  const seed = {
+    ...context(home, { target: "kimi", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  };
+  assert.equal(installer.installCommand(seed).ok, true);
+
+  const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+  fs.mkdirSync(path.join(kimiCore, "transient"), { recursive: true });
+  const away = path.join(home, "away");
+  fs.mkdirSync(away, { recursive: true });
+  const outside = path.join(home, "B");
+  fs.mkdirSync(outside, { recursive: true });
+  fs.symlinkSync(
+    "../KM/skills/parley-deck/transient/../../../../away",
+    path.join(outside, "skills")
+  );
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome, CODEX_HOME: outside }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false);
+  assert.equal(fs.existsSync(path.join(away, "parley-deck")), false, "nothing may be orphaned");
+});
+
+test("the chain walk starts at the platform root, not at the separator", () => {
+  // Both walkers restarted from `path.sep`, valid only for POSIX: on Windows `C:\\Users\\a`
+  // became the probes `\\C:` and `\\C:\\Users`, and a UNC path lost its whole root — so the gate
+  // degraded to spelling-derived values on a channel that ships a binary CI never executes.
+  // This exercises the installer's own splitter with win32 semantics injected, rather than
+  // asserting `path.win32`'s behaviour, which would pin nothing.
+  // (round 19: codex-1 MAJOR, kimi-1 MAJOR.)
+  const win = path.win32;
+
+  const drive = installer.splitAtRoot("C:\\Users\\a\\skills", win);
+  assert.equal(drive.root, "C:\\");
+  assert.deepEqual(drive.parts, ["Users", "a", "skills"]);
+
+  const unc = installer.splitAtRoot("\\\\server\\share\\dir\\x", win);
+  assert.equal(unc.root, "\\\\server\\share\\");
+  assert.deepEqual(unc.parts, ["dir", "x"]);
+
+  let logical = drive.root;
+  const probes = drive.parts.map((part) => (logical = win.join(logical, part)));
+  assert.deepEqual(probes, ["C:\\Users", "C:\\Users\\a", "C:\\Users\\a\\skills"]);
+
+  // and POSIX is unchanged
+  const posix = installer.splitAtRoot("/tmp/x/y", path.posix);
+  assert.equal(posix.root, "/");
+  assert.deepEqual(posix.parts, ["tmp", "x", "y"]);
+});
+
 test("nesting is caught when the two sides anchor on different existing ancestors", () => {
   // Cycle 21 keyed each destination by its NEAREST EXISTING ancestor and compared those keys as
   // string prefixes. When both destinations already exist — or the inner one has its own
