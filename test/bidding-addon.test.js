@@ -1603,6 +1603,78 @@ test("a marker that kept its manifest but lost its schema is still malformed", (
   assert.match(unit.problems.join(" "), /manifest but declares no markerSchema/);
 });
 
+test("aliased runtime roots are caught before anything exists to realpath", () => {
+  // `realpath` on the parent failed for both targets when `skills/` did not exist yet, so the
+  // fallback keys differed and one target's core silently became the other's. Identity now
+  // comes from the nearest EXISTING ancestor's dev/ino. (round 14, codex-1 MAJOR.)
+  const home = tmpDir();
+  const shared = path.join(home, "shared-root");
+  fs.mkdirSync(shared, { recursive: true });
+  fs.symlinkSync(shared, path.join(home, ".codex"));
+  fs.symlinkSync(shared, path.join(home, ".hermes"));
+
+  const result = installer.installCommand(context(home, { target: "all", includeUndetected: true }));
+  assert.equal(result.ok, false);
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units into an aliased plan`);
+  assert.match(
+    result.actions.find((a) => a.target === "codex").skills[0].message,
+    /resolve to the same directory/
+  );
+});
+
+test("case-only spellings of one directory are one destination", () => {
+  // On a case-insensitive volume realpath preserves the caller's spelling, so two case-only
+  // variants produced two keys for one directory. (round 14, codex-1 MAJOR.)
+  const home = tmpDir();
+  const real = path.join(home, "RuntimeHome");
+  fs.mkdirSync(path.join(real, "skills"), { recursive: true });
+  const a = installer.installCommand(context(home, { target: "generic", dest: path.join(home, "RuntimeHome", "skills", "parley-deck") }));
+  assert.equal(a.ok, true);
+  const lower = path.join(home, "runtimehome", "skills", "parley-deck");
+  const sameFile = fs.existsSync(lower);
+  if (!sameFile) return; // case-sensitive volume: nothing to assert
+  const b = installer.doctorCommand(context(home, { command: "doctor", target: "generic", dest: lower }));
+  assert.equal(b.targets[0].skills[0].status, "valid", "the same directory under either spelling");
+});
+
+test("every read of the manifest shares the regular-file rule", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const dest = path.join(home, ".codex", "skills", "parley-bidding");
+  const manifest = path.join(dest, "parley-addon.json");
+  const outside = path.join(home, "ext.json");
+  fs.renameSync(manifest, outside);
+  fs.symlinkSync(outside, manifest);
+
+  assert.equal(addonManifest.hasManifest(dest), false);
+  assert.equal(addonManifest.manifestFileHash(dest), null);
+  assert.equal(addonManifest.verifyPayload(dest).ok, false);
+  assert.equal(addonManifest.readManifest(dest).ok, false, "the parser must not read through the link");
+});
+
+test("uninstall --dry-run does not promise removals the real command refuses", () => {
+  // The fleet gate ran after each good unit had already been recorded as `remove`, and those
+  // records were never revisited. (round 14, codex-1 MINOR.)
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const markerFile = path.join(home, ".codex", "skills", "parley-bidding", installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+  marker.name = "someone-else";
+  fs.writeFileSync(markerFile, JSON.stringify(marker, null, 2));
+
+  const dry = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex", dryRun: true }));
+  const real = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+  assert.equal(dry.ok, real.ok);
+  assert.equal(
+    dry.actions[0].skills.filter((s) => s.action === "remove").length,
+    real.actions[0].skills.filter((s) => s.action === "removed").length,
+    "dry-run must promise exactly what the real command performs"
+  );
+});
+
 test("a symlinked manifest is a payload defect, not payload authority", () => {
   // Cycle 16 confined the manifest's KEYS and left the file that supplies them unconfined:
   // `hasManifest` followed links, so an external byte-identical manifest read as `valid` and
