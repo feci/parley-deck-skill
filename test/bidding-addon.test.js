@@ -1652,6 +1652,57 @@ test("case-only spellings of one home are one destination in a single plan", () 
   assert.equal(written.length, 0, `wrote ${written.length} units into one directory twice`);
 });
 
+test("nesting is caught when the two sides anchor on different existing ancestors", () => {
+  // Cycle 21 keyed each destination by its NEAREST EXISTING ancestor and compared those keys as
+  // string prefixes. When both destinations already exist — or the inner one has its own
+  // existing parent — the two keys start from different inodes and no prefix relation holds,
+  // though the paths are physically nested. Measured at `64e43f9`: ok:true, codex `replaced`,
+  // its destination gone. (round 18: hermes-1 MAJOR, codex-1 MAJOR, kimi-1 — unanimous.)
+  const home = tmpDir();
+  const outer = path.join(home, "OUTER");
+  const inner = path.join(outer, "skills", "parley-deck");
+  fs.mkdirSync(path.join(inner, "skills", "parley-deck"), { recursive: true });
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true, force: true }),
+    env: { HOME: home, PATH: "", CODEX_HOME: inner, KIMI_CODE_HOME: outer }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false);
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units into a nested pair`);
+});
+
+test("a symlink buried below an existing subdirectory is still located inside its destination", () => {
+  // `physicalEntryKey` keyed a link by its IMMEDIATE parent, so a link two directories deep
+  // anchored on that deep directory rather than on the destination containing it.
+  // (round 18, codex-1.)
+  const home = tmpDir();
+  const kimiHome = path.join(home, "KM");
+  const seed = {
+    ...context(home, { target: "kimi", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  };
+  assert.equal(installer.installCommand(seed).ok, true);
+
+  const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+  const deep = path.join(kimiCore, "one", "two");
+  fs.mkdirSync(deep, { recursive: true });
+  const away = path.join(home, "away");
+  fs.mkdirSync(away, { recursive: true });
+  fs.symlinkSync(away, path.join(deep, "redirect"));
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome, CODEX_HOME: path.join(deep, "redirect") }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false);
+  assert.equal(fs.existsSync(path.join(away, "skills", "parley-deck")), false);
+});
+
 test("a firmlink respelling of one directory is one destination", () => {
   // `/private/x` and `/System/Volumes/Data/private/x` are the same objects; `lstat` calls both
   // directories and `realpath` preserves both spellings, so the symlink-only touchpoint check
