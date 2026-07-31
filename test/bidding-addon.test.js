@@ -1235,6 +1235,44 @@ test("a dangling destination symlink is a filesystem entry, not absence", () => 
   assert.equal(blocked.action, "blocked");
 });
 
+test("--force does not suppress an impossible destination parent", () => {
+  // --force overrides whose tree may be replaced. It was also suppressing the only check that
+  // looked at the path at all, so an uncreatable destination stopped being caught in preflight:
+  // 78 units across 13 targets were written before `aionrs` failed. (round 9, codex-1 MAJOR.)
+  for (const force of [false, true]) {
+    const home = tmpDir();
+    fs.mkdirSync(path.join(home, ".aionrs"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".aionrs", "skills"), "not a directory\n");
+
+    const result = installer.installCommand(
+      context(home, { target: "all", includeUndetected: true, force })
+    );
+    assert.equal(result.ok, false, `force=${force}`);
+
+    const written = (result.actions || []).flatMap((action) =>
+      (action.skills || []).filter((s) => s.action === "installed" || s.action === "replaced")
+    );
+    assert.equal(written.length, 0, `force=${force} wrote ${written.length} units before failing`);
+
+    const blocked = result.actions
+      .find((action) => action.target === "aionrs")
+      .skills.find((s) => s.action === "blocked");
+    assert.match(blocked.message, /is not a directory/);
+  }
+});
+
+test("a destination parent that is a symlink to a real directory is not an obstacle", () => {
+  // The check resolves with `stat`, not `lstat`, so a symlinked home layout still installs.
+  const home = tmpDir();
+  const real = path.join(home, "real-codex");
+  fs.mkdirSync(path.join(real, "skills"), { recursive: true });
+  fs.symlinkSync(real, path.join(home, ".codex"));
+
+  const result = installer.installCommand(context(home, { target: "codex" }));
+  assert.equal(result.ok, true, JSON.stringify(result.actions && result.actions[0]));
+  assert.equal(fs.existsSync(path.join(real, "skills", "parley-deck", "SKILL.md")), true);
+});
+
 test("health does not call a dangling destination symlink missing", () => {
   // Cycle 10 converted only the install path, so `skillUnitStatus` still answered "missing"
   // for an entry that is plainly there. `missing` invites an install that preflight refuses.
