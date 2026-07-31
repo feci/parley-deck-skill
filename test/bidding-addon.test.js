@@ -1694,6 +1694,93 @@ test("a firmlink respelling with an existing inner parent is still one nesting",
   }
 });
 
+test("a link reached through an earlier link is walked from where it physically sits", () => {
+  // `resolutionTouchpoints` accumulated its path by string join and discarded the physical
+  // landing point `walkRawTarget` returns, so a second link's relative target was walked from
+  // the spelling. Any `..` then climbed the wrong tree whenever the first link's target is
+  // deeper than its spelling. (round 21: codex-1 MAJOR, kimi-1 MAJOR — the same arm.)
+  const home = tmpDir();
+  const real = path.join(home, "real");
+  fs.mkdirSync(path.join(real, "A", "container"), { recursive: true });
+  fs.mkdirSync(path.join(real, "Btree"), { recursive: true });
+  fs.symlinkSync(path.join(real, "A"), path.join(home, "linkA"));
+
+  const kimiHome = path.join(real, "Btree");
+  const seed = {
+    ...context(home, { target: "kimi", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  };
+  assert.equal(installer.installCommand(seed).ok, true);
+
+  const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+  const outside = path.join(home, "outside");
+  fs.mkdirSync(path.join(outside, "deep"), { recursive: true });
+  fs.symlinkSync(outside, path.join(kimiCore, "inner"));
+  fs.symlinkSync(
+    "../../Btree/skills/parley-deck/inner/deep",
+    path.join(real, "A", "container", "skills")
+  );
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true }),
+    env: {
+      HOME: home,
+      PATH: "",
+      KIMI_CODE_HOME: kimiHome,
+      CODEX_HOME: path.join(home, "linkA", "container")
+    }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false);
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units`);
+  assert.equal(
+    fs.existsSync(path.join(outside, "deep", "parley-deck")),
+    false,
+    "nothing may be orphaned through the linked ancestor"
+  );
+});
+
+test("a backslash inside a POSIX link target is a filename byte, not a separator", () => {
+  // `split(/[\\/]+/)` treated `\` as a separator on every platform; on POSIX it is an ordinary
+  // byte in a filename. (round 21, codex-1.)
+  //
+  // THIS IS A PIN, NOT A PROOF. It passes at `381e639` too: the parent component is recorded
+  // before the torn name, so the arm is caught by accident there. I could not construct an
+  // input where the tearing causes a MISS rather than an extra, so this asserts the corrected
+  // behaviour without discriminating against the defect. Labelled rather than counted, because
+  // five earlier findings in this idea were tests of mine dressed as proofs.
+  if (process.platform === "win32") return;
+  const home = tmpDir();
+  const kimiHome = path.join(home, "KM");
+  const seed = {
+    ...context(home, { target: "kimi", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  };
+  assert.equal(installer.installCommand(seed).ok, true);
+
+  // a directory whose NAME contains a backslash, living inside kimi's destination
+  const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+  const odd = path.join(kimiCore, "we\\ird");
+  fs.mkdirSync(odd, { recursive: true });
+  const outside = path.join(home, "B");
+  fs.mkdirSync(outside, { recursive: true });
+  fs.symlinkSync(odd, path.join(outside, "skills"));
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome, CODEX_HOME: outside }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false, "the link lands inside kimi's destination and must be refused");
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units`);
+});
+
 test("an intermediate link in a raw target is expanded before `..` is applied", () => {
   // The kernel expands a link the moment it enters it, so `..` steps back through the expanded
   // target. A lexical walk stepped back through the spelling instead, and never recorded the
