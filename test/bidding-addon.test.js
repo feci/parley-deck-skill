@@ -1603,6 +1603,116 @@ test("a marker that kept its manifest but lost its schema is still malformed", (
   assert.match(unit.problems.join(" "), /manifest but declares no markerSchema/);
 });
 
+test("a symlinked manifest is a payload defect, not payload authority", () => {
+  // Cycle 16 confined the manifest's KEYS and left the file that supplies them unconfined:
+  // `hasManifest` followed links, so an external byte-identical manifest read as `valid` and
+  // even `managed: true`. (round 13: codex-1 MAJOR, hermes-1 MINOR — both asked for the rule.)
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const dest = path.join(home, ".codex", "skills", "parley-bidding");
+  const manifest = path.join(dest, "parley-addon.json");
+  const outside = path.join(home, "external-manifest.json");
+  fs.renameSync(manifest, outside);
+  fs.symlinkSync(outside, manifest);
+
+  const verified = addonManifest.verifyPayload(dest);
+  assert.equal(verified.ok, false);
+  assert.match(verified.problems.join(" "), /symbolic link/);
+
+  const unit = doctorStatus(home, "parley-bidding");
+  assert.equal(unit.status, "malformed");
+  assert.notEqual(unit.managed, true, "an external manifest must not confer managed status");
+});
+
+test("two targets resolving to one physical directory refuse the whole plan", () => {
+  // A runtime's configured container may be a symlink; two of them may point at one place. Both
+  // reported ok:true while one target's specialized core overwrote the other's.
+  const home = tmpDir();
+  const shared = path.join(home, "shared-skills");
+  fs.mkdirSync(shared, { recursive: true });
+  fs.mkdirSync(path.join(home, ".gemini", "config"), { recursive: true });
+  fs.symlinkSync(shared, path.join(home, ".gemini", "config", "plugins"));
+  fs.symlinkSync(shared, path.join(home, ".gemini", "extensions"));
+
+  const result = installer.installCommand(context(home, { target: "all", includeUndetected: true }));
+  assert.equal(result.ok, false);
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units into an aliased plan`);
+  const blocked = result.actions
+    .find((a) => a.target === "agy")
+    .skills.find((s) => s.action === "blocked");
+  assert.match(blocked.message, /resolve to the same directory/);
+});
+
+test("install --dry-run answers exactly what the real install would", () => {
+  // A dry run that disagrees with the command it models is worse than no dry run.
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const markerFile = path.join(home, ".codex", "skills", "parley-deck", installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+  marker.addons = {};
+  fs.writeFileSync(markerFile, JSON.stringify(marker, null, 2));
+
+  const dry = installer.installCommand(context(home, { target: "codex", dryRun: true }));
+  const real = installer.installCommand(context(home, { target: "codex" }));
+  assert.equal(dry.ok, real.ok, "dry-run and real install must agree");
+  assert.equal(dry.actions[0].dryRun, true, "the per-action flag is part of the JSON contract");
+
+  // And uninstall, which kimi-1 found had the same gap.
+  const other = tmpDir();
+  installer.installCommand(context(other, { target: "codex" }));
+  const otherMarker = path.join(other, ".codex", "skills", "parley-deck", installer.MARKER_FILE);
+  const om = JSON.parse(fs.readFileSync(otherMarker, "utf8"));
+  om.addons = {};
+  fs.writeFileSync(otherMarker, JSON.stringify(om, null, 2));
+  const dryRemove = installer.uninstallCommand(
+    context(other, { command: "uninstall", target: "codex", dryRun: true })
+  );
+  const realRemove = installer.uninstallCommand(
+    context(other, { command: "uninstall", target: "codex" })
+  );
+  assert.equal(dryRemove.ok, realRemove.ok, "dry-run and real uninstall must agree");
+});
+
+test("a damaged recorded selection is repairable, and the message says how", () => {
+  // Fail-closed everywhere left no command that could repair the state and no output naming
+  // the exit. Install derives its units from discovery, never the marker, so it is the repair.
+  // (round 13, kimi-1 MINOR.)
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex", noAddons: true }));
+  const markerFile = path.join(home, ".codex", "skills", "parley-deck", installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+  marker.addons = { bogus: true };
+  fs.writeFileSync(markerFile, JSON.stringify(marker, null, 2));
+
+  const health = doctorStatus(home, "parley-deck");
+  assert.equal(health.status, "malformed");
+  assert.match(health.problems.join(" "), /Re-run install to rewrite it/);
+
+  const blockedRemoval = installer.uninstallCommand(
+    context(home, { command: "uninstall", target: "codex", force: true })
+  );
+  assert.equal(blockedRemoval.ok, false, "uninstall must still refuse: it builds paths from this");
+
+  const repair = installer.installCommand(context(home, { target: "codex" }));
+  assert.equal(repair.ok, true, "install repairs the selection it never reads");
+  assert.equal(doctorStatus(home, "parley-deck").status, "valid");
+});
+
+test("a recorded selection naming the core skill is refused", () => {
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }));
+  const markerFile = path.join(home, ".codex", "skills", "parley-deck", installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+  marker.addons = ["parley-deck"];
+  fs.writeFileSync(markerFile, JSON.stringify(marker, null, 2));
+  const health = doctorStatus(home, "parley-deck");
+  assert.equal(health.status, "malformed");
+  assert.match(health.problems.join(" "), /records the core skill as an add-on/);
+});
+
 test("install is fleet-wide too: an immovable destination writes nothing anywhere", () => {
   // Cycle 15 deleted the removability predicate from install as well, on the argument that
   // install "already commits by rename". True of the commit, false of the fleet: a destination
