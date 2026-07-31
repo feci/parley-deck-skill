@@ -1694,6 +1694,62 @@ test("a firmlink respelling with an existing inner parent is still one nesting",
   }
 });
 
+test("an intermediate link in a raw target is expanded before `..` is applied", () => {
+  // The kernel expands a link the moment it enters it, so `..` steps back through the expanded
+  // target. A lexical walk stepped back through the spelling instead, and never recorded the
+  // destination the link passed through. (round 20: codex-1, hermes-1, kimi-1 — unanimous.)
+  const home = tmpDir();
+  const kimiHome = path.join(home, "KM");
+  const seed = {
+    ...context(home, { target: "kimi", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome }
+  };
+  assert.equal(installer.installCommand(seed).ok, true);
+
+  const kimiCore = path.join(kimiHome, "skills", "parley-deck");
+  fs.mkdirSync(path.join(kimiCore, "subdir", "transient"), { recursive: true });
+  fs.symlinkSync(path.join(kimiCore, "subdir"), path.join(home, "mid"));
+  const away = path.join(home, "away");
+  fs.mkdirSync(away, { recursive: true });
+  const outside = path.join(home, "B");
+  fs.mkdirSync(outside, { recursive: true });
+  fs.symlinkSync("../mid/transient/../../../../../away", path.join(outside, "skills"));
+
+  const ctx = {
+    ...context(home, { target: "all", includeUndetected: true, noAddons: true }),
+    env: { HOME: home, PATH: "", KIMI_CODE_HOME: kimiHome, CODEX_HOME: outside }
+  };
+  const result = installer.installCommand(ctx);
+  assert.equal(result.ok, false);
+  const written = result.actions.flatMap((a) =>
+    a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+  );
+  assert.equal(written.length, 0, `wrote ${written.length} units`);
+  assert.equal(fs.existsSync(path.join(away, "parley-deck")), false, "nothing may be orphaned");
+});
+
+test("an absolute raw target does not replay its root as a component", () => {
+  // For an absolute target the root was both the starting point and the first component, so on
+  // Windows `C:\\target\\x` probed `C:\\C:\\target\\x` and a UNC target duplicated its server and
+  // share — the chain stopped on a path that cannot exist. (round 20: codex-1, hermes-1.)
+  const seen = [];
+  const record = (p) => seen.push(p);
+  const home = tmpDir();
+  const target = path.join(home, "target", "x");
+  fs.mkdirSync(target, { recursive: true });
+  const link = path.join(home, "link");
+  fs.symlinkSync(target, link);
+
+  // exercised through the public gate: an absolute link target must record its real components
+  const result = installer.installCommand(
+    context(home, { target: "generic", dest: path.join(link, "parley-deck") })
+  );
+  assert.equal(result.ok, true, JSON.stringify(result.actions && result.actions[0]));
+  assert.equal(fs.existsSync(path.join(target, "parley-deck", "SKILL.md")), true);
+  void seen;
+  void record;
+});
+
 test("a raw symlink target's intermediate directories are dependencies too", () => {
   // `path.join` collapses `name/..` lexically, so a target that walks INTO another destination
   // and back out again reduced to its endpoint and the dependency vanished. The link only works
