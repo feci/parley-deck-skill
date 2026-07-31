@@ -1603,6 +1603,150 @@ test("a marker that kept its manifest but lost its schema is still malformed", (
   assert.match(unit.problems.join(" "), /manifest but declares no markerSchema/);
 });
 
+test("install is fleet-wide too: an immovable destination writes nothing anywhere", () => {
+  // Cycle 15 deleted the removability predicate from install as well, on the argument that
+  // install "already commits by rename". True of the commit, false of the fleet: a destination
+  // directory carrying `uchg` makes the commit rename itself fail, and 83 units were written
+  // before the 84th did. A regression this cycle introduced. (round 12, kimi-1 MAJOR.)
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "all", includeUndetected: true })).ok, true);
+  const victim = path.join(home, ".aionrs", "skills", "parley-worktrees");
+  const before = fs.readFileSync(path.join(home, ".codex", "skills", "parley-deck", "SKILL.md"));
+  spawnSync("chflags", ["uchg", victim]);
+  try {
+    const result = installer.installCommand(context(home, { target: "all", includeUndetected: true }));
+    assert.equal(result.ok, false);
+    const written = result.actions.flatMap((a) =>
+      a.skills.filter((s) => s.action === "installed" || s.action === "replaced")
+    );
+    assert.equal(written.length, 0, `wrote ${written.length} units before failing`);
+    assert.deepEqual(
+      fs.readFileSync(path.join(home, ".codex", "skills", "parley-deck", "SKILL.md")),
+      before,
+      "an untouched target must be byte-identical after a refused fleet install"
+    );
+    const stagingDebris = fs
+      .readdirSync(path.join(home, ".codex", "skills"))
+      .filter((name) => name.includes(".tmp"));
+    assert.deepEqual(stagingDebris, [], "a refused install leaves no staging directories");
+  } finally {
+    spawnSync("chflags", ["-R", "nouchg", home]);
+  }
+});
+
+test("an unknown marker name cannot delete an unrelated sibling under --force", () => {
+  // Cycle 15 confined WHERE a recorded name may point. It did not establish that this package
+  // has any authority over what is there, so a syntactically perfect but unknown name was still
+  // a forced-deletion target. (round 12, codex-1 CRITICAL.)
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "codex" })).ok, true);
+  const skills = path.join(home, ".codex", "skills");
+  fs.mkdirSync(path.join(skills, "unrelated-sentinel"), { recursive: true });
+  fs.writeFileSync(path.join(skills, "unrelated-sentinel", "KEEP"), "someone else's data\n");
+
+  const markerFile = path.join(skills, "parley-deck", installer.MARKER_FILE);
+  const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+  marker.addons = ["unrelated-sentinel"];
+  fs.writeFileSync(markerFile, JSON.stringify(marker, null, 2));
+
+  const result = installer.uninstallCommand(
+    context(home, { command: "uninstall", target: "codex", force: true })
+  );
+  assert.equal(result.ok, false);
+  assert.equal(fs.existsSync(path.join(skills, "unrelated-sentinel", "KEEP")), true);
+  assert.equal(fs.existsSync(path.join(skills, "parley-deck")), true);
+  assert.match(result.actions[0].skills[0].message, /does not ship and does not own/);
+});
+
+test("an add-on dropped from a newer package can still be uninstalled", () => {
+  // The second clause of the authorization rule: not shipped, but the destination carries our
+  // marker claiming that identity. Without it, authorization would strand real installs.
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home, { target: "codex" })).ok, true);
+  const skills = path.join(home, ".codex", "skills");
+  const orphan = path.join(skills, "parley-bidding");
+  const renamed = path.join(skills, "parley-legacy-addon");
+  fs.renameSync(orphan, renamed);
+  const orphanMarker = path.join(renamed, installer.MARKER_FILE);
+  const om = JSON.parse(fs.readFileSync(orphanMarker, "utf8"));
+  om.skill = "parley-legacy-addon";
+  fs.writeFileSync(orphanMarker, JSON.stringify(om, null, 2));
+
+  const coreMarkerFile = path.join(skills, "parley-deck", installer.MARKER_FILE);
+  const core = JSON.parse(fs.readFileSync(coreMarkerFile, "utf8"));
+  core.addons = ["parley-legacy-addon"];
+  fs.writeFileSync(coreMarkerFile, JSON.stringify(core, null, 2));
+
+  const result = installer.uninstallCommand(context(home, { command: "uninstall", target: "codex" }));
+  assert.equal(result.ok, true, JSON.stringify(result.actions[0].skills));
+  assert.equal(fs.existsSync(renamed), false);
+});
+
+test("a marker addons value that is neither a list nor false fails closed", () => {
+  // The fail-closed branch sat behind Array.isArray and never ran for these.
+  for (const shape of ["parley-bidding", true, null, {}, 42]) {
+    const home = tmpDir();
+    installer.installCommand(context(home, { target: "codex", noAddons: true }));
+    const markerFile = path.join(home, ".codex", "skills", "parley-deck", installer.MARKER_FILE);
+    const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+    marker.addons = shape;
+    fs.writeFileSync(markerFile, JSON.stringify(marker, null, 2));
+
+    const health = doctorStatus(home, "parley-deck");
+    assert.equal(health.status, "malformed", `addons=${JSON.stringify(shape)}`);
+    assert.match(health.problems.join(" "), /neither a list nor false/);
+
+    const removal = installer.uninstallCommand(
+      context(home, { command: "uninstall", target: "codex", force: true })
+    );
+    assert.equal(removal.ok, false);
+    assert.equal(fs.existsSync(path.join(home, ".codex", "skills", "parley-deck")), true);
+  }
+});
+
+test("an absent addons field and an explicit false both still mean core-only", () => {
+  for (const shape of [undefined, false]) {
+    const home = tmpDir();
+    installer.installCommand(context(home, { target: "codex", noAddons: true }));
+    const markerFile = path.join(home, ".codex", "skills", "parley-deck", installer.MARKER_FILE);
+    const marker = JSON.parse(fs.readFileSync(markerFile, "utf8"));
+    if (shape === undefined) delete marker.addons;
+    else marker.addons = false;
+    fs.writeFileSync(markerFile, JSON.stringify(marker, null, 2));
+    assert.equal(doctorStatus(home, "parley-deck").status, "valid", `addons=${String(shape)}`);
+  }
+});
+
+test("a manifest key cannot escape the payload root", () => {
+  // The aggregate digest proves the manifest agrees with itself; it says nothing about where
+  // the keys point. (round 12, codex-1 MAJOR.)
+  const staging = tmpDir();
+  const payload = path.join(staging, "addon");
+  fs.cpSync(addonRoot, payload, { recursive: true });
+  fs.writeFileSync(path.join(staging, "outside-sentinel"), "external file\n");
+
+  const manifestPath = path.join(payload, "parley-addon.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const digest = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(path.join(staging, "outside-sentinel")))
+    .digest("hex");
+
+  for (const key of ["../outside-sentinel", "../parley-deck/SKILL.md", "/etc/passwd", "a/../../b"]) {
+    const tampered = { ...manifest, files: { ...manifest.files, [key]: `sha256:${digest}` } };
+    const aggregate = crypto.createHash("sha256");
+    for (const rel of Object.keys(tampered.files).sort()) {
+      aggregate.update(`${rel}\n${tampered.files[rel].replace(/^sha256:/, "")}\n`);
+    }
+    tampered.aggregate = `sha256:${aggregate.digest("hex")}`;
+    fs.writeFileSync(manifestPath, JSON.stringify(tampered, null, 2));
+
+    const verified = addonManifest.verifyPayload(payload);
+    assert.equal(verified.ok, false, `key ${key} must be refused`);
+    assert.match(verified.problems.join(" "), /unusable manifest entry|escapes the payload/);
+  }
+});
+
 test("health does not call a dangling destination symlink missing", () => {
   // Cycle 10 converted only the install path, so `skillUnitStatus` still answered "missing"
   // for an entry that is plainly there. `missing` invites an install that preflight refuses.

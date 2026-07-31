@@ -46,9 +46,27 @@ Notable changes per release. Dates are release dates.
 - **`doctor` no longer approves a gutted add-on tree.** An add-on directory containing nothing
   but `SKILL.md` previously reported `valid`. With a manifest present it now reports
   `malformed` on any missing, modified, or undeclared file.
-- Installation is atomic across the whole selected set, not merely per skill directory. A
-  predictable failure — an unmarked destination, or a source payload that disagrees with its
-  own manifest — produces zero writes.
+- **Installation and removal are atomic across the whole fleet**, not merely per skill
+  directory and not merely per target. The complete target x unit plan is checked before the
+  first write or the first deletion, and a predictable failure anywhere produces **zero** writes
+  and zero deletions. The questions asked are the ones a mutation actually depends on: may this
+  destination be touched (is it ours), can it be created (is an ancestor a non-directory, or
+  unwritable), and does the source payload agree with its own manifest.
+
+  `--force` overrides **whose** tree may be replaced or removed. It does not suppress the
+  feasibility checks, and it does not let recorded data widen the command's path scope: add-on
+  names read from an install marker are validated as plain skill names, confined to a direct
+  child of the skills directory, and accepted only when this package ships that add-on or the
+  destination already carries this installer's marker claiming that identity. Manifest file
+  keys are validated and confined to the payload root for the same reason.
+
+  Both mutations are transactions rather than predictions. Installation stages every unit
+  first, commits them by rename, and reverts every earlier commit if any later one fails. Removal renames every destination in the plan
+  aside first — a rename needs permission on the parent only — and only once the whole fleet is
+  set aside is anything deleted. A rename failure rolls back and deletes nothing. A
+  deletion failure afterwards leaves a named leftover directory and is reported as a warning,
+  because the destination is genuinely gone. For the same reason a replacement that has already
+  committed is never reported as a failure.
 - The published-command documentation guard was generalized from a hardcoded `node --test`
   pair to a `{binary, flag}` shape, and gained a **static** `python3 scripts/*.py` arm that
   checks the referenced script exists and compiles, without executing it.
@@ -87,9 +105,13 @@ Notable changes per release. Dates are release dates.
 
 ### Compatibility
 
-Install markers written by 2.0.0 carry no schema version and are treated as legacy, so
-upgrading in place does not report a healthy install as malformed. `--no-addons` and
-`--only <name>` are unchanged.
+Install markers written by 2.0.0 carry **neither** a schema version nor a manifest record, and
+that exact shape is treated as legacy for the skills that shipped in 2.0.0, so upgrading in
+place does not report a healthy install as malformed. The exemption does not extend to a skill
+whose packaged payload ships a manifest — `parley-bidding` shipped in neither 2.0.0 nor with a
+manifest-free installer, so a schema-less marker there can only be damage, and is reported with
+the repair named. Otherwise deleting one or two metadata fields would silently downgrade a
+current install from byte validation to none. `--no-addons` and `--only <name>` are unchanged.
 
 ## 2.0.0
 
