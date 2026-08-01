@@ -43,11 +43,17 @@ function listAddons() {
   // The core skill is included. It is a packaged skill directory like any other, and a foreign
   // installer copies it the same way; excluding it meant a verbatim core copy could never be
   // proven intact and was reported `malformed` however correct its bytes were.
+  // A skill directory is one that carries `SKILL.md`. F2's binding text says "every
+  // `skills/*/SKILL.md` directory"; enumerating bare directories would also sweep in anything
+  // else that lands under `skills/`. (kimi-1 NIT, review round 1.)
   return entries
     .filter((entry) => entry !== ".DS_Store")
     .filter((entry) => {
       try {
-        return fs.statSync(path.join(SKILLS_DIR, entry)).isDirectory();
+        return (
+          fs.statSync(path.join(SKILLS_DIR, entry)).isDirectory() &&
+          fs.existsSync(path.join(SKILLS_DIR, entry, "SKILL.md"))
+        );
       } catch (_error) {
         return false;
       }

@@ -240,8 +240,11 @@ test("a manifest:false marker is unhealthy once the skill ships a manifest", () 
   assert.equal(status.status, "malformed");
   assert.match(status.problems.join(" "), /this skill now ships one; re-run install/);
 
-  // And re-running install repairs it, which is what the message tells the user to do.
-  installer.installCommand(context(home, { target: "codex", force: true }));
+  // And re-running install repairs it — WITHOUT `--force`, which is what the changelog tells
+  // the user to do. Asserting the forced path proved a repair nobody was instructed to perform
+  // and would have hidden it if the plain path had stopped working. (codex-1 MINOR, round 1.)
+  const repair = installer.installCommand(context(home, { target: "codex" }));
+  assert.equal(repair.ok, true, "the documented repair must not need --force");
   assert.equal(doctorStatus(home, "parley-worktrees").status, "valid");
 });
 
@@ -851,9 +854,17 @@ test("valid-unmanaged never grants ownership: install and uninstall stay fail-cl
   assert.equal(doctorStatus(c.home, "parley-bidding").status, "valid", "--force reclaims it as managed");
 });
 
-test("the core unit never becomes valid-unmanaged", () => {
-  // The core skill's payload is assembled from several package entries rather than one
-  // directory, so it ships no manifest and there is nothing to verify against.
+test("a natively installed core whose marker was deleted stays malformed", () => {
+  // The core DOES ship a manifest now, so the old reason for this test ("nothing to verify
+  // against") no longer holds. It still passes, for a different reason worth stating: the
+  // NATIVE core tree is assembled from several package entries and deliberately does not carry
+  // the manifest, so once the marker is gone `unmanagedButVerified` fails on the manifest-hash
+  // comparison — the destination has no manifest to compare. A verbatim FOREIGN copy of
+  // `skills/parley-deck/` does carry one and is `valid-unmanaged`; that is the case this idea
+  // fixed, and it is covered in manifest-coverage.test.js.
+  //
+  // This is deferred follow-up 3 in FINAL.md: the bytes here are correct and the tree is still
+  // reported malformed. Fail-safe, recorded, not closed. (hermes-1 MINOR, review round 1.)
   const home = tmpDir();
   installer.installCommand(context(home, { target: "codex" }));
   fs.rmSync(path.join(home, ".codex", "skills", "parley-deck", installer.MARKER_FILE));
@@ -1255,6 +1266,37 @@ test("a symlink in the CORE source is caught before the first write too", () => 
     false,
     "a defect in the core source must also produce zero writes"
   );
+  // The core now ships a manifest, and source-manifest verification runs before the copyability
+  // walk, so for a manifested source the manifest reports the symlink first. Both refuse and
+  // both write nothing; the assertion is on the outcome and on the offending path being named,
+  // not on which of the two guards spoke. The arm below keeps the copyability walk itself
+  // discriminated, on a source the manifest cannot cover.
+  assert.match(result.actions[0].skills[0].message, /symlink.*references\/linked\.md/);
+});
+
+test("the copyability preflight still covers a CORE source that ships no manifest", () => {
+  // Without this arm the previous test no longer proves what it was written for: once the core
+  // ships a manifest, manifest verification shadows the copyability walk for symlinks, and the
+  // walk — which codex-1 added in round 8 precisely because the core was excluded from it —
+  // would be untested for the core again.
+  const home = tmpDir();
+  const stagedRoot = path.join(tmpDir(), "package");
+  fs.cpSync(path.join(root, "skills"), path.join(stagedRoot, "skills"), { recursive: true });
+  for (const file of ["package.json", "plugin.json", "gemini-extension.json"]) {
+    fs.cpSync(path.join(root, file), path.join(stagedRoot, file));
+  }
+  fs.rmSync(path.join(stagedRoot, "skills", "parley-deck", addonManifest.MANIFEST_FILE));
+  fs.symlinkSync(
+    path.join(root, "README.md"),
+    path.join(stagedRoot, "skills", "parley-deck", "references", "linked.md")
+  );
+
+  const ctx = context(home, { target: "codex" });
+  ctx.packageRoot = stagedRoot;
+  const result = installer.installCommand(ctx);
+
+  assert.equal(result.ok, false);
+  assert.equal(fs.existsSync(path.join(home, ".codex", "skills")), false, "zero writes");
   assert.match(result.actions[0].skills[0].message, /Refusing to copy symlink/);
 });
 

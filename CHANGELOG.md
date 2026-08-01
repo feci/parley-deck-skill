@@ -37,8 +37,12 @@ Notable changes per release. Dates are release dates.
 you re-run `install`.** Those installs recorded `manifest: false`, which was true when they were
 made; trusting that record now would leave them on the old `SKILL.md`-only check forever, which
 is the defect above. Re-run your usual install command — for example
-`parley-deck-skill install --target all` — and `doctor` returns to green. Nothing is deleted and
-no payload changes; only the marker is refreshed.
+`parley-deck-skill install --target all` — and `doctor` returns to green. `--force` is not
+needed: these are this installer's own trees and it still owns them.
+
+Re-running install replaces the payload with the packaged one and refreshes the marker. Local
+edits to an installed skill are overwritten, as they are on any install. Nothing outside the
+skill directories is touched.
 
 This is deliberately loud. The alternative was that the fix never reaches an existing install,
 because nobody re-installs while `doctor` is green.
