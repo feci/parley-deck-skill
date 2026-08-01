@@ -63,9 +63,15 @@ function packageWithoutManifest(skill) {
     const src = path.join(root, entry);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
   }
+  // Remove if present, and do NOT assert presence. The assertion made every test using this
+  // fixture die during construction at any commit where the skill ships no manifest — so the
+  // F4 regression "failed at 23a9856" for the wrong reason and proved nothing about the
+  // migration branch it was written to discriminate. What the fixture must guarantee is the
+  // post-condition: this package ships no manifest for `skill`.
+  // (kimi-1 NIT round 1, carried and co-raised by codex-1 in round 2.)
   const manifest = path.join(pkg, "skills", skill, addonManifest.MANIFEST_FILE);
-  assert.ok(fs.existsSync(manifest), `${skill} was expected to ship a manifest to remove`);
-  fs.rmSync(manifest);
+  if (fs.existsSync(manifest)) fs.rmSync(manifest);
+  assert.equal(fs.existsSync(manifest), false, `${skill} must ship no manifest in the fixture package`);
   return pkg;
 }
 

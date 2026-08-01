@@ -327,7 +327,15 @@ test("a foreign copy of the core is valid-unmanaged on every target shape, not o
   // repository root — `gemini-extension.json` for gemini, `skills/SKILL.md` and `plugin.json`
   // for antigravity. A verbatim foreign copy cannot contain them, so the core stayed
   // `malformed` on those targets while the identical copy passed on codex. (kimi-1 MINOR, r1.)
-  for (const [target, sub] of [["codex", [".codex", "skills"]], ["gemini", [".gemini", "extensions"]]]) {
+  // All three staging shapes, not two: `agy` is the antigravity shape, whose native install
+  // gets a second `skills/SKILL.md` and whose per-kind list therefore differed most from what a
+  // foreign copy contains. (kimi-1 R2-K3, review round 2.)
+  const shapes = [
+    ["codex", [".codex", "skills"]],
+    ["gemini", [".gemini", "extensions"]],
+    ["agy", [".gemini", "config", "plugins"]]
+  ];
+  for (const [target, sub] of shapes) {
     const home = tmpDir();
     const dir = path.join(home, ...sub);
     fs.mkdirSync(dir, { recursive: true });
@@ -342,4 +350,61 @@ test("a foreign copy of the core is valid-unmanaged on every target shape, not o
       `${target}: the foreign core must be provable, not malformed`
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// FIX-PROVING, review round 2 — must fail at e46f661 (fix-up cycle 1)
+// ---------------------------------------------------------------------------
+
+test("a damaged package source fails health but does not revoke ownership", () => {
+  // Fail-closed is deliberate and stays: a tree whose packaged source cannot be enumerated is a
+  // tree doctor cannot certify. But `managed` is evidence from the MARKER, and the marker is
+  // present and valid — reporting it unowned in the same document that shows it contradicts
+  // itself. (hermes-1 R2-2(b), co-signed by kimi-1; R2-2(a) — the red itself — was dismissed.)
+  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json", "lib", "bin"]) {
+    const src = path.join(root, entry);
+    if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
+  }
+  const home = tmpDir();
+  const withPkg = (options) => {
+    const ctx = context(home, options);
+    ctx.packageRoot = pkg;
+    return ctx;
+  };
+  assert.equal(installer.installCommand(withPkg({})).ok, true);
+
+  // Damage ONLY the package. The installed tree stays byte-perfect.
+  fs.rmSync(path.join(pkg, "plugin.json"));
+
+  const status = installer
+    .doctorCommand(withPkg({ command: "doctor" }))
+    .targets[0].skills.find((entry) => entry.skill === "parley-deck");
+
+  assert.equal(status.missing.length, 0, "the installed tree is complete");
+  assert.equal(status.status, "malformed", "an uncheckable tree must not report healthy");
+  assert.equal(status.managed, true, "a present, valid marker still proves this installer owns it");
+  assert.match(status.problems.join(" "), /packaged source for plugin\.json cannot be read/);
+});
+
+test("an empty packaged skill directory still demands SKILL.md", () => {
+  // `safeSourceFiles` returned an empty list for an empty directory, so the unmarked floor
+  // demanded nothing at all. (hermes-1 R2-3, review round 2.)
+  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json", "lib", "bin"]) {
+    const src = path.join(root, entry);
+    if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
+  }
+  // Empty the packaged core, and put an empty tree at the destination with no marker.
+  fs.rmSync(path.join(pkg, "skills", "parley-deck"), { recursive: true });
+  fs.mkdirSync(path.join(pkg, "skills", "parley-deck"), { recursive: true });
+
+  const home = tmpDir();
+  fs.mkdirSync(path.join(home, ".codex", "skills", "parley-deck"), { recursive: true });
+
+  const ctx = context(home, { command: "doctor" });
+  ctx.packageRoot = pkg;
+  const status = installer.doctorCommand(ctx).targets[0].skills.find((entry) => entry.skill === "parley-deck");
+  assert.equal(status.status, "malformed", "an empty source must not certify an empty destination");
+  assert.match(status.problems.concat(status.missing).join(" "), /SKILL\.md|is empty/);
 });
