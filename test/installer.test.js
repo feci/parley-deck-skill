@@ -303,7 +303,20 @@ test("doctor reports missing and malformed installs", () => {
   result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
   assert.equal(result.ok, false);
   assert.equal(result.targets[0].status, "malformed");
-  assert.deepEqual(result.targets[0].missing, ["SKILL.md", "references/COOPERATION.md", "references/compatibility.json", "agents/manifest.yaml"]);
+  // The core's required-file list is derived from the copy plan, so it names every file the
+  // installer writes rather than a hand-picked four. The three that were absent from the old
+  // list — `plugin.json`, `agents/openai.yaml`, `references/WORKED_EXAMPLES.md` — could each be
+  // deleted from a real install with `doctor` reporting `valid` and zero problems.
+  assert.deepEqual(result.targets[0].missing, [
+    "SKILL.md",
+    "agents/manifest.yaml",
+    "agents/openai.yaml",
+    "gemini-extension.json",
+    "plugin.json",
+    "references/COOPERATION.md",
+    "references/WORKED_EXAMPLES.md",
+    "references/compatibility.json"
+  ]);
 });
 
 test("status reports installer version, runtime drift, and project metadata state", () => {

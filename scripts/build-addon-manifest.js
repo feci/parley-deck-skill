@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 "use strict";
 
-// Generate or verify an add-on's parley-addon.json.
+// Generate or verify a packaged skill's parley-addon.json.
 //
 // The manifest is generated, never hand-maintained: a hand-written file list goes stale on the
 // first payload change and then certifies the wrong tree. Run with --check in CI so a payload
 // edit that forgets to regenerate fails the build instead of shipping a manifest that
 // disagrees with the files beside it.
 //
+// Every directory under skills/ is covered, the core skill included. Coverage is mandatory:
+// with no names given, a skill that carries no manifest is a --check FAILURE, not a skip.
+//
 // Usage:
-//   node scripts/build-addon-manifest.js                      refresh every add-on that has one
+//   node scripts/build-addon-manifest.js                      refresh every packaged skill
 //   node scripts/build-addon-manifest.js --check              verify without writing
-//   node scripts/build-addon-manifest.js <addon> [<addon>...]  target named add-ons
-//   node scripts/build-addon-manifest.js <addon> --runtime-python ">=3.10"
+//   node scripts/build-addon-manifest.js <skill> [<skill>...]  target named skills
+//   node scripts/build-addon-manifest.js <skill> --runtime-python ">=3.10"
 //
 // The runtime block is sticky: once written it is preserved on every later regeneration, so
 // the interpreter floor is declared once by the add-on rather than re-typed by each caller.
@@ -24,7 +27,6 @@ const { MANIFEST_FILE, computeManifest, hasManifest, readManifest, verifyPayload
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const SKILLS_DIR = path.join(REPO_ROOT, "skills");
-const CORE_SKILL_NAME = "parley-deck";
 
 function fail(message) {
   process.stderr.write(`build-addon-manifest: ${message}\n`);
@@ -38,8 +40,11 @@ function listAddons() {
   } catch (_error) {
     fail(`no skills directory at ${SKILLS_DIR}`);
   }
+  // The core skill is included. It is a packaged skill directory like any other, and a foreign
+  // installer copies it the same way; excluding it meant a verbatim core copy could never be
+  // proven intact and was reported `malformed` however correct its bytes were.
   return entries
-    .filter((entry) => entry !== CORE_SKILL_NAME && entry !== ".DS_Store")
+    .filter((entry) => entry !== ".DS_Store")
     .filter((entry) => {
       try {
         return fs.statSync(path.join(SKILLS_DIR, entry)).isDirectory();
@@ -84,11 +89,18 @@ function main() {
     }
     targets = names;
   } else {
-    // No names: only refresh add-ons that already opted in by carrying a manifest. This keeps
-    // the tool generic — it never decides on its own that an add-on ought to have one.
-    targets = available.filter((name) => hasManifest(path.join(SKILLS_DIR, name)));
+    // No names: every packaged skill, whether or not it already carries a manifest.
+    //
+    // This used to refresh only the directories that had opted in by already having one, which
+    // read as generic restraint and was in fact the hole. A skill without a manifest cannot be
+    // proven intact when a foreign installer put it there, and `--check` could not notice,
+    // because the very absence being checked for removed the directory from the check. Five of
+    // six skills sat in that blind spot through a release. Coverage is now mandatory: a
+    // packaged skill with no manifest is a `--check` failure, so a seventh skill cannot repeat
+    // it silently.
+    targets = available;
     if (targets.length === 0) {
-      process.stdout.write("no add-on carries a manifest yet; name one explicitly to create it\n");
+      process.stdout.write("no packaged skill directories found\n");
       return;
     }
   }

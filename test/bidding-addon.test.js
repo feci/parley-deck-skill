@@ -25,7 +25,7 @@ function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "parley-bidding-test-"));
 }
 
-function context(home, options) {
+function context(home, options, packageRoot) {
   return {
     options: {
       command: "install",
@@ -43,8 +43,30 @@ function context(home, options) {
     env: { HOME: home, PATH: "" },
     cwd: home,
     homeDir: home,
-    packageRoot: root
+    packageRoot: packageRoot || root
   };
+}
+
+// A package copy in which one named skill ships NO parley-addon.json.
+//
+// Every packaged skill now carries a manifest, so no real skill exhibits the manifest-free
+// shape any more. The branches that handle it are still live — `unmanagedButVerified` and
+// `manifestProblems` both fork on it, and every 2.0.0-era install on disk is that shape — so
+// the coverage has to come from a fixture instead of from a real skill's accidental state.
+// The tests below used `parley-worktrees` for this and were silently testing a property of the
+// repository rather than a property of the code.
+//
+// Only what the installer reads from a package root is copied; node_modules is not.
+function packageWithoutManifest(skill) {
+  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json"]) {
+    const src = path.join(root, entry);
+    if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
+  }
+  const manifest = path.join(pkg, "skills", skill, addonManifest.MANIFEST_FILE);
+  assert.ok(fs.existsSync(manifest), `${skill} was expected to ship a manifest to remove`);
+  fs.rmSync(manifest);
+  return pkg;
 }
 
 // Install once and return the installed add-on directory.
@@ -54,8 +76,8 @@ function installed(home, options) {
   return path.join(home, ".codex", "skills", "parley-bidding");
 }
 
-function doctorStatus(home, skill) {
-  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }));
+function doctorStatus(home, skill, packageRoot) {
+  const result = installer.doctorCommand(context(home, { command: "doctor", target: "codex" }, packageRoot));
   const target = result.targets[0];
   return target.skills.find((entry) => entry.skill === skill);
 }
@@ -161,13 +183,26 @@ test("installing records the manifest's aggregate and its own hash in the add-on
   assert.equal(doctorStatus(home, "parley-bidding").status, "valid");
 });
 
-test("an add-on that ships no manifest records manifest:false and stays healthy", () => {
+test("every packaged skill ships a manifest, so none records manifest:false", () => {
+  // The coverage guarantee itself. Previously five of six shipped none, which is what let a
+  // gutted tree report `valid` and a foreign copy report `malformed`.
   const home = tmpDir();
   installer.installCommand(context(home, { target: "codex" }));
-  const dir = path.join(home, ".codex", "skills", "parley-worktrees");
-  const marker = readMarker(dir);
+  for (const skill of ["parley-bidding", "parley-design", "parley-design-check", "parley-tracker", "parley-worktrees"]) {
+    const marker = readMarker(path.join(home, ".codex", "skills", skill));
+    assert.notEqual(marker.manifest, false, `${skill} must record a manifest, not manifest:false`);
+    assert.equal(typeof marker.manifest.aggregate, "string", `${skill} marker needs an aggregate`);
+    assert.equal(doctorStatus(home, skill).status, "valid");
+  }
+});
+
+test("an add-on whose source ships no manifest records manifest:false and stays healthy", () => {
+  const pkg = packageWithoutManifest("parley-worktrees");
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }, pkg));
+  const marker = readMarker(path.join(home, ".codex", "skills", "parley-worktrees"));
   assert.equal(marker.manifest, false);
-  assert.equal(doctorStatus(home, "parley-worktrees").status, "valid");
+  assert.equal(doctorStatus(home, "parley-worktrees", pkg).status, "valid");
 });
 
 test("a legacy marker with no schema keeps validating on required files alone", () => {
@@ -175,16 +210,38 @@ test("a legacy marker with no schema keeps validating on required files alone", 
   // install is not reported broken for a field its installer never knew about.
   //
   // Narrowed in cycle 15: the exemption belongs to skills that could actually HAVE a legacy
-  // install. `parley-worktrees` shipped in 2.0.0 and ships no manifest, so it is the honest
-  // subject here; `parley-bidding` shipped in neither and is covered by its own regression.
+  // install — one whose source ships no manifest. Every shipped skill now ships one, so the
+  // subject is a fixture package rather than a real skill.
   // (review round 11, codex-1 MAJOR.)
+  const pkg = packageWithoutManifest("parley-worktrees");
   const home = tmpDir();
-  installer.installCommand(context(home, { target: "codex" }));
+  installer.installCommand(context(home, { target: "codex" }, pkg));
   const dir = path.join(home, ".codex", "skills", "parley-worktrees");
   const marker = readMarker(dir);
   delete marker.markerSchema;
   delete marker.manifest;
   writeMarker(dir, marker);
+  assert.equal(doctorStatus(home, "parley-worktrees", pkg).status, "valid");
+});
+
+test("a manifest:false marker is unhealthy once the skill ships a manifest", () => {
+  // The migration hole. An install performed before manifest coverage records `manifest:false`;
+  // trusting that record after coverage lands leaves the old install on the required-file check
+  // alone — `SKILL.md` and nothing else for an add-on. Measured on 2.1.0: such an install,
+  // gutted to one file, still reported `valid` and `doctor` exited 0 under a build that ships
+  // the manifests. Loud by decision: the user accepted the upgrade red wave on 2026-08-01.
+  const legacyPkg = packageWithoutManifest("parley-worktrees");
+  const home = tmpDir();
+  installer.installCommand(context(home, { target: "codex" }, legacyPkg));
+  assert.equal(readMarker(path.join(home, ".codex", "skills", "parley-worktrees")).manifest, false);
+
+  // Same install, inspected by a build whose source DOES ship the manifest.
+  const status = doctorStatus(home, "parley-worktrees");
+  assert.equal(status.status, "malformed");
+  assert.match(status.problems.join(" "), /this skill now ships one; re-run install/);
+
+  // And re-running install repairs it, which is what the message tells the user to do.
+  installer.installCommand(context(home, { target: "codex", force: true }));
   assert.equal(doctorStatus(home, "parley-worktrees").status, "valid");
 });
 
@@ -294,12 +351,13 @@ test("an internally consistent manifest+payload replacement is still detected", 
 });
 
 test("a manifest appearing where none was installed is reported, not silently trusted", () => {
+  const pkg = packageWithoutManifest("parley-worktrees");
   const home = tmpDir();
-  installer.installCommand(context(home, { target: "codex" }));
+  installer.installCommand(context(home, { target: "codex" }, pkg));
   const dir = path.join(home, ".codex", "skills", "parley-worktrees");
   const manifest = addonManifest.computeManifest(dir, {});
   fs.writeFileSync(path.join(dir, addonManifest.MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  const status = doctorStatus(home, "parley-worktrees");
+  const status = doctorStatus(home, "parley-worktrees", pkg);
   assert.equal(status.status, "malformed");
   assert.ok(status.problems.some((p) => p.includes("marker records that none was installed")));
 });
@@ -1576,15 +1634,16 @@ test("the legacy marker exemption covers only skills that could have a legacy in
   assert.equal(tampered.status, "malformed", "deleting BOTH fields must not buy the exemption");
   assert.match(tampered.problems.join(" "), /predates payload manifests, but this skill ships one/);
 
-  // A skill that really shipped in 2.0.0 and ships no manifest keeps the exemption.
+  // A skill whose source ships no manifest keeps the exemption — the genuine 2.0.0 shape.
+  const legacyPkg = packageWithoutManifest("parley-worktrees");
   const legacy = tmpDir();
-  installer.installCommand(context(legacy, { target: "codex" }));
+  installer.installCommand(context(legacy, { target: "codex" }, legacyPkg));
   const legacyMarker = path.join(legacy, ".codex", "skills", "parley-worktrees", installer.MARKER_FILE);
   const shipped = JSON.parse(fs.readFileSync(legacyMarker, "utf8"));
   delete shipped.markerSchema;
   delete shipped.manifest;
   fs.writeFileSync(legacyMarker, JSON.stringify(shipped, null, 2));
-  assert.equal(doctorStatus(legacy, "parley-worktrees").status, "valid",
+  assert.equal(doctorStatus(legacy, "parley-worktrees", legacyPkg).status, "valid",
     "2.0.0 installs must still upgrade cleanly");
 });
 

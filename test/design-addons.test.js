@@ -37,10 +37,15 @@ test("parley-design ships exactly the four doctrine files", () => {
     }
   };
   walk(designRoot);
+  // `parley-addon.json` is integrity metadata, not doctrine. It is excluded from the doctrine
+  // budget and asserted separately, so this test keeps meaning what it says — the doctrine
+  // itself must not grow — rather than being relaxed to accommodate the manifest.
+  const manifest = "parley-addon.json";
+  assert.ok(found.includes(manifest), "every packaged skill must carry an integrity manifest");
   assert.deepEqual(
-    found.sort(),
+    found.filter((rel) => rel !== manifest).sort(),
     BUDGETS.map(([rel]) => rel).sort(),
-    "the doctrine skill must contain exactly four files — file count only ever grows"
+    "the doctrine skill must contain exactly four doctrine files — file count only ever grows"
   );
 });
 

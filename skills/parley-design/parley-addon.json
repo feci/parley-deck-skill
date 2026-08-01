@@ -1,0 +1,10 @@
+{
+  "schema": "parley-addon/1",
+  "files": {
+    "SKILL.md": "sha256:9ccf8e9d03cc3655fc30c29714b390f79aa4fa90a0ca47125cbdf8d00b25d1bd",
+    "references/PDS.md": "sha256:20745260c7c1afb05e6b20c90ee41f598ae029fd032db861d21acfc3fda4383c",
+    "references/RULES.md": "sha256:b49ff596451f68746460316abe00da390d4ef7ab680c941f82eaf286b2718574",
+    "references/WEB-ANNEX.md": "sha256:e09db667517dddfbe747509507c22f4b4117cba2358cf185c523829966cb01ce"
+  },
+  "aggregate": "sha256:fca17c7042f21309ac44042825d52082d066bf3a73c1005ff8dc86ffaae185a1"
+}

@@ -2,6 +2,47 @@
 
 Notable changes per release. Dates are release dates.
 
+## 2.2.0 — 2026-08-01
+
+### Fixed
+
+- **`doctor` no longer calls a byte-perfect install broken.** Installing all six skills with a
+  foreign installer — including the universal `skills` command this README recommends first —
+  reported five of six `malformed` and exited 1, because a tree can only be proven intact
+  against a packaged manifest and only `parley-bidding` shipped one. Every packaged skill now
+  ships a `parley-addon.json`, and the proof is anchored through each unit's packaged source
+  directory rather than through an add-on-only field, which the core skill never had. Such a
+  tree now reports `valid-unmanaged`: healthy, and not owned by this installer.
+
+- **`doctor` no longer called a gutted install healthy.** With this installer's own marker
+  retained, an add-on reduced to a single `SKILL.md` reported `valid`, `managed: true`, and
+  `doctor` exited 0 — for four of the six skills. An add-on's required-file list was `SKILL.md`
+  and nothing more, and the manifest check had nothing to check against. Manifest coverage
+  closes it: the marker now records a payload digest for every skill.
+
+- **The core skill's required-file list was shorter than what it installs.** A natively
+  installed core survived deletion of `plugin.json`, `agents/openai.yaml` and
+  `references/WORKED_EXAMPLES.md` with `doctor` reporting `valid` and no problems at all. The
+  list is now derived from the copy plan instead of hand-maintained, so it names every file the
+  installer writes.
+
+- **Manifest coverage is mandatory rather than opt-in.** `build-addon-manifest.js --check`
+  verified only directories that already carried a manifest, so the absence being checked for
+  removed a skill from the check. A packaged skill without a manifest is now a `--check`
+  failure, and a newly added skill cannot repeat this silently.
+
+### Upgrading — one-time action required
+
+**If you installed with 2.1.0 or earlier, `doctor` will report your add-ons `malformed` until
+you re-run `install`.** Those installs recorded `manifest: false`, which was true when they were
+made; trusting that record now would leave them on the old `SKILL.md`-only check forever, which
+is the defect above. Re-run your usual install command — for example
+`parley-deck-skill install --target all` — and `doctor` returns to green. Nothing is deleted and
+no payload changes; only the marker is refreshed.
+
+This is deliberately loud. The alternative was that the fix never reaches an existing install,
+because nobody re-installs while `doctor` is green.
+
 ## 2.1.0 — 2026-08-01
 
 ### Added
@@ -83,7 +124,9 @@ Notable changes per release. Dates are release dates.
   neither a marker nor the manifest its packaged source ships also stays `malformed` — that is
   the gutting signal.
 
-  **Known residual.** Only `parley-bidding` ships a manifest today, so a skill installed by a
+  **Known residual.** *(Resolved in 2.2.0 — every packaged skill now ships a manifest. The
+  paragraph below describes 2.1.0 as released and is kept for the record.)* Only
+  `parley-bidding` ships a manifest today, so a skill installed by a
   third-party installer that does *not* ship one has nothing to verify against and is reported
   `malformed` with the reason stated. Installing all six skills with the universal `skills` CLI
   therefore reports one `valid-unmanaged` and five `malformed`, and `doctor` exits 1. Closing

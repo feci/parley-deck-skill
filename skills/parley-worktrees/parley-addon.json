@@ -1,0 +1,7 @@
+{
+  "schema": "parley-addon/1",
+  "files": {
+    "SKILL.md": "sha256:91f94c4017edfea19f61ad298131d45cb74c4e56d9661eef1f3ebca2383fc3a9"
+  },
+  "aggregate": "sha256:ca446d5945183a1b76692d7445b84445aa21660053496ea554456c7a029a19db"
+}
