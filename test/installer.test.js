@@ -22,10 +22,47 @@ function trackTemp(dir) {
   TEMP_DIRS.push(dir);
   return dir;
 }
+// Removal needs write+execute on the PARENT directory, and several tests deliberately harden a
+// tree (mode 0555 / 0000) to exercise the installer's rename-based commit. Those trees get
+// renamed aside to `.<name>.*.bak`, and the tests restore permissions through the ORIGINAL path
+// — which after the rename names the new tree, not the moved backup. So the backup stayed
+// unremovable and `rmSync` failed silently. Normalizing here fixes every such case at once
+// rather than one test at a time. (codex-1 MINOR, review round 4.)
+//
+// `lstatSync`, and symlinks are never chmod-ed: `chmodSync` follows a link and would change the
+// mode of whatever it points at, which for a link escaping the temp tree means touching a file
+// outside it.
+function forceRemove(target) {
+  const relax = (abs) => {
+    let stat;
+    try {
+      stat = fs.lstatSync(abs);
+    } catch (_error) {
+      return;
+    }
+    if (stat.isSymbolicLink()) return;
+    if (!stat.isDirectory()) return;
+    try {
+      fs.chmodSync(abs, 0o700);
+    } catch (_error) {
+      return;
+    }
+    let entries;
+    try {
+      entries = fs.readdirSync(abs);
+    } catch (_error) {
+      return;
+    }
+    for (const entry of entries) relax(path.join(abs, entry));
+  };
+  relax(target);
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
 process.on("exit", () => {
   for (const dir of TEMP_DIRS) {
     try {
-      fs.rmSync(dir, { recursive: true, force: true });
+      forceRemove(dir);
     } catch (_error) {
       // Best effort at exit; a leftover is not worth failing a green run over.
     }

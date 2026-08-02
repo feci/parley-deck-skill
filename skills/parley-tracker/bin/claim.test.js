@@ -15,12 +15,29 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
+// Every temp directory this file creates is removed when the process exits. Without it each run
+// left its fixtures behind; across runs that is unbounded growth in the system temp directory.
+const TEMP_DIRS = [];
+function trackTemp(dir) {
+  TEMP_DIRS.push(dir);
+  return dir;
+}
+process.on("exit", () => {
+  for (const dir of TEMP_DIRS) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (_error) {
+      // Best effort at exit.
+    }
+  }
+});
+
 const claimBin = path.join(__dirname, "claim.js");
 const claim = require("./claim.js");
 const validate = require("./validate.js");
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "parley-tracker-claim-"));
+  return trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-tracker-claim-")));
 }
 
 function runCli(args) {

@@ -3,12 +3,12 @@
   "files": {
     "SKILL.md": "sha256:25b7a6b2226833b1e8291864685cd0343de635f5b989b23799c40c98d5741198",
     "bin/claim.js": "sha256:00e28ebeddc66126ed631b0a1355c32bb20b582f82482df06e3634d8d0b3fc2d",
-    "bin/claim.test.js": "sha256:a87f15f95424bcb4791bb9da73d53a32bca3290b01ed746c12ae9a369e368249",
+    "bin/claim.test.js": "sha256:1c2aa42f14c5f1d260e3a931fd24f6fafe7294aba991bb14d2afef2c10e61b7c",
     "bin/validate.js": "sha256:95f17b1502832dd66b4b21aa7cc639c7f8cd774187ef7c5c43d101e22fd2ebf8",
-    "bin/validate.test.js": "sha256:102dd95bb96dfba672e288cd65708be7e89dcdac366d73b3ab4f1a703b63e85d",
+    "bin/validate.test.js": "sha256:2625daa8d44283baf28933263175d1d29c7b8ae3c6a6b32c0b1bc8672ac55061",
     "templates/epic.md": "sha256:18cc52f782d66107fb81bfab081923f9162dd186d622b9c872d669cc086a6a4f",
     "templates/story.md": "sha256:73429dbbfe82c9d7468ee3175d0ac4d497529fee3996dc645482cae6a5e2a3ca",
     "templates/subtask.md": "sha256:2ad8c96ef777d753ed554c2444c0f68437656928811411e436aad8276ba11a1a"
   },
-  "aggregate": "sha256:2b1787237ff6f8a54f8f4296ad52eb327a98028760854259c770a35f3c285eeb"
+  "aggregate": "sha256:07d9826373e4be3d2f393a8a56da616945fbc2e4e0838938827ceba7e85dfdd5"
 }
