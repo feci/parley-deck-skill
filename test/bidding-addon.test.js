@@ -21,8 +21,27 @@ const addonManifest = require("../lib/addon-manifest");
 const root = path.resolve(__dirname, "..");
 const addonRoot = path.join(root, "skills", "parley-bidding");
 
+// Every temp directory this file creates is registered and removed when the process exits.
+// Without it each run left a full package copy behind: measured, 340 directories from this
+// suite and over 29 GB across `/var/folders`, which twice filled the disk mid-review and
+// blocked every tool. A test that leaks its fixtures is a defect in the test.
+const TEMP_DIRS = [];
+function trackTemp(dir) {
+  TEMP_DIRS.push(dir);
+  return dir;
+}
+process.on("exit", () => {
+  for (const dir of TEMP_DIRS) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (_error) {
+      // Best effort at exit; a leftover is not worth failing a green run over.
+    }
+  }
+});
+
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "parley-bidding-test-"));
+  return trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-bidding-test-")));
 }
 
 function context(home, options, packageRoot) {
@@ -58,7 +77,7 @@ function context(home, options, packageRoot) {
 //
 // Only what the installer reads from a package root is copied; node_modules is not.
 function packageWithoutManifest(skill) {
-  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  const pkg = trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-")));
   for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json"]) {
     const src = path.join(root, entry);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
@@ -658,6 +677,9 @@ function doctorInChildWithPath(pathValue, stubs) {
     const bidding = r.targets[0].skills.find((s) => s.skill === "parley-bidding");
     const other = r.targets[0].skills.find((s) => s.skill === "parley-worktrees");
     process.stdout.write(JSON.stringify({ ok: r.ok, bidding, other }));
+    // This script runs in a CHILD process via node -e, so it cannot see this file's helpers.
+    // It cleans up after itself instead.
+    try { fs.rmSync(h, { recursive: true, force: true }); } catch (_e) {}
   `;
   const run = spawnSync(path.join(binDir, "node"), ["-e", script], {
     encoding: "utf8",
@@ -2299,7 +2321,22 @@ test("a symlinked manifest is a payload defect, not payload authority", () => {
 
   const unit = doctorStatus(home, "parley-bidding");
   assert.equal(unit.status, "malformed");
-  assert.notEqual(unit.managed, true, "an external manifest must not confer managed status");
+  // The round-13 defect was that an external manifest made this tree read `valid`. That is what
+  // the assertion above holds, and it still holds.
+  //
+  // The original test ALSO asserted `managed !== true`, and that half is deliberately changed
+  // here — flagged to review round 4 rather than settled by the implementer. `managed` now
+  // answers exactly what `installerOwnsDestination` answers, because a `doctor` that calls a
+  // tree unowned while an unforced `uninstall` removes it is telling automation two different
+  // things about one directory (codex-1 MINOR, round 3). This tree genuinely IS ours — our own
+  // installer put it there and the marker is intact — and what is wrong with it is its payload,
+  // which `status: malformed` states. Ownership and health are separate questions.
+  assert.equal(unit.managed, true, "the marker is intact: this tree is ours, and broken");
+  assert.equal(
+    installer.doctorCommand(context(home, { command: "doctor", target: "codex" })).ok,
+    false,
+    "and health must still fail, which is the guarantee round 13 actually established"
+  );
 });
 
 test("two targets resolving to one physical directory refuse the whole plan", () => {

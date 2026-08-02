@@ -13,8 +13,27 @@ const packageJson = require("../package.json");
 const root = path.resolve(__dirname, "..");
 const bin = path.join(root, "bin", "parley-deck-skill.js");
 
+// Every temp directory this file creates is registered and removed when the process exits.
+// Without it each run left a full package copy behind: measured, 340 directories from this
+// suite and over 29 GB across `/var/folders`, which twice filled the disk mid-review and
+// blocked every tool. A test that leaks its fixtures is a defect in the test.
+const TEMP_DIRS = [];
+function trackTemp(dir) {
+  TEMP_DIRS.push(dir);
+  return dir;
+}
+process.on("exit", () => {
+  for (const dir of TEMP_DIRS) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (_error) {
+      // Best effort at exit; a leftover is not worth failing a green run over.
+    }
+  }
+});
+
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "parley-deck-skill-test-"));
+  return trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-deck-skill-test-")));
 }
 
 function writeRuntimeEvidence(home, runtimeDir) {

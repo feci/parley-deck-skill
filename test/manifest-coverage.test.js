@@ -27,10 +27,29 @@ const installer = require("../lib/installer");
 const addonManifest = require("../lib/addon-manifest");
 
 const root = path.resolve(__dirname, "..");
+// Every temp directory this file creates is registered and removed when the process exits.
+// Without it each run left a full package copy behind: measured, 340 directories from this
+// suite and over 29 GB across `/var/folders`, which twice filled the disk mid-review and
+// blocked every tool. A test that leaks its fixtures is a defect in the test.
+const TEMP_DIRS = [];
+function trackTemp(dir) {
+  TEMP_DIRS.push(dir);
+  return dir;
+}
+process.on("exit", () => {
+  for (const dir of TEMP_DIRS) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (_error) {
+      // Best effort at exit; a leftover is not worth failing a green run over.
+    }
+  }
+});
+
 const SKILLS = ["parley-deck", "parley-bidding", "parley-design", "parley-design-check", "parley-tracker", "parley-worktrees"];
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "parley-coverage-"));
+  return trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-coverage-")));
 }
 
 function context(home, options) {
@@ -276,7 +295,7 @@ test("a damaged package source is a problem, never a shorter requirement list", 
   // damaged install report valid/managed with no missing files and no problems at all — the
   // more broken the package, the healthier every install looked. Found independently by
   // codex-1, hermes-1 and kimi-1.
-  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  const pkg = trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-")));
   for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json", "lib", "bin"]) {
     const src = path.join(root, entry);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
@@ -305,7 +324,7 @@ test("source drift in the core blocks install before anything is written", () =>
   // stale core manifest failed `--check` while `install` wrote all six units and copied the
   // drifted bytes. Verification item 5 failing on the one unit whose drift nothing downstream
   // would catch. (codex-1 MAJOR, review round 1.)
-  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  const pkg = trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-")));
   for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json", "lib", "bin"]) {
     const src = path.join(root, entry);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
@@ -361,7 +380,7 @@ test("a damaged package source fails health but does not revoke ownership", () =
   // tree doctor cannot certify. But `managed` is evidence from the MARKER, and the marker is
   // present and valid — reporting it unowned in the same document that shows it contradicts
   // itself. (hermes-1 R2-2(b), co-signed by kimi-1; R2-2(a) — the red itself — was dismissed.)
-  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  const pkg = trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-")));
   for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json", "lib", "bin"]) {
     const src = path.join(root, entry);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
@@ -390,7 +409,7 @@ test("a damaged package source fails health but does not revoke ownership", () =
 test("an empty packaged skill directory still demands SKILL.md", () => {
   // `safeSourceFiles` returned an empty list for an empty directory, so the unmarked floor
   // demanded nothing at all. (hermes-1 R2-3, review round 2.)
-  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-"));
+  const pkg = trackTemp(fs.mkdtempSync(path.join(os.tmpdir(), "parley-pkg-")));
   for (const entry of ["skills", "plugin.json", "gemini-extension.json", "README.md", "LICENSE", "package.json", "lib", "bin"]) {
     const src = path.join(root, entry);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(pkg, entry), { recursive: true });
@@ -407,4 +426,25 @@ test("an empty packaged skill directory still demands SKILL.md", () => {
   const status = installer.doctorCommand(ctx).targets[0].skills.find((entry) => entry.skill === "parley-deck");
   assert.equal(status.status, "malformed", "an empty source must not certify an empty destination");
   assert.match(status.problems.concat(status.missing).join(" "), /SKILL\.md|is empty/);
+});
+
+test("managed answers the same question the mutation paths ask", () => {
+  // `doctor` reported `managed: false` for a tree with a valid marker whose installed payload
+  // was damaged, while an unforced `uninstall` removed that same tree — two answers about one
+  // directory. Ownership is the marker; health is `status`/`missing`/`problems`.
+  // (codex-1 MINOR, review round 3.)
+  const home = tmpDir();
+  assert.equal(installer.installCommand(context(home)).ok, true);
+  const core = path.join(home, ".codex", "skills", "parley-deck");
+  fs.rmSync(path.join(core, "plugin.json"));
+
+  const status = statusOf(doctor(home), "parley-deck");
+  assert.equal(status.status, "malformed", "the damage is still reported");
+  assert.deepEqual(status.missing, ["plugin.json"]);
+  assert.equal(status.managed, true, "a valid marker means this installer owns it, damaged or not");
+
+  // The mutation path must agree, and it is the one that acts.
+  const removal = installer.uninstallCommand(context(home, { command: "uninstall" }));
+  assert.equal(removal.ok, true, "unforced uninstall removes it, so doctor must not call it unowned");
+  assert.equal(fs.existsSync(core), false);
 });
