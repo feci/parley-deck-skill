@@ -4,9 +4,9 @@
     "SKILL.md": "sha256:9f5d48c885446acf74a3e8434d01851626a725e21b39effea015c1f7e1d2d77b",
     "agents/manifest.yaml": "sha256:542b709e6d4f3aca26f4c77139734a269a0dbe6844cb4437a7aa00f04d7acdb7",
     "agents/openai.yaml": "sha256:238587fd55a9fcba856ca7183dcdd998bebcea1e1e6794e61c8325a04ff50d9c",
-    "references/COOPERATION.md": "sha256:53cb270f1e36c1fb1d22adcdeeb8da7e629ec57021cd740a8f9a8772db181642",
+    "references/COOPERATION.md": "sha256:a72bc52e5511a0958fc93b10dbf3f6e50e77ee49ad510eee3a7de9d18b13b437",
     "references/WORKED_EXAMPLES.md": "sha256:96bc78c4e750ffda86a109a06f9adb8c5b23c74d9aff62753960446b2758a788",
     "references/compatibility.json": "sha256:b2465b207a16ac4241040e05c64b9e9f4ea79c1c780b63149c4e8c0d18267abd"
   },
-  "aggregate": "sha256:dad64a9ef8aae915b438c2f8461fa5145dd0faf720ddc1ee691b42dc6e005af1"
+  "aggregate": "sha256:166b68fabee83eac6a17e2ce18b352e250ddcaa5c5703bf8dd232eeaa6a6d687"
 }

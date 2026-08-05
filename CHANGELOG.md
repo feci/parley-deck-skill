@@ -2,6 +2,34 @@
 
 Notable changes per release. Dates are release dates.
 
+## 2.3.0 — 2026-08-05
+
+### Changed
+
+- **Bundled protocol snapshot resynced to `§15 Verification integrity`.** The skill ships
+  `skills/parley-deck/references/COOPERATION.md` as the portability fallback an agent loads when
+  the live project protocol is unavailable. `parley-deck-cli` 1.38.0 ratified a new §15 — what
+  makes a verification valid: no verdict on a claim you own, a mandatory provenance tag on every
+  verdict (`PRIMARY` / `SECONDARY` / `RECALL`, untagged reads as `RECALL`), conflicts resolved by
+  evidence and never by counting participants, a witness requirement for exemption claims,
+  drafter position-change disclosure, and a steelman requirement on unanimous judgment-shaped
+  ideas. It also fixed a contradiction in §4.0, which listed round-1 independence among invariants
+  "never dropped for speed" while §11.A said there is no enforcement beyond agent discipline.
+  The bundled fallback carried none of that and would have handed an offline agent a protocol two
+  sections behind the live one.
+- The snapshot is regenerated **mechanically** from the CLI's embedded bootstrap template, with
+  the two header lines the skill genericizes further (`Transport`, `Created`) swapped back in —
+  the same relationship that held before this change, verified by diff.
+
+### Note on how this was caught
+
+Nothing in the skill's test suite compares the bundled snapshot against the live protocol; the
+`SKILL.md` drift check is a runtime `shasum` comparison that warns at session start, not a test.
+The stale snapshot was found by hand after the CLI release. The **integrity manifest did its job**
+— `build-addon-manifest.js --check` exited 1 with `parley-deck: STALE parley-addon.json` as soon
+as the file changed — but that guards the payload against damage, not the payload against being
+out of date. A drift test in this package is recorded as a follow-up.
+
 ## 2.2.0 — 2026-08-01
 
 ### Fixed
