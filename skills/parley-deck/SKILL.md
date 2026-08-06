@@ -249,9 +249,7 @@ Every headless participant MUST be invoked in its non-interactive auto-approve (
 | kimi (Kimi Code) | plain `-p` — its print mode already auto-approves in-workspace writes. NOTE: `--yolo`/`--auto` are mutually exclusive with `-p`, so `-p` IS kimi's yolo-equivalent. |
 | opencode | `run --auto` — the prompt is an argv positional, not stdin. `opencode run` writes unattended even without `--auto`; pass `--auto` explicitly, because an implicit vendor default is what may change between versions. |
 
-The source of truth for an agent's autonomous capability is the **effective launch argv**, not the declared mode. The declared autonomous-write mode is a verification contract, not a second set of launch arguments: before treating a headless participant as able to write its artifact, inspect the effective launch arguments after all configuration layers have been applied — the launch config recorded in the orchestration summary, or `parley agents list` when the parley CLI drives the agents — and verify that every argument required by the declared mode is present. A config override can replace the launch arguments wholesale and silently drop the enabling flag. If the effective arguments cannot be inspected, or any required argument is absent, treat autonomous write as unavailable (`AUTO=no`) and do not launch that participant as write-capable. Passing this check proves only that the autonomous mode is enabled; it does not prove workspace confinement. If workspace confinement cannot be demonstrated for an agent, treat its autonomous bit as unset (fail-closed) rather than escalating to a full-filesystem bypass.
-
-A vendor flag change is a config edit, not a skill revision.
+The source of truth for an agent's autonomous capability is the **effective launch argv**, not the declared mode. The declared autonomous-write mode is a verification contract, not a second set of launch arguments: before treating a headless participant as able to write its artifact, inspect the effective launch arguments after all configuration layers have been applied — the launch config recorded in the orchestration summary, or `parley agents list` when the parley CLI drives the agents — and verify that every argument required by the declared mode is present. A config override can replace the launch arguments wholesale and silently drop the enabling flag. If the effective arguments cannot be inspected, or any required argument is absent, treat autonomous write as unavailable (`AUTO=no`) and do not launch that participant as write-capable. Passing this check proves only that the autonomous mode is enabled; it does not prove workspace confinement. If workspace confinement cannot be demonstrated for an agent, treat its autonomous bit as unset (fail-closed) rather than escalating to a full-filesystem bypass. A vendor flag change is a config edit, not a skill revision.
 
 ## Agent display names & roster init
 
@@ -378,7 +376,9 @@ Use this generic JSON shape for local configuration:
 
 All values above are placeholders. The facilitator must fill them from explicit user choice, CLI capability discovery, or the default selection policy.
 
-**`headlessArgs` is the whole invocation.** There is no separate write-mode argument list: the flag that lets an agent write its own artifact must be **inside** `headlessArgs`, alongside everything else the launch needs. Nothing is appended to it afterwards.
+This shape is **manual-facilitator input**: it is what you read when you assemble and run the command yourself (branch A of "Generic CLI Invocation Contract"). The Parley CLI reads its own snake-case configuration instead, where `headless_args` is the complete argv template and nothing is appended to it — see branch B.
+
+**There is no separate write-mode argument list.** The flag that lets an agent write its own artifact belongs **inside** `headlessArgs`. Model, thinking and profile flags remain separate fields and are appended by branch A at launch; the write-enabling flag is not one of them.
 
 **Migrating an older config.** When an existing `headless-agents.local.json` contains a `writeModeArgs` field, merge its arguments into that agent's `headlessArgs` and remove the field. It was a separate list in older revisions of this skill and is no longer part of the shape; leaving the enabling flag there means the agent launches without it.
 

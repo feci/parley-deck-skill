@@ -25,8 +25,8 @@ would reproduce the defect 1.39.0 fixed.
   substituted inside it, and nothing — no permission, model, thinking, profile or prompt argument —
   is appended afterwards.
 - **`writeModeArgs` removed from the documented config shape.** No such field exists in the CLI; the
-  write-enabling flag belongs **inside** `headlessArgs`. A separate list is precisely the mental
-  model that made the `hermes` regression invisible. Both `SKILL.md` and `WORKED_EXAMPLES.md`
+  write-enabling flag belongs **inside** `headlessArgs`. A separate list teaches a two-list launch
+  model the CLI does not implement. Both `SKILL.md` and `WORKED_EXAMPLES.md`
   updated, with a **migration note**: an existing `headless-agents.local.json` carrying
   `writeModeArgs` should have those arguments merged into `headlessArgs` and the field removed.
 - **`compatibility.json` `skillVersion` was `1.4.3` while the package was `2.3.0`** — four releases
