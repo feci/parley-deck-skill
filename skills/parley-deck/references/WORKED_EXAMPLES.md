@@ -28,9 +28,8 @@ When options are unknown, do not guess. Use CLI defaults, record the unknowns, a
   "agents": {
     "agent-a": {
       "cli": "agent-a-cli",
-      "headlessArgs": ["--non-interactive"],
+      "headlessArgs": ["--non-interactive", "--workspace-write"],
       "promptMode": "stdin",
-      "writeModeArgs": ["--workspace-write"],
       "modelFlag": "--model",
       "model": "strongest-discovered-or-cli-default",
       "thinkingFlag": "--effort",
@@ -41,6 +40,8 @@ When options are unknown, do not guess. Use CLI defaults, record the unknowns, a
   }
 }
 ```
+
+Note that the write-enabling flag (`--workspace-write` above) sits **inside** `headlessArgs`. There is no separate write-mode argument list. If an older local config still has a `writeModeArgs` field, merge its arguments into `headlessArgs` and remove the field.
 
 Store machine-local preferences in `parley-deck/meta/headless-agents.local.json` only after user approval. Do not require that file to be committed.
 

@@ -2,6 +2,52 @@
 
 Notable changes per release. Dates are release dates.
 
+## 2.4.0 — 2026-08-06
+
+Sync to `parley-deck-cli` 1.39.0. That release changed what decides whether a headless participant
+can write its own artifact: `headless_args` **is** the launch, and `autonomous_write` became a
+declaration audited against it. The skill still taught the older two-list model — guidance that
+would reproduce the defect 1.39.0 fixed.
+
+### Fixed
+
+- **`SKILL.md` said the source of truth was the wrong field.** *"The source of truth for each
+  agent's mode is the spec's `autonomous_write` field"* pointed readers at the field that launches
+  nothing, three lines under the table a facilitator reads to pick a flag. Replaced: the source of
+  truth is the **effective launch argv**; `autonomous_write` is a verification contract to audit it
+  against. A config layer that overrides `headless_args` replaces it wholesale and can silently drop
+  the enabling flag — inspect the effective arguments, not the label, before trusting a participant
+  can write. The existing workspace-confinement fail-closed rule is retained.
+- **The command-construction recipe described an assembly the CLI does not perform.** It read as one
+  numbered list covering both hand-rolled invocations and `parley`-driven launches. Split into an
+  explicit **manual facilitation** branch (which keeps the multi-step assembly) and a **Parley CLI**
+  branch: resolved `headless_args` is the complete argv template, `{prompt}`/`{root}` are
+  substituted inside it, and nothing — no permission, model, thinking, profile or prompt argument —
+  is appended afterwards.
+- **`writeModeArgs` removed from the documented config shape.** No such field exists in the CLI; the
+  write-enabling flag belongs **inside** `headlessArgs`. A separate list is precisely the mental
+  model that made the `hermes` regression invisible. Both `SKILL.md` and `WORKED_EXAMPLES.md`
+  updated, with a **migration note**: an existing `headless-agents.local.json` carrying
+  `writeModeArgs` should have those arguments merged into `headlessArgs` and the field removed.
+- **`compatibility.json` `skillVersion` was `1.4.3` while the package was `2.3.0`** — four releases
+  of silent drift, because nothing read the field. Now `2.4.0`, and guarded.
+
+### Added
+
+- **`opencode` row** in the Autonomous Execution table: `run --auto`, prompt as an argv positional.
+  `opencode run` writes unattended even without `--auto`, but the flag is passed explicitly —
+  an implicit vendor default is what changes between versions.
+- **A version-sync guard.** `scripts/build-addon-manifest.js` now fails when
+  `compatibility.json`'s `skillVersion` and `package.json`'s `version` disagree, and
+  `test/manifest-coverage.test.js` asserts the same via the exported check. It lives in **both**
+  places on purpose: `prepack` runs the script but not `node --test`, so a test-only assertion
+  would leave `npm publish` ungated — the exact path the drift took. Bumping `package.json`
+  without `compatibility.json` now fails the suite *and* the pack step.
+
+Designed and reviewed through a full Parley Deck run (`skill-sync-cli-1-39`, four participants,
+two rounds, two signoff revisions). Three of the four defects were found by participants rather
+than by the brief.
+
 ## 2.3.0 — 2026-08-05
 
 ### Changed

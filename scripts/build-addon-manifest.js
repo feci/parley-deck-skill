@@ -82,9 +82,28 @@ function parseArgs(argv) {
   return { names, check, runtimePython };
 }
 
+// compatibility.json's skillVersion is documentation that nothing consumed, so it drifted four
+// releases behind package.json without a single failure. Checked here rather than only in the test
+// suite because `prepack` runs this script and does not run `node --test` — a direct `npm publish`
+// is exactly the path the drift took.
+function versionSyncProblem() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
+  const compatPath = path.join(SKILLS_DIR, "parley-deck", "references", "compatibility.json");
+  const compat = JSON.parse(fs.readFileSync(compatPath, "utf8"));
+  if (compat.skillVersion === pkg.version) {
+    return null;
+  }
+  return `compatibility.json skillVersion is ${JSON.stringify(compat.skillVersion)} but package.json version is ${JSON.stringify(pkg.version)} — update skills/parley-deck/references/compatibility.json`;
+}
+
 function main() {
   const { names, check, runtimePython } = parseArgs(process.argv.slice(2));
   const available = listAddons();
+
+  const versionProblem = versionSyncProblem();
+  if (versionProblem) {
+    fail(versionProblem);
+  }
 
   let targets;
   if (names.length > 0) {
@@ -164,4 +183,8 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { versionSyncProblem };

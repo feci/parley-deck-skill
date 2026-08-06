@@ -485,3 +485,16 @@ test("managed answers the same question the mutation paths ask", () => {
   assert.equal(removal.ok, true, "unforced uninstall removes it, so doctor must not call it unowned");
   assert.equal(fs.existsSync(core), false);
 });
+
+// Idea `skill-sync-cli-1-39`, decision D4.
+//
+// `compatibility.json`'s `skillVersion` sat at 1.4.3 while the package reached 2.3.0 — four
+// releases of silent drift, because nothing read the field. This is the guard. It lives here as a
+// test so `npm test` reports it by name, and the same check runs inside
+// `scripts/build-addon-manifest.js` so `prepack` catches it too: `prepack` does not invoke
+// `node --test`, so a test-only assertion would leave `npm publish` ungated — the exact path the
+// drift took.
+test("compatibility.json skillVersion tracks package.json version", () => {
+  const { versionSyncProblem } = require("../scripts/build-addon-manifest.js");
+  assert.equal(versionSyncProblem(), null);
+});
