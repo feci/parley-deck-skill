@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.5.1 — 2026-08-06
+
+Corrections found by the multi-agent review of parley-deck-cli 1.41.0. Ships with that release.
+
+### Fixed
+
+- **The legacy-deck remediation was factually wrong.** SKILL.md told agents a legacy deck keeps
+  working "until `parley roster sync` moves it across". `roster sync` moves nothing across — it
+  rebases an *existing* deck roster onto the machine values, and on a legacy deck it correctly
+  reports "nothing to do". The real paths are `parley roster migrate` (fleet, attended, backed up)
+  or `roster set` per member followed by `roster render`, and neither was named.
+- **Membership is the deck file.** Documented explicitly: the machine layer seeds values, not
+  members, so a deck declaring two participants runs two. A deck declaring no roster shows the
+  machine roster marked `inherited-roster`, and `roster render` will not commit it without
+  `--adopt-inherited`.
+- **Bootstrap no longer records roster picks in the §2 table.** §2 is a generated view; the
+  instruction now names `parley roster set` and `parley roster render`. The same contradiction was
+  removed from the bundled protocol snapshot.
+- **New verbs and flags documented**: `roster render`, `roster migrate`, `--all`, `--explain AGENT`,
+  `--scope deck|machine`, and the `--confirm-breaking` requirement for membership changes.
+- **Status vocabulary extended**: `section2-only`, `inherited-roster`, `not-in-roster`.
+- Bundled `references/COOPERATION.md` resynced to the ratified protocol.
+
 Notable changes per release. Dates are release dates.
 
 ## 2.5.0 — 2026-08-06

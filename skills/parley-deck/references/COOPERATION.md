@@ -53,7 +53,7 @@ Once chosen, replace the `Transport:` line in the header with the active value. 
 
 **The choice is sticky for the project.** Switching transports later is possible but requires a meta-protocol-change idea (§7), because in-flight ideas span multiple PRs/branches.
 
-**Deck bootstrap (one-time).** When `parley-deck/` is first created in a project (`parley init`), in addition to the transport the facilitator MUST confirm the **active roster, each agent's model, and each agent's reasoning/effort level** with the user as a required one-time setup step, and record the persistent per-agent choices in the local agent config (`meta/headless-agents.local.json`; mirrored in the §2 roster). The **default reasoning/effort is the strongest (highest) level the agent supports**; fall back to `cli-default` only when the level cannot be discovered. This fires **only at deck creation** — not per idea, not per later session; an already-bootstrapped deck reuses the saved selection (and the user may re-run the confirmation on request). The protocol stays **model- and reasoning-agnostic** — it mandates the confirmation and a highest-by-default, not any specific model or level. Per-agent defaults are seeded from the **user-global central config `~/.parley/agents.toml`** (lists each agent's model + reasoning), which `parley init` creates and any deck overrides per-project via `parley-deck/agents.toml`. Its `[defaults]` block also carries project-wide policy defaults — `ping_tier` (§9.0 liveness ping), `preferred_transport` (used by `parley init`), `roster_change_policy`, and `speed`/`timeouts`. See the skill for the interactive list-roster → confirm → list-models-and-effort → pick flow. (The §9.0 readiness check only pings agent *liveness* per idea; it does not re-select models or effort.)
+**Deck bootstrap (one-time).** When `parley-deck/` is first created in a project (`parley init`), in addition to the transport the facilitator MUST confirm the **active roster, each agent's model, and each agent's reasoning/effort level** with the user as a required one-time setup step, and record the persistent per-agent choices in the deck's roster authority `parley-deck/agents.toml` via `parley roster set` (then regenerate the §2 view with `parley roster render`). The **default reasoning/effort is the strongest (highest) level the agent supports**; fall back to `cli-default` only when the level cannot be discovered. This fires **only at deck creation** — not per idea, not per later session; an already-bootstrapped deck reuses the saved selection (and the user may re-run the confirmation on request). The protocol stays **model- and reasoning-agnostic** — it mandates the confirmation and a highest-by-default, not any specific model or level. Per-agent defaults are seeded from the **user-global central config `~/.parley/agents.toml`** (lists each agent's model + reasoning), which `parley init` creates and any deck overrides per-project via `parley-deck/agents.toml`. Its `[defaults]` block also carries project-wide policy defaults — `ping_tier` (§9.0 liveness ping), `preferred_transport` (used by `parley init`), `roster_change_policy`, and `speed`/`timeouts`. See the skill for the interactive list-roster → confirm → list-models-and-effort → pick flow. (The §9.0 readiness check only pings agent *liveness* per idea; it does not re-select models or effort.)
 
 **Universal invariants** that hold for every transport:
 
@@ -121,7 +121,11 @@ parley roster sync                                   # inherit the machine roste
 are **marked, never deleted**, so a past idea's participant list stays interpretable.
 
 A deck that predates this change and still has only a hand-written table keeps working: it is read
-as a legacy roster and every row reports `legacy-roster` until `parley roster sync` moves it over.
+as a legacy roster and every row reports `legacy-roster`; that table remains the deck's
+membership until it is migrated. `roster sync` does NOT migrate it — it only rebases an
+existing deck roster onto the machine values. Migrate with `parley roster migrate` (fleet,
+attended, backed up) or `parley roster set <id> --scope deck --adapter <family> --yes
+--confirm-breaking` per member, then `parley roster render` to regenerate this view.
 
 The generated view:
 
@@ -1050,7 +1054,7 @@ To bootstrap this protocol in a fresh project:
 1.  **Pick a transport** (§0): `local-dir`, `github-pr`, or `gitlab-mr`.
 2.  **Copy this file** to `<project>/parley-deck/COOPERATION.md`.
 3.  **Fill in the header**: workspace name, shared channel path, transport, creation date, bootstrapping agent ID.
-4.  **Fill in §2 roster**: list every agent that will participate, with their workdirs, roles, and (for B/C) host handles.
+4.  **Declare the roster**: add a `[roster.<id>]` block per participant to `parley-deck/agents.toml` (`parley roster set <id> --scope deck --adapter <family> --yes --confirm-breaking`), then run `parley roster render` to generate the §2 view. Do NOT hand-edit the §2 table — it is generated and non-authoritative.
 5.  **Create the directory skeleton**:
 
         parley-deck/
@@ -1171,7 +1175,7 @@ hook, an MCP trigger, the `parley loop tick` command — is bound by this brake.
   `round-01`), or otherwise start a deliberation or a `parley run`.
 - Implement, write code, or apply fixes.
 - Land, merge, push, or finalize (`FINAL.md` / closing an idea).
-- Modify the active roster (§2).
+- Modify the active roster (`parley-deck/agents.toml`; §2 is the generated view).
 - Override, bypass, reopen, or re-draft a consensus or signoff.
 
 ### 14.3 Fail-safe

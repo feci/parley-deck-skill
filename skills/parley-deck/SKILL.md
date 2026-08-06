@@ -168,7 +168,7 @@ The user chooses the coordination transport before the first idea starts. Once `
 - **Seed from the central default.** Load `~/.parley/agents.toml` (the user-global default that `parley init` creates) and present its agents, models, and reasoning as the starting point. The deck inherits these unless the user changes them here; a per-project change is written to the deck config and overrides the central default for this project only.
 - **List the candidate roster** (agent IDs + their CLIs) and ask the user to confirm or adjust which agents are in the deck.
 - **For each confirmed agent, list its available models AND its reasoning/effort levels** — use discovery where the CLI exposes it (e.g. `<cli> models`, `model list`, documented aliases; thinking/effort/reasoning flags such as `--effort`, `--reasoning`, thinking levels). Otherwise show the configured/`cli-default` value and let the user enter an exact model id / effort level. Ask which model **and which reasoning/effort level** the user wants for that agent. **The default reasoning/effort is the strongest (highest) level the agent supports** — only drop to `cli-default` when the level cannot be discovered.
-- **Record each pick as the persistent default** in `parley-deck/meta/headless-agents.local.json` (and the §2 roster): the agent's `model`, its `thinking`/effort level, and (where used) the `deep`/`review` profiles. These are used for that agent in every run until the user changes them. Prefer an **exact model id over a vendor "latest" alias** (an alias can resolve to an older model), and prefer the **highest reasoning level** unless the user chooses otherwise.
+- **Record each pick as the persistent default** in the deck's roster authority `parley-deck/agents.toml`, via `parley roster set <id> --scope deck --model M --effort E --yes` (never by hand-editing the §2 table, which is a generated view): the agent's `model`, its `thinking`/effort level, and (where used) the `deep`/`review` profiles. These are used for that agent in every run until the user changes them. Prefer an **exact model id over a vendor "latest" alias** (an alias can resolve to an older model), and prefer the **highest reasoning level** unless the user chooses otherwise.
 
 An **already-bootstrapped deck** (roster + per-agent models + reasoning already recorded) does **not** re-prompt — the saved selection is reused. The user may re-run this confirmation any time on request (e.g. to change an agent's model or effort level); changing a pick updates the persistent file. This bootstrap gate is separate from the per-idea Startup Flow (step 7) and from the §9.0 readiness check (which only pings agent liveness per idea).
 
@@ -271,28 +271,52 @@ AGENT  ADAPTER  STATE  INSTALLED  MODEL  MODEL-FAMILY  MODEL-COMPANY  EFFORT  SP
   an adapter never implies a company (hermes running `glm-5p2` is Zhipu AI, not hermes).
 - **`STATUS`** carries a closed vocabulary: `ok`, `unmapped`, `not-installed`, `model-drift`,
   `model-unbound`, `effort-unknown`, `metadata-unknown`, `masked-by-env`, `legacy-roster`,
-  `inactive`, `stale-snapshot`.
+  `inactive`, `stale-snapshot`, `section2-only`, `inherited-roster`, `not-in-roster`.
 
-The other two verbs:
+`roster show` also takes `--all` (additionally list configured adapters that no roster declares —
+use it when an agent you installed does not appear) and `--explain AGENT` (per-field provenance:
+which config layer set each value). `--scope deck` is the default; `--scope machine` reads
+`~/.parley/agents.toml`.
+
+The other verbs:
 
 ```bash
-parley roster set <agent> --scope deck|machine [--model M] [--effort E] [--speed S] [--state active|inactive]
+parley roster set <agent> --scope deck|machine [--adapter A] [--model M] [--effort E] [--speed S] [--state active|inactive] [--confirm-breaking]
 parley roster sync [--keep AGENT.FIELD]...
+parley roster render [--adopt-inherited]
+parley roster migrate --backup-dir DIR [--yes --confirm-breaking]
 ```
 
 - `set` changes ONE member in ONE file. **Preview is the default**; `--yes` applies. `--scope deck`
   writes the committed `parley-deck/agents.toml`, never the gitignored `agents.local.toml`.
   `--state inactive` **marks** a retired agent; rows are never deleted, so past ideas stay readable.
+  A **membership change** — adding, retiring or reviving a member — needs `--confirm-breaking` on
+  top of `--yes`, because it changes who deliberates and therefore a future idea's quorum.
 - `sync` is the single defined way to reconcile a deck with the machine roster, in **one direction
   only** (machine → deck). Its semantics are **rebase**: it removes deck overrides that merely
   restate the machine value so the deck goes back to inheriting. A deliberate pin — a deck value
   that differs — is never dropped silently: it is enumerated with the exact `--keep AGENT.FIELD`
-  that retains it.
+  that retains it. A `--keep` token matching no override is an error, not a no-op.
+- `render` regenerates the §2 table from the authority. It is idempotent, and it **reports** every
+  row it removes before removing it.
+- `migrate` is the one-shot converter for legacy decks (see below). Attended only.
 
 **Authority.** `parley-deck/agents.toml` owns the roster; `COOPERATION.md` §2 is a generated,
-non-authoritative view. Never hand-edit §2 to add or retire an agent. A deck that still has only
-the old hand-written table keeps working and reports `legacy-roster` on every row until
-`parley roster sync` moves it across.
+non-authoritative view. Never hand-edit §2 to add or retire an agent.
+
+**Membership is the DECK FILE.** The machine layer (`~/.parley/agents.toml`) seeds *values* for
+members the deck declares — it does not add members. A deck declaring two participants runs two,
+not however many the machine happens to configure. A deck that declares no roster at all may
+display the machine roster, but every such row is marked `inherited-roster`, and `roster render`
+refuses to commit it into `COOPERATION.md` without `--adopt-inherited`.
+
+**Legacy decks.** A deck that still has only the old hand-written table keeps working and reports
+`legacy-roster` on every row. `roster sync` does **not** migrate it — sync only rebases an existing
+deck roster onto the machine values, so on a legacy deck it correctly reports "nothing to do". The
+remediation is `parley roster migrate --backup-dir DIR --dry-run` (fleet, attended, with backups
+and rollback) or `parley roster set <id> --scope deck --adapter <family> --yes --confirm-breaking`
+per member, then `parley roster render` to regenerate §2. An ID that exists only in §2 is reported
+`unmapped` / `section2-only`; it is never auto-added.
 
 Agents are also shown with a composite display name of the form `family_model_effort` (e.g.
 `claude_opus-5-1m_max`). It is DERIVED for display; the stable roster ID (`claude-1`) remains the
