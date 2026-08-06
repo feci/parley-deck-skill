@@ -99,7 +99,31 @@ An agent MAY use internal helper mechanisms such as subagents, retrieval, tools,
 
 ## 2. Active agents (roster)
 
-The roster is project-specific. Maintain it as a table here:
+**The roster's authority is `parley-deck/agents.toml`, not this table.** Membership and each
+agent's adapter, model, effort and speed live in `[roster.<id>]` blocks there; the table below is a
+generated, human-readable **view** and is NOT authoritative. Do not hand-edit it to add, remove or
+retire an agent — the edit will not take effect and will be overwritten on the next render.
+
+This changed because hand-maintenance failed at scale: across 40 decks the table had drifted into
+**nine different rosters**, 17 decks carried no roster at all, and 17 still named an agent retired
+months earlier. A table that every project edits by hand and no tool validates cannot stay correct.
+
+Change the roster with:
+
+```bash
+parley roster show                                   # the canonical answer, one fixed table
+parley roster set <agent> --scope deck|machine …     # change one member (preview by default)
+parley roster sync                                   # inherit the machine roster (machine -> deck)
+```
+
+`--scope deck` writes the **committed** `parley-deck/agents.toml`; `--scope machine` writes
+`~/.parley/agents.toml` and every deck inherits it. Retiring an agent sets `active = false` — rows
+are **marked, never deleted**, so a past idea's participant list stays interpretable.
+
+A deck that predates this change and still has only a hand-written table keeps working: it is read
+as a legacy roster and every row reports `legacy-roster` until `parley roster sync` moves it over.
+
+The generated view:
 
 | Agent ID       | Workspace dir                       | Role          |
 | -------------- | ----------------------------------- | ------------- |

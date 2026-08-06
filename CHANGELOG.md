@@ -2,6 +2,31 @@
 
 Notable changes per release. Dates are release dates.
 
+## 2.5.0 — 2026-08-06
+
+Sync to `parley-deck-cli` 1.40.0, which standardized roster operations.
+
+### Changed
+
+- **The skill no longer describes a roster format of its own.** `parley roster show` is named as
+  THE answer to "what is the current agent roster?", and the skill reproduces its output rather
+  than assembling a table by parsing §2, `agents.toml`, or `parley agents list` — which is how one
+  question came to have three different answers.
+- **The frozen 11-column contract is documented**, with the rule that matters:
+  `MODEL` and `EFFORT` are what the launch **actually passes**, or `unknown`. A configured value
+  the argv never carries shows up as `STATUS=model-drift`/`effort-unknown`, never as a confident
+  cell. Model family and company are CLI-derived with gateway prefixes peeled first, so
+  `litellm/xai/grok-4.5` is xAI via LiteLLM, and an adapter never implies a company.
+- **`roster set` and `roster sync` are documented** with their safety properties: preview by
+  default, `--scope deck` writing the committed file rather than the gitignored one, `--state
+  inactive` marking rather than deleting, and sync's one-directional **rebase** semantics that
+  enumerate every deliberate pin with the exact `--keep` needed to retain it.
+- **Bundled protocol snapshot resynced**: `COOPERATION.md` §2 is now a generated, non-authoritative
+  view; `parley-deck/agents.toml` owns the roster. Decks with only the old hand-written table keep
+  working and report `legacy-roster`.
+
+Designed through a full Parley Deck run (`roster-operations-standard`, track `deliberation`).
+
 ## 2.4.0 — 2026-08-06
 
 Sync to `parley-deck-cli` 1.39.0. That release changed what decides whether a headless participant

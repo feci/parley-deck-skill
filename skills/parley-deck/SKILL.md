@@ -251,11 +251,53 @@ Every headless participant MUST be invoked in its non-interactive auto-approve (
 
 The source of truth for an agent's autonomous capability is the **effective launch argv**, not the declared mode. The declared autonomous-write mode is a verification contract, not a second set of launch arguments: before treating a headless participant as able to write its artifact, inspect the effective launch arguments after all configuration layers have been applied — the launch config recorded in the orchestration summary, or `parley agents list` when the parley CLI drives the agents — and verify that every argument required by the declared mode is present. A config override can replace the launch arguments wholesale and silently drop the enabling flag. If the effective arguments cannot be inspected, or any required argument is absent, treat autonomous write as unavailable (`AUTO=no`) and do not launch that participant as write-capable. Passing this check proves only that the autonomous mode is enabled; it does not prove workspace confinement. If workspace confinement cannot be demonstrated for an agent, treat its autonomous bit as unset (fail-closed) rather than escalating to a full-filesystem bypass. A vendor flag change is a config edit, not a skill revision.
 
-## Agent display names & roster init
+## The roster: one answer, three verbs
 
-Agents are shown with self-documenting composite display names of the form `family_model_effort` — `_` separates the three meanings, `-` separates words within a section, `.` keeps version numbers (e.g. `claude_opus-4.8-1m_max`, `codex_gpt-5.6-sol_xHigh`, `agy_gemini-3.5-flash_high`, `kimi_k3_max`). The name is DERIVED from config for display; the stable roster ID (`claude-1`) remains the identity used in artifact paths and signoffs.
+**`parley roster show` is THE answer to "what is the current agent roster?"** Run it and reproduce
+its output. Do not build a roster yourself by parsing `COOPERATION.md` §2, `agents.toml`, or
+`parley agents list` — that is how three different tables came to answer one question.
 
-When the CLI is available, run `parley roster show` to see the resolved roster with its display names, and `parley roster init [--scope session|machine]` to (re)build the roster: it discovers agents, records the roster-ID→family mapping, and lets model/effort be pinned per agent. `fast` is the standard startup speed on a separate axis from effort — same model + same effort, faster output — never a downgrade.
+It prints a frozen, versioned column contract, identical in text and `--json`:
+
+```
+AGENT  ADAPTER  STATE  INSTALLED  MODEL  MODEL-FAMILY  MODEL-COMPANY  EFFORT  SPEED  AUTO  STATUS
+```
+
+- **`MODEL` and `EFFORT` are what the launch ACTUALLY passes**, or `unknown` — never a configured
+  value the argv does not carry. A configured value that never reaches the process shows up as
+  `STATUS=model-drift` or `effort-unknown`, not as a confident cell.
+- **`MODEL-FAMILY` / `MODEL-COMPANY`** are derived by the CLI from the model reference, with any
+  gateway prefix peeled off first: `litellm/xai/grok-4.5` is **xAI** via LiteLLM, not "LiteLLM", and
+  an adapter never implies a company (hermes running `glm-5p2` is Zhipu AI, not hermes).
+- **`STATUS`** carries a closed vocabulary: `ok`, `unmapped`, `not-installed`, `model-drift`,
+  `model-unbound`, `effort-unknown`, `metadata-unknown`, `masked-by-env`, `legacy-roster`,
+  `inactive`, `stale-snapshot`.
+
+The other two verbs:
+
+```bash
+parley roster set <agent> --scope deck|machine [--model M] [--effort E] [--speed S] [--state active|inactive]
+parley roster sync [--keep AGENT.FIELD]...
+```
+
+- `set` changes ONE member in ONE file. **Preview is the default**; `--yes` applies. `--scope deck`
+  writes the committed `parley-deck/agents.toml`, never the gitignored `agents.local.toml`.
+  `--state inactive` **marks** a retired agent; rows are never deleted, so past ideas stay readable.
+- `sync` is the single defined way to reconcile a deck with the machine roster, in **one direction
+  only** (machine → deck). Its semantics are **rebase**: it removes deck overrides that merely
+  restate the machine value so the deck goes back to inheriting. A deliberate pin — a deck value
+  that differs — is never dropped silently: it is enumerated with the exact `--keep AGENT.FIELD`
+  that retains it.
+
+**Authority.** `parley-deck/agents.toml` owns the roster; `COOPERATION.md` §2 is a generated,
+non-authoritative view. Never hand-edit §2 to add or retire an agent. A deck that still has only
+the old hand-written table keeps working and reports `legacy-roster` on every row until
+`parley roster sync` moves it across.
+
+Agents are also shown with a composite display name of the form `family_model_effort` (e.g.
+`claude_opus-5-1m_max`). It is DERIVED for display; the stable roster ID (`claude-1`) remains the
+identity used in artifact paths and signoffs. `fast` is a startup speed on a separate axis from
+effort — same model, same effort, faster output — never a downgrade.
 
 ## Selection Checkpoint
 
