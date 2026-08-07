@@ -748,8 +748,10 @@ view (idea `meta-protocol-change-global-core-protocol`). One core change therefo
 project at once, so the two are not the same act:
 
 - A **core** change requires the meta-protocol-change idea above **and explicit user ratification**.
-  **Only the user may change the global core.** An agent may not — not by editing a release, not by
-  publishing one: releases are write-once and `parley protocol publish` refuses without a
+  **Changing the global core is the user's call, and the tooling is built to keep it that way.**
+  It is a rule backed by mechanism, not a proof: an agent runs with the user's own privileges, so
+  what the tooling guarantees is that a change cannot happen *quietly* or *through the normal
+  path* — releases are write-once and `parley protocol publish` refuses without a
   controlling terminal. That refusal stops an ordinary agent run, whose stdin is a pipe or
   `/dev/null`; it does not stop an agent that allocates a pty. An agent that needs different rules
   proposes them; it does not apply them.
