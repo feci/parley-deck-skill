@@ -301,6 +301,28 @@ parley roster migrate --backup-dir DIR [--yes --confirm-breaking]
   row it removes before removing it.
 - `migrate` is the one-shot converter for legacy decks (see below). Attended only.
 
+## The protocol: a global core, a generated deck view
+
+`COOPERATION.md` in a deck is a **generated view** of a global core at
+`~/.parley/protocol/core/<version>/` — the same move §2's roster table made. Do not hand-edit it.
+
+```bash
+parley protocol status                     # which core is installed, which the deck pins
+parley protocol render [--dry-run] [--yes] # regenerate the deck view from the core
+parley protocol check                      # report a hand-edited or stale deck copy (never rewrites)
+```
+
+- **Releases are write-once.** A core version is never edited in place; a change is a new version.
+- **`publish` is attended-only** — it refuses without a controlling terminal. Changing the global
+  core is the user's call. An agent proposes a change; it does not apply one.
+- **A missing pinned release BLOCKS** rendering rather than substituting another version.
+- `render` **reports what it will not carry forward**, in preview and on apply. That report is a
+  **line-level diff, not a Markdown semantic analysis**: an empty report means no line disappeared,
+  not that no meaning was lost. Read the diff before `--yes`.
+
+**Not yet in force** (ratified, not implemented — do not rely on them): per-idea protocol version
+pinning, the deck overlay for local override/extension, and OS-sandbox enforcement.
+
 **Authority.** `parley-deck/agents.toml` owns the roster; `COOPERATION.md` §2 is a generated,
 non-authoritative view. Never hand-edit §2 to add or retire an agent.
 

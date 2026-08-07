@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.6.0 — 2026-08-07
+
+Ships with parley-deck-cli 1.42.0 (idea `meta-protocol-change-global-core-protocol`).
+
+### Added
+
+- **The protocol is now a global core with a generated deck view.** SKILL.md documents
+  `parley protocol status|render|check`, that the deck's `COOPERATION.md` must not be hand-edited,
+  that core releases are write-once, that `publish` is attended-only, and that a missing pinned
+  release blocks rather than substituting.
+- The §7 blast-radius clause in the bundled protocol snapshot: a CORE change needs the meta idea
+  and explicit user ratification; a DECK change is a normal idea.
+
+### Stated limits
+
+`render`'s loss report is a line-level diff, not a Markdown semantic analysis — an empty report
+means no line disappeared, not that no meaning was lost. Per-idea pinning, the deck overlay and
+OS-sandbox enforcement are ratified but **not implemented**, and the skill says so rather than
+describing them as available.
+
 ## 2.5.1 — 2026-08-06
 
 Corrections found by the multi-agent review of parley-deck-cli 1.41.0. Ships with that release.
