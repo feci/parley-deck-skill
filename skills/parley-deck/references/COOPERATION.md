@@ -742,6 +742,21 @@ Open an idea under `ideas/meta-protocol-change-<topic>/` and run the full lifecy
     Drafted by: <agent-id>
     Summary: <1–2 sentences>
 
+**Blast radius — a CORE change is not a deck change.** The protocol is moving to a single global
+core in `~/.parley/protocol/core/<version>/`, of which each deck's `COOPERATION.md` is a generated
+view (idea `meta-protocol-change-global-core-protocol`). One core change therefore reaches every
+project at once, so the two are not the same act:
+
+- A **core** change requires the meta-protocol-change idea above **and explicit user ratification**.
+  **Only the user may change the global core.** An agent may not — not by editing a release, not by
+  publishing one: releases are write-once and `parley protocol publish` refuses without a
+  controlling terminal. An agent that needs different rules proposes them; it does not apply them.
+- A **deck** change — the deck's own overlay, once that ships — is a smaller act and goes through a
+  normal idea in that deck.
+
+An idea that is already open completes under the protocol version it was pinned to; the next idea
+in that deck picks up the current one.
+
 **Carve-out — a version sync is not a protocol change.** Adopting an upstream-ratified
 protocol version via the §9.0 freshness sync — when it is additive/compatible and
 preserves the project-specific zones — is a maintenance sync, **not** a protocol change,
