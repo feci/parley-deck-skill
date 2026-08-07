@@ -750,12 +750,20 @@ project at once, so the two are not the same act:
 - A **core** change requires the meta-protocol-change idea above **and explicit user ratification**.
   **Only the user may change the global core.** An agent may not — not by editing a release, not by
   publishing one: releases are write-once and `parley protocol publish` refuses without a
-  controlling terminal. An agent that needs different rules proposes them; it does not apply them.
+  controlling terminal. That refusal stops an ordinary agent run, whose stdin is a pipe or
+  `/dev/null`; it does not stop an agent that allocates a pty. An agent that needs different rules
+  proposes them; it does not apply them.
 - A **deck** change — the deck's own overlay, once that ships — is a smaller act and goes through a
   normal idea in that deck.
 
-An idea that is already open completes under the protocol version it was pinned to; the next idea
-in that deck picks up the current one.
+**Not yet in force — do not rely on it.** Per-idea version pinning (an open idea completing under
+the version it started with) and the `DETECTED-UNATTRIBUTED` tamper signal are **ratified but not
+implemented**. They are ranks 2 and 4 of the implementation plan. Until they ship, an idea does NOT
+carry a pinned protocol version, and this section states that rather than describing an intended
+future as present fact. What IS in force today, and no more than this: releases are
+write-once and are refused through a symlinked store, `parley protocol publish` refuses when it
+cannot see a controlling terminal (which stops an ordinary agent run, not one that allocates a
+pty), and no agent-accessible code path writes a release.
 
 **Carve-out — a version sync is not a protocol change.** Adopting an upstream-ratified
 protocol version via the §9.0 freshness sync — when it is additive/compatible and
