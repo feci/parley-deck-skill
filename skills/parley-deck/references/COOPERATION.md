@@ -755,8 +755,11 @@ project at once, so the two are not the same act:
   controlling terminal. That refusal stops an ordinary agent run, whose stdin is a pipe or
   `/dev/null`; it does not stop an agent that allocates a pty. An agent that needs different rules
   proposes them; it does not apply them.
-- A **deck** change — the deck's own overlay, once that ships — is a smaller act and goes through a
-  normal idea in that deck.
+- A **deck** change — the deck's own overlay (`parley-deck/protocol-overlay.md`) — is a smaller act
+  and goes through a normal idea in that deck. The overlay is **partially implemented**: the file
+  grammar, the `parley.protocol-lock/v2` lock and composition at the terminal boundary exist and are
+  extend-only; the roster-annotation identity slot and the removal of prose-matched zone addressing
+  do NOT. Do not rely on the parts that are absent.
 
 **Not yet in force — do not rely on it.** Per-idea version pinning (an open idea completing under
 the version it started with) and the `DETECTED-UNATTRIBUTED` tamper signal are **ratified but not

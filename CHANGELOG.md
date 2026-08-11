@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.7.0 — 2026-08-11
+
+### Changed — bundled protocol snapshot
+
+The §7 promissory note is retired. The bundled `references/COOPERATION.md` previously said the
+deck's own overlay would arrive "once that ships"; the overlay is now **partially implemented** in
+parley-deck-cli 1.43.0, so the text states what exists and what does not instead of promising a
+future:
+
+> the file grammar, the `parley.protocol-lock/v2` lock and composition at the terminal boundary
+> exist and are extend-only; the roster-annotation identity slot and the removal of prose-matched
+> zone addressing do NOT. Do not rely on the parts that are absent.
+
+Changed identically in all three copies of the protocol — this snapshot, the CLI's embedded default,
+and the CLI's own deck — so the three cannot disagree about what is implemented.
+
 ## 2.6.0 — 2026-08-07
 
 Ships with parley-deck-cli 1.42.0 (idea `meta-protocol-change-global-core-protocol`).
