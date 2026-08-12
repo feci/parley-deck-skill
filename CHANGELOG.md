@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.8.0 — 2026-08-12
+
+### Changed — bundled protocol snapshot: the two `deliberation` budget cells
+
+Tracks parley-deck-cli 1.44.0. The §4.0 per-track table previously printed **`unbounded`** for
+`deliberation` in two cells while the driver silently applied its own defaults — 3 fix-up cycles and
+1 cross-review round. The text and the tool disagreed, and the text lost.
+
+| Cell | Was | Now |
+| --- | --- | --- |
+| Fix-up (Phase 8) | `unbounded; strict_gate available` | `cap 5 cycles; strict_gate available` |
+| Cross-review rounds (Phase 2) | `unbounded` | `capped at 3 after round 1, then escalate` |
+
+The run halts with a blocking escalation when another round or attempt would exceed either cap — reaching the last allowed one is not itself a halt. The CLI charges a cycle when it is
+RESERVED, before the fix-up runs, so a failed attempt still spends it; its enforcement is **not** a
+security boundary against a participant that edits the workspace — see parley-deck-cli 1.44.0 for the exact limits. The
+cross-review ceiling now binds the consensus-BLOCK back-edge as well, on `standard` (cap 2) as well
+as `deliberation` — previously that path ignored both. A budget is
+an escalation threshold, never a close criterion, and there is no severity floor. The structured
+trajectory payload the idea ratified is **not implemented yet** and is a named remaining piece.
+
+Ratified by the §7 idea `meta-protocol-change-phase-packet-and-fixup-budget` — four cross-review
+rounds, accepted by codex-1, hermes-1 and kimi-1. The CLI enforces both cells in the same release, so
+the printed number and the enforced number are the same number.
+
 ## 2.7.0 — 2026-08-11
 
 ### Changed — bundled protocol snapshot

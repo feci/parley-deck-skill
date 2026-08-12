@@ -213,11 +213,11 @@ over `standard`, until the risk is disproven.
 | Aspect                        | `fast`                                     | `standard` (default)                        | `deliberation`                          |
 | ----------------------------- | ------------------------------------------ | ------------------------------------------- | --------------------------------------- |
 | §9.0 readiness ping           | skipped                                     | full                                        | full                                    |
-| Cross-review rounds (Phase 2) | skipped                                     | capped at 2, then escalate/upgrade          | unbounded                               |
+| Cross-review rounds (Phase 2) | skipped                                     | capped at 2, then escalate/upgrade          | capped at 3 after round 1, then escalate |
 | Consensus + FINAL (Phase 3–4) | collapsed: one `FINAL.md` with embedded signoffs | separate, drafted simultaneously        | separate                                |
 | Reviewers (Phase 6)           | 1 (model-diverse)                           | 2                                           | all non-implementers                    |
 | Review consensus (Phase 7)    | the one reviewer's ✅ = consensus            | reviewers who reviewed sign off             | all participants sign off               |
-| Fix-up (Phase 8)              | cap 1 cycle; fix-only verification ok       | cap 2 cycles; fix-only verify for narrow fixes | unbounded; `strict_gate` available   |
+| Fix-up (Phase 8)              | cap 1 cycle; fix-only verification ok       | cap 2 cycles; fix-only verify for narrow fixes | cap 5 cycles; `strict_gate` available |
 | Timeout per agent             | ~5 min                                      | ~15 min                                     | ~30 min                                 |
 | Auto-advance                  | full (pause only for the one signoff)       | auto-advance; human gate at FINAL→implementation | human gate at each transition      |
 
