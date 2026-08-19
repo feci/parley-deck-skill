@@ -311,7 +311,27 @@ test("the natively installed core does not carry parley-addon.json", () => {
   const cores = result.actions
     .flatMap((action) => action.skills || [])
     .filter((entry) => entry.skill === "parley-deck");
-  assert.equal(cores.length, 14, "expected one core destination per known target");
+  // EXPECTED_TARGETS is deliberately an EXTERNAL constant, and both attempts to make it
+  // "self-maintaining" were wrong. Deriving it from result.actions was circular (codex-1 MAJOR,
+  // review round 1). Deriving it from installer.TARGETS is circular too, one level up: removing
+  // a target removes it from the registry as well, so both sides shrink and the check still
+  // passes — proved by reverting the zcode entry in an isolated copy and watching this test go
+  // green. A target that DISAPPEARS cannot be detected from inside the thing that lost it.
+  // The number is a tripwire: bumping it is the deliberate act that records a target change.
+  const EXPECTED_TARGETS = 15;
+  const registered = new Set(installer.TARGETS.map((t) => t.name));
+  const planned = new Set(result.actions.map((action) => action.target));
+  assert.equal(registered.size, EXPECTED_TARGETS, "installer target registry changed size; bump EXPECTED_TARGETS deliberately");
+  assert.deepEqual(
+    [...planned].sort(),
+    [...registered].sort(),
+    "install --target all must plan exactly the registered targets"
+  );
+  assert.equal(
+    cores.length,
+    EXPECTED_TARGETS,
+    `expected one core destination per known target (expected=${EXPECTED_TARGETS}, cores=${cores.length})`
+  );
   for (const core of cores) {
     assert.equal(
       fs.existsSync(path.join(core.dest, addonManifest.MANIFEST_FILE)),
@@ -497,4 +517,29 @@ test("managed answers the same question the mutation paths ask", () => {
 test("compatibility.json skillVersion tracks package.json version", () => {
   const { versionSyncProblem } = require("../scripts/build-addon-manifest.js");
   assert.equal(versionSyncProblem(), null);
+});
+
+// kimi-1 MINOR (review round 1): nothing pinned zcode's resolved destination, so a typo in the
+// skillDir would install into a directory zcode never reads and the failure would be silent —
+// install reports ok, the agent simply never sees the skill. `.zcode/skills` is the user skill
+// root documented by the vendor's own bundled guide inside zcode-app-cli.
+test("the zcode target resolves to .zcode/skills and receives the core", () => {
+  const target = installer.TARGETS.find((t) => t.name === "zcode");
+  assert.ok(target, "installer registry has no zcode target");
+  assert.equal(target.skillDir, path.join(".zcode", "skills"), "zcode skillDir moved; zcode reads ~/.zcode/skills");
+  assert.deepEqual(target.commands, ["zcode"], "zcode target must be detected by the zcode command");
+
+  const home = tmpDir();
+  const result = installer.installCommand(context(home, { target: "zcode", includeUndetected: true }));
+  assert.equal(result.ok, true, `install into zcode failed: ${JSON.stringify(result)}`);
+  const core = result.actions
+    .flatMap((action) => action.skills || [])
+    .find((entry) => entry.skill === "parley-deck");
+  assert.ok(core, "zcode install placed no core skill");
+  assert.equal(
+    core.dest,
+    path.join(home, ".zcode", "skills", "parley-deck"),
+    "core landed outside the directory zcode reads"
+  );
+  assert.equal(fs.existsSync(path.join(core.dest, "SKILL.md")), true, "installed core has no SKILL.md");
 });
