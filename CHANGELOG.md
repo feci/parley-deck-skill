@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.9.0 — 2026-08-19
+
+### Added — `zcode` is a supported install target and a roster adapter
+
+Tracks parley-deck-cli 1.45.0. The installer gained `zcode` as a target
+(`~/.zcode/skills`, confirmed against the runtime bundle and against the vendor's own bundled
+configuration guide), bringing the target count to 15.
+
+### Changed — the roster `STATUS` vocabulary gained two terms
+
+`model-from-config` and `effort-from-config`. They mark a `MODEL`/`EFFORT` cell that was read out
+of the **agent's own** configuration because its CLI exposes no flag for the value — so no parley
+layer can bind it and the process reads that file itself at launch.
+
+The documented rule is unchanged: a cell must never show a *parley-side* declaration the argv does
+not carry. These terms exist so the weaker claim is never mistaken for the stronger one — such a
+row is never reported as `ok`, and `roster show --explain` names the file it read plus the
+limitation (the file can change before launch, and the CLIs do not echo the model back, so the
+value is not confirmable after a run).
+
+Applies to `zcode` (model and effort), `kimi` (effort) and `opencode` (effort).
+
 ## 2.8.0 — 2026-08-12
 
 ### Changed — bundled protocol snapshot: the two `deliberation` budget cells

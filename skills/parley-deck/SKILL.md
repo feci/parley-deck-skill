@@ -267,12 +267,22 @@ AGENT  ADAPTER  STATE  INSTALLED  MODEL  MODEL-FAMILY  MODEL-COMPANY  EFFORT  SP
 - **`MODEL` and `EFFORT` are what the launch ACTUALLY passes**, or `unknown` — never a configured
   value the argv does not carry. A configured value that never reaches the process shows up as
   `STATUS=model-drift` or `effort-unknown`, not as a confident cell.
+- **One exception, reported under its own status**: when a CLI has no flag for the value at all,
+  no parley layer can bind it and the process reads its **own** config instead. The cell then
+  carries what that file says, with `STATUS=model-from-config` / `effort-from-config` — never
+  plain `ok`, because the launch does not enforce it. This is not a loosening of the rule above:
+  the rule forbids echoing a *parley-side* declaration back as if the argv carried it, whereas
+  this reads the same file the agent itself reads at launch. `--explain` names the file, and
+  states the limitation — the file can change before launch and the CLI does not echo the model
+  back, so the value is not confirmable after a run. Applies to `zcode` (model and effort),
+  `kimi` (effort) and `opencode` (effort).
 - **`MODEL-FAMILY` / `MODEL-COMPANY`** are derived by the CLI from the model reference, with any
   gateway prefix peeled off first: `litellm/xai/grok-4.5` is **xAI** via LiteLLM, not "LiteLLM", and
   an adapter never implies a company (hermes running `glm-5p2` is Zhipu AI, not hermes).
 - **`STATUS`** carries a closed vocabulary: `ok`, `unmapped`, `not-installed`, `model-drift`,
-  `model-unbound`, `effort-unknown`, `metadata-unknown`, `masked-by-env`, `legacy-roster`,
-  `inactive`, `stale-snapshot`, `section2-only`, `inherited-roster`, `not-in-roster`.
+  `model-unbound`, `effort-unknown`, `metadata-unknown`, `model-from-config`,
+  `effort-from-config`, `masked-by-env`, `legacy-roster`, `inactive`, `stale-snapshot`,
+  `section2-only`, `inherited-roster`, `not-in-roster`.
 
 `roster show` also takes `--all` (additionally list configured adapters that no roster declares —
 use it when an agent you installed does not appear) and `--explain AGENT` (per-field provenance:
