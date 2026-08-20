@@ -122,9 +122,14 @@ parley roster sync                                   # inherit the machine roste
 `~/.parley/agents.toml` and every deck inherits it. Retiring an agent sets `active = false` — rows
 are **marked, never deleted**, so a past idea's participant list stays interpretable.
 
-A deck that predates this change and still has only a hand-written table keeps working: it is read
-as a legacy roster and every row reports `legacy-roster`; that table remains the deck's
-membership until it is migrated. `roster sync` does NOT migrate it — it only rebases an
+**Three authority states, in this order.** (1) The deck declares `[roster.<id>]` blocks in
+`parley-deck/agents.toml` — those blocks are the membership. (2) Else a deck that predates this
+change and still has only a hand-written §2 table keeps working: it is read as a legacy roster and
+every row reports `legacy-roster`; that table remains the deck's membership until it is migrated.
+**A row in that table IS a declaration** — emptying the `[roster.*]` blocks alone falls through to
+it, not past it. (3) Else, with neither, the deck **inherits** `~/.parley/agents.toml` and every
+row reports `inherited-roster`; a change to the machine roster then reaches the deck with no deck
+edit. Inheritance is the state a deck is in when it declares nothing at all. `roster sync` does NOT migrate it — it only rebases an
 existing deck roster onto the machine values. Migrate with `parley roster migrate` (fleet,
 attended, backed up) or `parley roster set <id> --scope deck --adapter <family> --yes
 --confirm-breaking` per member, then `parley roster render` to regenerate this view.
