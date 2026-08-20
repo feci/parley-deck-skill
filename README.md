@@ -72,7 +72,7 @@ It ships adapters for Cosinex/DTVP and NRW, subreport ELViS, and a manual profil
 ceiling is an operator's word. Adapter maturity never grants permission.
 
 > **Runtime availability, stated precisely.** The payload installs into and validates in every
-> runtime this installer covers — measured across all fourteen destinations. Whether a given
+> runtime this installer covers — measured across all fifteen destinations. Whether a given
 > runtime then *exposes* it as an invocable skill is that runtime's own behaviour and is
 > **NOT TESTED** here.
 >
@@ -158,7 +158,7 @@ or Phase-5 implementers work in one repository at once.
 > It detects your agents and asks which to install into. `--agent <name>` picks them
 > explicitly; `--list` shows what the repository offers without installing anything.
 
-This package's own installer covers fourteen named runtimes and adds health checks
+This package's own installer covers fifteen named runtimes and adds health checks
 (`doctor`, `status`) and project-metadata sync that the universal one does not:
 
 ```bash
@@ -203,9 +203,9 @@ The installer checks known user-level agent directories and CLI commands, then i
 the runtimes it detects. A marker-only
 directory created by this installer is not treated as a real runtime.
 
-Native targets are **fourteen named runtimes** — Codex, Claude Code, Antigravity CLI (plugin
+Native targets are **fifteen named runtimes** — Codex, Claude Code, Antigravity CLI (plugin
 mode), legacy Gemini CLI (extension mode), Hermes, Qwen, CodeBuddy, Goose, Kimi, Factory
-Droid, Vibe, Cursor, OpenCode and AionRS — **plus `generic`, a destination you point at with
+Droid, Vibe, Cursor, OpenCode, AionRS and zcode — **plus `generic`, a destination you point at with
 `--dest`.**
 
 ```bash
@@ -234,7 +234,7 @@ npx -y parley-deck-skill@latest uninstall --target all
 Commands: `install`, `paths`, `doctor`, `status`, `sync-project`, `uninstall`, `--version`.
 
 ```text
---target auto|all|codex|claude|agy|gemini|hermes|qwen|codebuddy|goose|kimi|droid|vibe|cursor|opencode|aionrs|generic
+--target auto|all|codex|claude|agy|gemini|hermes|qwen|codebuddy|goose|kimi|droid|vibe|cursor|opencode|aionrs|zcode|generic
 --scope user|project     --project <path>     --dest <path>
 --force  --dry-run  --json  --include-undetected
 --yes                    (sync-project only: without it, sync-project is a dry run)
@@ -259,7 +259,7 @@ separate target: prefer `--target agy`, and validate with
 `agy plugin validate ~/.gemini/config/plugins/parley-deck`.
 
 Run `parley-deck-skill paths` for the install directory of every *detected* target, or
-`parley-deck-skill paths --target all --include-undetected` for all fourteen. The installer writes
+`parley-deck-skill paths --target all --include-undetected` for all fifteen. The installer writes
 `.parley-deck-skill-install.json` into each managed destination; updates replace marked
 installs safely, and unmarked directories are never overwritten or removed without `--force`.
 
