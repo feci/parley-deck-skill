@@ -33,9 +33,11 @@ Parley verification. Parley is for work where independent verification earns its
 | Facilitator               | Quickstart, §4, §5, §9, your §11 transport    | open ideas, drive consensus, keep the roster              |
 
 **Core vs reference (progressive disclosure).** The **core** every participant needs is
-§0–§8. The rest are **reference appendices** — skip them until a task needs them: **§9**
-session-start checklist, **§11** transport mechanics, **§12** pipelines & action stages,
-**§13** retrospective optimization, **§14** automated outer loop.
+§0–§8 **and §15 (verification integrity), which binds on every track**. The rest are
+**reference appendices** — skip them until a task needs them: **§9** session-start checklist,
+**§10** escalation to the user, **§11** transport mechanics, **§12** pipelines & action stages,
+**§13** retrospective optimization, **§14** automated outer loop. (§10 sits physically between
+§8 and §9 in this document; it is numbered, not ordered.)
 
 ---
 
@@ -156,6 +158,7 @@ When an agent leaves the project, mark its row as inactive (do not delete it) so
 
     parley-deck/
     ├── COOPERATION.md               ← this document
+    ├── agents.toml                  ← roster AUTHORITY (§2) + per-agent launch config
     ├── ideas/                       ← one subdir per idea/design/spec in progress
     │   └── <idea-slug>/
     │       ├── 00-prompt.md         ← original problem + participants + deadline
@@ -178,7 +181,8 @@ When an agent leaves the project, mark its row as inactive (do not delete it) so
     │           └── consensus.md     ← review-cycle consensus (same signoff rules as §3 consensus)
     ├── inbox/                       ← direct 1-to-1 or 1-to-N notes not tied to an idea
     │   └── <from>-to-<to>_<topic>.md
-    └── meta/                        ← roster updates, protocol changes, retrospectives
+    ├── meta/                        ← roster updates, protocol changes, retrospectives
+    └── runs/                        ← driver run state and per-agent logs (§12.12)
 
 **Idea slug rules:** `kebab-case`, short, stable. Example: `execution-worker-retry-policy`.
 
@@ -969,7 +973,7 @@ The merge IS the close-idea transaction. After this point, the design discussion
 
 1. Creates branch `feature/<slug>` off the integration branch of the **code repo** (which may equal the parley-deck repo).
 2. Implements per the merged `FINAL.md` (referencing the parley-deck-repo commit SHA).
-3. On completion, commits `IMPLEMENTATION.md` directly to the integration branch of the parley-deck repo (small, no PR needed) with message `[<agent>] <slug>: IMPLEMENTATION.md — ready for review`. The frontmatter `implementation-pr:` field is filled in step 4.
+3. On completion, commits `IMPLEMENTATION.md` on the implementation branch and opens the same PR as the code (it lives at `ideas/<slug>/IMPLEMENTATION.md`, which the recommended branch protection below requires a PR for — the previous wording said "directly … no PR needed" and contradicted it) with message `[<agent>] <slug>: IMPLEMENTATION.md — ready for review`. The frontmatter `implementation-pr:` field is filled in step 4.
 4. Opens a **Draft PR** in the code repo titled `[<slug>] implementation` against the integration branch. Description references the merged design PR URL and the `FINAL.md` permalink. Labels: `implementation`, `phase:review-round-01`. Reviewers: all participants except the implementer.
 5. Switches the PR to Ready-for-review when implementation is complete (i.e. when reviews can begin).
 
@@ -1145,7 +1149,7 @@ Agents produce and reach consensus on a markdown action plan. The driver may cal
 ### 12.12 Compatibility
 All pipeline files are optional and live under `parley-deck/pipelines/<slug>/`; `ideas/`, `inbox/`, `meta/`, `runs/` are unchanged. Existing `run.json`/manifests may gain optional `pipeline_slug`/`block_id` fields under a schema bump with zero-value defaulting; older drivers ignore unknown fields and degrade to advisory.
 
-Changing this section follows §7 (a meta-protocol-change idea). This section was ratified by idea `meta-protocol-change-end-to-end-pipeline` (2026-06-02).
+Changing this section follows §7 (a meta-protocol-change idea). This section was ratified by idea `2026-06-02T12-07-14-meta-protocol-ch` (2026-06-02).
 
 ## 13. Retrospective optimization
 
