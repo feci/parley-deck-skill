@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.10.0 — 2026-08-21
+
+Ships alongside `parley-deck-cli` 1.46.0 and the `protocol-and-skill-audit` idea it closes.
+
+### Fixed — `status` no longer misdirects a source deck
+
+`kimi-1/F4`. Nothing in the package read `protocolRole`, so on a deck whose role is `source` — the
+one place where the packaged protocol copy is by definition the **older** one
+(`COOPERATION.md:839-840`) — `status` recommended *"Review the local COOPERATION.md changes before
+adopting packaged protocol updates."* Following that advice there means treating an older snapshot
+as an update to the newer live protocol.
+
+`inspectProject` now resolves `protocolRole`, and `recommendedActions` branches on it. A `source`
+deck is told the difference is expected and **not** to adopt. Consumer advice is unchanged, and a
+deck with **no** recorded role keeps the conservative wording rather than guessing which side is
+upstream — the tool does not know, and a confident wrong answer is the defect being fixed.
+
+### Protocol snapshot
+
+`skills/parley-deck/references/COOPERATION.md` carries the audit's protocol-text corrections: §2
+documents all three roster-authority states, §12.12's dangling slug is fixed, the Quickstart names
+§15 and §10, §3's layout includes `agents.toml` and `runs/`, and §11.B no longer contradicts its own
+branch-protection advice.
+
+
 ## 2.9.0 — 2026-08-19
 
 ### Added — `zcode` is a supported install target and a roster adapter

@@ -6,7 +6,7 @@
     "agents/openai.yaml": "sha256:238587fd55a9fcba856ca7183dcdd998bebcea1e1e6794e61c8325a04ff50d9c",
     "references/COOPERATION.md": "sha256:f41c8e5fed52de4d41adefd3339efb4267eb3344b0e5bcc2485b295c4196e6b2",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
-    "references/compatibility.json": "sha256:96d6514dcf4ebde204966bfbbe779cf9c66d4269552a5487b56fa80d95e26cf2"
+    "references/compatibility.json": "sha256:4424017151ba58818b4867a09afe76ad9f0dcc876a8094cd1aaf2fd4d6f9203f"
   },
-  "aggregate": "sha256:c15369429485a3f5bf00e7661dd3e0d3ae0c14bd98673e817f1739ac3b718fe7"
+  "aggregate": "sha256:8c5f9e8150957c5819ec208eaa30e67e44fda528999850864f91a9d6834683e1"
 }
