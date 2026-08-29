@@ -1338,8 +1338,9 @@ transfer or signoff weight is created.
 
 ### 15.6 Alternatives and correlated agreement
 
-Unconditional on every track. The executing wording lives in the round prompt templates and is
-validated there; this section carries the duty only.
+Unconditional on every track. This section carries the duty; the executing wording lives in the
+round prompt templates. Only (a) is machine-validated today — (b) and (c) bind by discipline, and
+this sentence says so rather than implying a gate that does not exist.
 
 (a) `## Existing alternatives` in round 1: the mechanisms the proposal builds by hand, and for each
 what the toolchain already ships, with a locator. A scoped null names the sources consulted.
