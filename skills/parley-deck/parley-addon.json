@@ -4,9 +4,9 @@
     "SKILL.md": "sha256:7d0e4f285a03c058c57cd4e98078f5878e21d53c8f1c949ad67b9481000f9738",
     "agents/manifest.yaml": "sha256:542b709e6d4f3aca26f4c77139734a269a0dbe6844cb4437a7aa00f04d7acdb7",
     "agents/openai.yaml": "sha256:238587fd55a9fcba856ca7183dcdd998bebcea1e1e6794e61c8325a04ff50d9c",
-    "references/COOPERATION.md": "sha256:26d934684d4ae470b5fbef13a48f23ad7daf0f002e0224dbe203a1aabee51332",
+    "references/COOPERATION.md": "sha256:715592f19529f8282176e3b02cab52d5ca5b7a57493078a31e8c1786f9c86921",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
-    "references/compatibility.json": "sha256:4424017151ba58818b4867a09afe76ad9f0dcc876a8094cd1aaf2fd4d6f9203f"
+    "references/compatibility.json": "sha256:eb71f844814e98e153c329e159a9bd479448c3c25aa0521cb027e61e41050921"
   },
-  "aggregate": "sha256:07acdb31e6493ec8f790ea14da6cb23565635ea7c7795a6bb9288e78c37bd845"
+  "aggregate": "sha256:d1da8bbf73ec4f97057678d0e932bd0d25eb8f910c4564f640deb0b54a14884e"
 }
