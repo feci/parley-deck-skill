@@ -607,9 +607,18 @@ date: YYYY-MM-DD
 
 ## Summary
 ## Proposed approach
+## Existing alternatives
 ## Concerns / open questions
 ## Risks
 ```
+
+`## Existing alternatives` is required and must not be empty (§15.6a). Instruct the participant:
+enumerate the mechanisms the proposal builds **by hand** — name the components, do not describe them
+— and for each name the closest thing the toolchain, stdlib, dependencies or platform **already
+ships**, with a locator. Mark each load-bearing element constraint-forced or merely inherited. A null
+result is legal and must name the sources consulted; *"the hand-built route is correct"* is a valid
+outcome. Do **not** ask for an open-ended "consider alternatives" — an unenumerated search is the
+form measured not to work.
 
 After each participant returns, verify the file exists:
 

@@ -1336,28 +1336,21 @@ prior position, the new position, and the correct source round path. If there we
 `None`. Existing signoffs ratify its accuracy and completeness; no new reviewer, ownership
 transfer or signoff weight is created.
 
-### 15.6 Correlated agreement
+### 15.6 Alternatives and correlated agreement
 
-On `standard` and `deliberation`, if round 1 closes with no substantive disagreement and the
-idea's output is primarily a judgment rather than a mechanically decidable artifact, consensus
-MUST NOT close until:
+Unconditional on every track. The executing wording lives in the round prompt templates and is
+validated there; this section carries the duty only.
 
-(a) the strongest rejected or unconsidered alternative is steelmanned, with its best supporting
-evidence and an observation that would change the recommendation. **If no credible alternative
-is found, the record states the search scope, the candidates considered and why each failed** —
-that is a finding, not a failure to comply. The form differs by track:
+(a) `## Existing alternatives` in round 1: the mechanisms the proposal builds by hand, and for each
+what the toolchain already ships, with a locator. A scoped null names the sources consulted.
 
-- On `deliberation`, one participant is **assigned** and files it as a canonical round artifact.
-- On `standard`, it is an `## Adversarial alternative` **section inside an existing round-02
-  file** — no separate assignment and no extra round. Consensus MUST NOT close unless at least
-  one existing round-02 artifact contains that section and satisfies this clause, null-result
-  form included.
+(b) `consensus.md` records that unanimity among related models is a shared prior, not independent
+evidence, and what would make the agreed position wrong. `FINAL.md` states where nominally
+independent proposals are one family.
 
-(b) `consensus.md` records that unanimity among related models is a shared prior, not
-independent evidence, and states what would have to be true for the agreed position to be wrong.
-This clause binds unchanged on both tracks, since `standard` has a separate `consensus.md`.
-
-`FINAL.md` MUST state where multiple nominally independent proposals are in fact one family.
+(c) `## Alternatives disposition` in `consensus.md`: an `ALT-` id and an adopt or reject with the
+decisive reason for each alternative. `FINAL.md` may not contradict a recorded adoption; a
+contradiction blocks signoff and escalates to the owner. The scanner never auto-halts.
 
 ### 15.7 Per-track binding
 
@@ -1369,4 +1362,4 @@ This clause binds unchanged on both tracks, since `standard` has a separate `con
 | 15.4 exemption claims | yes | yes | yes |
 | 15.5 procedural calls provisional | yes | yes | yes |
 | 15.5 drafter position changes | yes (in collapsed `FINAL.md`) | yes | yes |
-| 15.6 correlated agreement | no | yes (section in an existing round-02 file) | yes (assigned round artifact) |
+| 15.6 alternatives & correlated agreement | yes | yes | yes |
