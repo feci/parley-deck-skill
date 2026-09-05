@@ -9,7 +9,7 @@ description: "Run Parley Deck multi-agent idea, implementation, review, or conse
 
 Act as the facilitator agent. Every participant writes its own protocol artifact, including participants invoked headlessly through local CLIs. The facilitator prepares directories, discovers agent capabilities, prompts agents, and verifies outputs; it must not proxy-write another participant's round, review, or signoff content as the normal path.
 
-Always read `parley-deck/COOPERATION.md` first. Follow the active transport, roster, phase rules, and English-only rule for every file under `parley-deck/`.
+Always load the protocol context first, the way "Required Protocol Context" says, and record its attestation. Follow the active transport, roster, phase rules, and English-only rule for every file under `parley-deck/`.
 
 ## Non-Solo Requirement
 
@@ -21,13 +21,14 @@ If no other agent can be invoked because of auth, CLI, timeout, permissions, or 
 
 ## Required Protocol Context
 
-Do not run this skill from the abbreviated workflow alone. Load the full cooperation protocol before acting:
+Do not run this skill from the abbreviated workflow alone. Load the cooperation protocol before acting, and record HOW it was loaded — every launch carries a context attestation (`context_mode`, `source_sha256`, `packet_sha256`, `fallback_reason`):
 
-1. Prefer the live project file `parley-deck/COOPERATION.md`.
-2. If the live file is unavailable, load the bundled fallback snapshot `references/COOPERATION.md`.
-3. If both are unavailable, stop and ask for the protocol.
+1. Prefer the shared renderer when the `parley` CLI is installed: `parley protocol packet --phase N --track T --json` renders the context from the live resolved authority (a source-role deck's own `parley-deck/COOPERATION.md`; a consumer deck's verified core + lock + overlay) and prints the attestation. The default `context_mode` is `full` with a shadow packet audit record. `--optimize` is the explicit experimental input of the ratified packet trial, never a default and never something this skill turns on by itself; a `full-fallback` or `refused` result is a visible outcome to report in the orchestration summary, not to work around. A `refused` launch (missing authority, detected secret) does not proceed with substituted protocol text.
+2. Otherwise read the live project file `parley-deck/COOPERATION.md` in full and record `context_mode=full-fallback` with the reason (for example `no-parley-cli`).
+3. If the live file is unavailable, load the bundled fallback snapshot `references/COOPERATION.md` and record `context_mode=full-fallback` with reason `bundled-snapshot`. The snapshot is a portability aid; it is never an authority for an optimized packet and never replaces a live file that exists.
+4. If both are unavailable, stop and ask for the protocol.
 
-The live `parley-deck/COOPERATION.md` is canonical. The bundled reference is only a portability fallback for agents that receive the skill without the repository context.
+The live `parley-deck/COOPERATION.md` is canonical. The bundled reference is only a portability fallback for agents that receive the skill without the repository context. Carry the attestation of every participant launch into the orchestration summary; a launch without one is recorded as `full-fallback` with its reason, never as an optimized packet.
 
 ## Skill Metadata
 
@@ -113,7 +114,7 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 ## Startup Flow
 
-1. Read `parley-deck/COOPERATION.md` and identify the current `Transport:` value and active roster.
+1. Load the protocol context as "Required Protocol Context" requires (attestation recorded), then identify the current `Transport:` value and active roster from `parley-deck/COOPERATION.md`.
 
 2. Run the version and project sync check before accepting new work:
 

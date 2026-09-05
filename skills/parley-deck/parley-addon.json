@@ -1,12 +1,12 @@
 {
   "schema": "parley-addon/1",
   "files": {
-    "SKILL.md": "sha256:7d0e4f285a03c058c57cd4e98078f5878e21d53c8f1c949ad67b9481000f9738",
+    "SKILL.md": "sha256:948469da974686e871543adf2fdfa16929504e47c94bac5c3f3b8232144d06d7",
     "agents/manifest.yaml": "sha256:542b709e6d4f3aca26f4c77139734a269a0dbe6844cb4437a7aa00f04d7acdb7",
     "agents/openai.yaml": "sha256:238587fd55a9fcba856ca7183dcdd998bebcea1e1e6794e61c8325a04ff50d9c",
-    "references/COOPERATION.md": "sha256:715592f19529f8282176e3b02cab52d5ca5b7a57493078a31e8c1786f9c86921",
+    "references/COOPERATION.md": "sha256:0a8c385246826d3a4947f4a47aad92d80ab57b428f89a444ef5ce8a22fe99d40",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
     "references/compatibility.json": "sha256:eb71f844814e98e153c329e159a9bd479448c3c25aa0521cb027e61e41050921"
   },
-  "aggregate": "sha256:d1da8bbf73ec4f97057678d0e932bd0d25eb8f910c4564f640deb0b54a14884e"
+  "aggregate": "sha256:f5ae6a63e7d2001ce39f44f79a56799e3fc6e5eda06c22b244cd8a5f77c67935"
 }
