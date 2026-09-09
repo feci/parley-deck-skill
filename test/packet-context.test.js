@@ -47,10 +47,22 @@ test("SKILL.md keeps full context as the default and the optimized packet explic
 
 test("SKILL.md preserves the explicit full/fallback path and refusal semantics", () => {
   const ctx = section(SKILL, "## Required Protocol Context", "## ");
-  assert.match(ctx, /`context_mode=full-fallback` with the reason \(for example `no-parley-cli`\)/);
+  // Semantics, not article wording: the no-CLI path reads the live file in full and records
+  // the fallback mode together with its reason.
+  assert.match(ctx, /`context_mode=full-fallback` with (?:the|its) reason \(for example `no-parley-cli`\)/);
+  assert.match(ctx, /read the live project file `parley-deck\/COOPERATION\.md` in full/);
+  // The bundled snapshot is local orientation only; it cannot authorize a protocol task launch.
   assert.match(ctx, /reason `bundled-snapshot`/);
+  assert.match(ctx, /LOCAL ORIENTATION ONLY/);
+  assert.match(ctx, /cannot authorize a protocol task launch/);
+  assert.match(ctx, /live authority cannot be established, that task stays blocked/);
   assert.match(ctx, /If both are unavailable, stop and ask for the protocol\./);
-  assert.match(ctx, /`refused` launch .* does not proceed with substituted protocol text/);
+  // `refused` stays a stop and is never satisfied by substituting other protocol text,
+  // while `full-fallback` stays the disclosed read of the live authority itself.
+  assert.match(ctx, /`full-fallback` reads the live authority in full and proceeds/);
+  assert.match(ctx, /`refused` \(unprovable authority, a detected secret\) is a \*\*stop\*\*/);
+  assert.match(ctx, /never substitute another authority for it/);
+  assert.match(ctx, /never continue that launch on unattested text/);
   // The manual hash comparison stays as the drift check for the bundled snapshot.
   assert.match(SKILL, /shasum -a 256 <project-root>\/parley-deck\/COOPERATION\.md <skill-root>\/references\/COOPERATION\.md/);
 });
@@ -70,7 +82,15 @@ test("packaged protocol §9 item 1 consumes the attestation and keeps the full-r
   }
   assert.match(item, /`full` is the default/);
   assert.match(item, /never a bundled snapshot/);
-  assert.match(item, /record `context_mode=full-fallback` with the reason/);
+  // Semantics, not article wording ("the reason" vs "its reason"): the full-fallback path is a
+  // visible result that reads the live authority in full and records the mode plus its reason.
+  assert.match(item, /`full-fallback` is a valid, visible result/);
+  assert.ok(item.includes("read all of `parley-deck/COOPERATION.md` — the live authority itself"));
+  assert.match(item, /record `context_mode=full-fallback` with (?:the|its) reason/);
+  // `refused` remains a stop; it is never downgraded into a full-fallback over substituted text.
+  assert.match(item, /`refused` is a \*\*stop\*\*/);
+  assert.match(item, /never permission to emit the refused content, to substitute some other authority for it/);
+  assert.match(item, /a disclosed fallback to the live authority, never a substitute for it/);
   assert.match(item, /note the active `Transport:` and check `meta\/protocol-changelog\.md` for updates/);
   assert.match(item, /`meta\/packet-applicability\.yaml` is protocol/);
 });
