@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.12.1 — 2026-09-18
+
+- Fix three macOS-specific filesystem tests that failed in Linux release CI by
+  explicitly limiting firmlink and `chflags` cases to macOS. The immutable-file
+  fixture now checks that `chflags` actually succeeded.
+- Run the full test suite on macOS before the Linux job tests and builds Windows
+  portable assets, retaining automated coverage of those platform-specific cases.
+- Installer behavior and the cooperation protocol are unchanged from 2.12.0.
+
 ## 2.12.0 — 2026-09-18
 
 Ships alongside `parley-deck-cli` 1.48.0.
