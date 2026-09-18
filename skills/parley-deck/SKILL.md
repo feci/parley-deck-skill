@@ -9,7 +9,7 @@ description: "Run Parley Deck multi-agent idea, implementation, review, or conse
 
 Act as the facilitator agent. Every participant writes its own protocol artifact, including participants invoked headlessly through local CLIs. The facilitator prepares directories, discovers agent capabilities, prompts agents, and verifies outputs; it must not proxy-write another participant's round, review, or signoff content as the normal path.
 
-Always read `parley-deck/COOPERATION.md` first. Follow the active transport, roster, phase rules, and English-only rule for every file under `parley-deck/`.
+First obtain and read the protocol context as specified in **Required Protocol Context** below. Follow the resolved authority's active transport, roster, phase rules, and English-only rule for every file under `parley-deck/`.
 
 ## Non-Solo Requirement
 
@@ -21,13 +21,36 @@ If no other agent can be invoked because of auth, CLI, timeout, permissions, or 
 
 ## Required Protocol Context
 
-Do not run this skill from the abbreviated workflow alone. Load the full cooperation protocol before acting:
+Do not run this skill from the abbreviated workflow alone. For an official project launch,
+obtain the protocol context and attestation from the shared CLI renderer before starting:
 
-1. Prefer the live project file `parley-deck/COOPERATION.md`.
-2. If the live file is unavailable, load the bundled fallback snapshot `references/COOPERATION.md`.
-3. If both are unavailable, stop and ask for the protocol.
+```bash
+parley protocol packet --dir <project-root> --phase <0..8> --track <track> --idea <slug> --json
+```
 
-The live `parley-deck/COOPERATION.md` is canonical. The bundled reference is only a portability fallback for agents that receive the skill without the repository context.
+Read the emitted `body_path` and record `context_mode`, `source_sha256`, `packet_sha256`,
+and `fallback_reason` (absent or empty when no fallback occurred) in the participant's own artifact. Use the actual phase, track and
+idea; pass applicable `--flag` values (`strict_gate`, `auto_implement`, `pipeline`,
+`protocol_change`). Full context is the default. `--optimize` is an explicit experimental
+input for the ratified packet trial, not a default or a proven efficiency improvement.
+
+- `full`: read the complete emitted context from the live resolved authority.
+- `packet`: read every included block and the omission index; follow its triggers to read
+  the full source whenever an omitted section becomes relevant.
+- `full-fallback`: read the complete live authority and retain the visible fallback reason.
+- `refused`: stop that launch, resolve the authority or secret-detection problem, and
+  re-render. Never replace a refusal with a bundled snapshot, cached text or hand excerpt.
+
+If the renderer is unreachable (for example, an older CLI without this command), read the
+full live `parley-deck/COOPERATION.md` and record `context_mode=full-fallback` with that
+reason. A reachable renderer's refusal is not unavailability. Any other renderer failure
+that produces no attestation (including authority or I/O errors) also stops the launch:
+resolve the error and re-render; do not reinterpret it as permission to use unattested text.
+If no live protocol is
+available, stop the project launch and report the missing authority. The bundled
+`references/COOPERATION.md` is a portability/bootstrap reference only; it cannot substitute
+for the live authority of an official launch. The live applicability map
+`parley-deck/meta/packet-applicability.yaml` is protocol and changes follow §7.
 
 ## Skill Metadata
 
@@ -113,7 +136,7 @@ If any checklist item is unclear for the requested workflow, ask the user before
 
 ## Startup Flow
 
-1. Read `parley-deck/COOPERATION.md` and identify the current `Transport:` value and active roster.
+1. Obtain and read the protocol context under **Required Protocol Context**, retain its attestation, and identify the current `Transport:` value and active roster.
 
 2. Run the version and project sync check before accepting new work:
 

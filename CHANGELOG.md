@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.12.0 — 2026-09-18
+
+Ships alongside `parley-deck-cli` 1.48.0.
+
+- Synchronize the portable protocol snapshot with the CLI's bootstrap protocol: automated
+  completion requires independent current-tree evidence and an available goal checker.
+- Teach manual facilitators to obtain live protocol context and record its attestation
+  through `parley protocol packet`. Full context stays the default; optimized packets are
+  experimental. Renderer refusal stops the launch; unavailable renderers use a disclosed
+  full-live-source fallback.
+- Run the portable builder through Node directly so Windows hosts do not need to execute a
+  `.cmd` shim without a shell.
+- Preserve the installer targets and existing add-on payloads. This release does not claim
+  completion of the empirical audit or measured efficiency gains.
+
+## 2.11.0 — 2026-08-29
+
+See the [published release notes](https://github.com/feci/parley-deck-skill/releases/tag/v2.11.0)
+for this earlier release; its detailed entry was not added to this changelog at publication.
+
 ## 2.10.0 — 2026-08-21
 
 Ships alongside `parley-deck-cli` 1.46.0 and the `protocol-and-skill-audit` idea it closes.

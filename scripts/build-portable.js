@@ -6,7 +6,8 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const pkgJson = require(path.join(root, "package.json"));
-const pkgBin = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "pkg.cmd" : "pkg");
+// Invoke the JavaScript entry point through Node so Windows does not need a .cmd shell.
+const pkgBin = require.resolve("@yao-pkg/pkg/lib-es5/bin.js");
 const dist = path.join(root, "dist");
 
 const targetGroups = {
@@ -54,11 +55,14 @@ function runPkg(target, output) {
     "--no-bytecode"
   ];
 
-  const result = spawnSync(pkgBin, args, {
+  const result = spawnSync(process.execPath, [pkgBin, ...args], {
     cwd: root,
     stdio: "inherit"
   });
 
+  if (result.error) {
+    process.stderr.write(`Portable build failed: ${result.error.message}\n`);
+  }
   if (result.status !== 0) {
     process.exit(result.status || 1);
   }
