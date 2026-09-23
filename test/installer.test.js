@@ -369,7 +369,10 @@ test("doctor reports missing and malformed installs", () => {
     "agents/openai.yaml",
     "gemini-extension.json",
     "plugin.json",
+    "references/ARTIFACT_TEMPLATES.md",
     "references/COOPERATION.md",
+    "references/HEADLESS_LAUNCH.md",
+    "references/ROSTER_AND_PROTOCOL.md",
     "references/WORKED_EXAMPLES.md",
     "references/compatibility.json"
   ]);

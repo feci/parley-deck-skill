@@ -30,7 +30,7 @@ Parley verification. Parley is for work where independent verification earns its
 | Developer / implementer   | Quickstart, §4.0, §4 phases, §6               | pick the track, write the plan/implementation, run checks |
 | Reviewer                  | §4 Phase 6–8 (refutation-default)             | try to break the acceptance criteria, file findings       |
 | PM / designer             | Quickstart, §1                                | state the outcome, constraints, non-goals, risk tolerance |
-| Facilitator               | Quickstart, §4, §5, §9, your §11 transport    | open ideas, drive consensus, keep the roster              |
+| Facilitator               | Quickstart, §4, §5, §9, your §11 transport    | open ideas, drive consensus, keep the roster; a deck declaring `facilitator:` may run it as the pure organizer by default — participants implement and verify code, the facilitator reads verdicts (`facilitator_participates: true` restores full participation) |
 
 **Core vs reference (progressive disclosure).** The **core** every participant needs is
 §0–§8 **and §15 (verification integrity), which binds on every track**. The rest are
@@ -433,7 +433,7 @@ Before publishing `FINAL.md`, the drafter MUST verify that every active non-faci
 
 ### Phase 5 — Implementation
 
-Once `FINAL.md` is published, the idea moves from design to build. **The default implementer is the FINAL drafter** (same agent as Phase 4). Any other participant may volunteer to implement instead by posting a claim in `inbox/<from>-to-all_<slug>_impl-claim.md` (or the appropriate transport surface) before work begins; if no one else claims within a reasonable window, the drafter proceeds.
+Once `FINAL.md` is published, the idea moves from design to build. In a declared-facilitator run (`facilitator:` in `00-prompt.md`) the default is that participants implement and verify the code while the declared facilitator reads their verdicts and validator output — never implementing or verifying code itself unless `facilitator_participates: true` opts it back into participation. **The default implementer is the FINAL drafter** (same agent as Phase 4). Any other participant may volunteer to implement instead by posting a claim in `inbox/<from>-to-all_<slug>_impl-claim.md` (or the appropriate transport surface) before work begins; if no one else claims within a reasonable window, the drafter proceeds.
 
 The implementer:
 
@@ -501,6 +501,8 @@ If the idea is design-only (no code artifact), Phase 5 may be reduced to a brief
 ### Phase 6 — Code review rounds
 
 > Verification verdicts, their provenance, and verdict conflicts follow **§15**.
+
+In a declared-facilitator run, code review and code verification stay with the participants by default; the declared facilitator consumes review verdicts rather than reviewing code itself.
 
 Once `IMPLEMENTATION.md` is published, every active participant **except the implementer** writes `ideas/<slug>/review/round-01/<agent-id>.md`:
 
@@ -873,7 +875,7 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
 
 Then proceed with the per-agent session-start checklist:
 
-1. Read the protocol context for this launch. An official launch (runner, interactive handoff or skill-facilitated) receives it from the shared renderer (`parley protocol packet`) with an attestation — `context_mode` (`full`, `packet`, `full-fallback` or `refused`), `source_sha256`, `packet_sha256`, `fallback_reason` — rendered from the live resolved authority (a source-role deck's own file; a consumer deck's verified core + lock + overlay), never a bundled snapshot. `full` is the default; an optimized `packet` is the explicit experimental input of the ratified packet trial, carries every block verbatim plus a complete omission index whose triggers say when to read the full source, and is never the default. These two outcomes are not the same. `full-fallback` is a valid, visible result: read all of `parley-deck/COOPERATION.md` — the live authority itself — record `context_mode=full-fallback` with its reason in your artifact, and proceed. `refused` is a **stop**: a refusal (unprovable authority, a detected secret) is never permission to emit the refused content, to substitute some other authority for it (a bundled snapshot, a cached or stale copy, a hand-assembled excerpt), or to continue that launch on unattested text — resolve it at the renderer and re-render, or report the blocker. A protocol task launch that carries **no** attestation is unresolved in the same way: obtain one from the renderer before the task starts. Only where no renderer is reachable does a launch fall back to reading the full live source, recorded as `full-fallback` with that reason — a disclosed fallback to the live authority, never a substitute for it. In every mode: note the active `Transport:` and check `meta/protocol-changelog.md` for updates. The applicability map `meta/packet-applicability.yaml` is protocol; changing it is a §7 change.
+1. Read the protocol context for this launch. An official launch (runner, interactive handoff or skill-facilitated) receives it from the shared renderer (`parley protocol packet`) with an attestation — `context_mode` (`full`, `packet`, `full-fallback` or `refused`), `source_sha256`, `packet_sha256`, `fallback_reason` — rendered from the live resolved authority (a source-role deck's own file; a consumer deck's verified core + lock + overlay), never a bundled snapshot. `full` is the default; an optimized `packet` is the explicit experimental input of the ratified packet trial, carries every block verbatim plus a complete omission index whose triggers say when to read the full source, and is never the default. These two outcomes are not the same. `full-fallback` is a valid, visible result: read all of `parley-deck/COOPERATION.md` — the live authority itself — record `context_mode=full-fallback` with its reason in your artifact, and proceed. `refused` is a **stop**: a refusal (unprovable authority, a detected secret) is never permission to emit the refused content, to substitute some other authority for it (a bundled snapshot, a cached or stale copy, a hand-assembled excerpt), or to continue that launch on unattested text — resolve it at the renderer and re-render, or report the blocker. A protocol task launch that carries **no** attestation is unresolved in the same way: obtain one from the renderer before the task starts. Only where no renderer is reachable does a launch fall back to reading the full live source, recorded as `full-fallback` with that reason — a disclosed fallback to the live authority, never a substitute for it. In every mode: note the active `Transport:` and check `meta/protocol-changelog.md` for updates. The applicability map `meta/packet-applicability.yaml` is protocol; changing it is a §7 change. A facilitator may request its audience-scoped view (`parley protocol packet --audience facilitator`) — an opt-in, verbatim, omission-indexed reading set that can never cut below the never-cut floor — and, after a compaction, may re-orient from the computed `parley organizer brief` instead of re-reading SKILL.md and the full COOPERATION.md.
 2. Read `parley-deck/inbox/` — filter for files addressed to you or `all`. Escalations addressed `to: user` that are still unanswered are context you should respect: don't cut across an active user-direction request.
 3. Read `parley-deck/ideas/*/00-prompt.md` — note open ideas where you are a participant.
 4. **Transport B/C only:** check the project's open PRs/MRs for any titled `[<slug>] design` or `[<slug>] implementation` where you are a requested reviewer or assignee. If any is awaiting your action that maps to a missing file in §3, that file is what you owe — write it first.
@@ -884,6 +886,8 @@ Then proceed with the per-agent session-start checklist:
 7. Only then proceed to the user's current task.
 
 ## 11. Transport mechanics
+
+Advisory: one blocking `parley wait` — a read-only verb that returns at the awaited phase boundary, on timeout, or loudly on degradation — is preferred over repeated short polls of `parley status`.
 
 This section describes the _how_ for each of the three transports. Pick the subsection that matches your active `Transport:` setting; ignore the others.
 
