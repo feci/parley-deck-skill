@@ -131,7 +131,11 @@ Do not re-read this SKILL.md or the full COOPERATION.md to re-orient.
 `parley wait --idea <slug> --for round|consensus|review|implementation|any` replaces
 poll loops: exit 0 boundary reached, 3 timeout (partial digest, outstanding agents
 named), 4 a present-but-invalid artifact (validator reason verbatim) or a blocking
-escalation/driver error, 1 usage/IO. Missing artifacts keep waiting. The
+escalation/driver error that ARRIVES after the wait started, 1 usage/IO. An
+escalation blocks only when its note belongs to this idea, is not `blocking: no`,
+and is not answered/resolved; pre-existing qualifying notes and historical
+driver errors are reported as digest notes, never exit 4. Missing artifacts keep
+waiting. The
 PhaseDigest it prints is mechanically derived — treat any block / DISPUTED / unparsed /
 adverse validity as the signal to open the RAW artifact and adjudicate there; the
 digest never substitutes for canonical files (residual over-trust risk, accepted).
