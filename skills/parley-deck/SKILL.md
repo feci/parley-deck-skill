@@ -133,9 +133,15 @@ poll loops: exit 0 boundary reached, 3 timeout (partial digest, outstanding agen
 named), 4 a present-but-invalid artifact (validator reason verbatim) or a blocking
 escalation/driver error that ARRIVES after the wait started, 1 usage/IO. An
 escalation blocks only when its note belongs to this idea, is not `blocking: no`,
-and is not answered/resolved; pre-existing qualifying notes and historical
-driver errors are reported as digest notes, never exit 4. Missing artifacts keep
-waiting. The
+and is not answered/resolved; pre-existing qualifying notes, historical driver
+errors, and to-user notes the wait could not evaluate (frontmatter unreadable, or
+no `idea:` to match against) are reported as digest notes, never exit 4. Missing
+artifacts keep waiting. With `--json`, stdout carries ONLY the machine-readable
+envelope — `{"notes": [annotations], "digest": PhaseDigest}` (`notes` omitted when
+empty) — on exits 0, 3 and 4; the terminal status line (`wait: boundary reached …`
+/ `wait: timeout after …`) goes to stderr, and a usage/IO failure (exit 1) prints
+its error to stderr with no envelope on stdout at all. Human (non-`--json`)
+output is unchanged. The
 PhaseDigest it prints is mechanically derived — treat any block / DISPUTED / unparsed /
 adverse validity as the signal to open the RAW artifact and adjudicate there; the
 digest never substitutes for canonical files (residual over-trust risk, accepted).
