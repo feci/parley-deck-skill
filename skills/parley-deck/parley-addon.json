@@ -9,7 +9,7 @@
     "references/HEADLESS_LAUNCH.md": "sha256:018135766190895224dceb099218dee9947f97d67a611a71c25086e07504cb8d",
     "references/ROSTER_AND_PROTOCOL.md": "sha256:808ce95a4aa71c2073b676e2ee566faf64d1b7e800d887a5f4aebaabb21e2c0b",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
-    "references/compatibility.json": "sha256:bf8e975b51ff756282e873aa1d0f500e228ddeb69f004d91aa064fd082ba7fa3"
+    "references/compatibility.json": "sha256:19ff1df406de35678dbb76a8a93c43995fc3674211843e24616928ed6d245550"
   },
-  "aggregate": "sha256:2d1eb0ea55e3606ce2023e439cd2805dbdd54740e8798e3574c9301334c70ea1"
+  "aggregate": "sha256:d8931d0081c4d563cc400436ece9f6bb94e5ba7bfe0a78f6f67e0e02c876193d"
 }

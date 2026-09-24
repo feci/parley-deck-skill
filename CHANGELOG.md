@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.13.0 — 2026-09-24
+
+Ships alongside `parley-deck-cli` 1.49.0.
+
+- Slim the installable SKILL.md core to a byte-capped quickstart (17.8 KB, under the
+  20 KB cap) and relocate the detailed material into reference files the core points
+  at (artifact templates, headless launch, roster and protocol), reducing organizer
+  read-in cost while the ratified protocol hunks stay byte-identical across all three
+  COOPERATION.md copies.
+- Document `parley wait` in the core, including the `--json` stream contract: stdout
+  carries the `{notes?, digest}` envelope on exits 0/3/4, terminal status goes to
+  stderr, and exit 1 emits no envelope; notes addressed to the user but not yet
+  evaluated are listed and flagged in the digest.
+- Carry the permissive §9.0 audience/brief sentence in the portable protocol snapshot
+  so manual facilitators see the same rule the CLI renders.
+- Recommend CLI >= 1.49.0 in `references/compatibility.json` (the core now documents
+  `parley wait`, which ships in that release); installer behavior is unchanged.
+- Add-on payload manifests regenerated; `npm test` and `prepack` gate them as before.
+
 ## 2.12.1 — 2026-09-18
 
 - Fix three macOS-specific filesystem tests that failed in Linux release CI by
