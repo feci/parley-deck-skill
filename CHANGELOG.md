@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.14.0 — 2026-09-25
+
+Ships alongside `parley-deck-cli` 1.50.0.
+
+- Document the owner-designated implementer in the protocol core: a per-idea
+  `implementer:` field in `00-prompt.md` plus an optional standing
+  `[defaults].default_implementer` in the layered agents config, one resolution chain
+  (re-entry pin → per-idea designation → global default → existing fallback),
+  fail-closed validity gates (an empty, ineligible or malformed value blocks any run
+  that reaches an implementer, review-round, goal-check or fix-up action and is never
+  trimmed or repaired), the designated-implementer liveness gate with its three
+  recorded exits, and the shipped UNSET product default. The hunks stay byte-identical
+  across all three COOPERATION.md copies (§0, §4.0, §4 Phase 4/5, §9.0, §10).
+- State the amended Phase-5 implementer-resolution chain in the roster/protocol
+  reference.
+- `compatibility.json`: skillVersion 2.14.0, recommendedCli `>=1.50.0` (the documented
+  mechanism ships in CLI 1.50.0).
+
 ## 2.13.0 — 2026-09-24
 
 Ships alongside `parley-deck-cli` 1.49.0.

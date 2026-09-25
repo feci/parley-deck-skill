@@ -5,11 +5,11 @@
     "agents/manifest.yaml": "sha256:542b709e6d4f3aca26f4c77139734a269a0dbe6844cb4437a7aa00f04d7acdb7",
     "agents/openai.yaml": "sha256:238587fd55a9fcba856ca7183dcdd998bebcea1e1e6794e61c8325a04ff50d9c",
     "references/ARTIFACT_TEMPLATES.md": "sha256:c47838c4d26f10a0ee8d0bf1c4e21a17b0d225dd859c4ee137c3a9400adbc785",
-    "references/COOPERATION.md": "sha256:fc907e5914a072d1a6afe249fc39401e1f8761cc1d67f2ce002dfde210762c9f",
+    "references/COOPERATION.md": "sha256:51476d69ed4291b77db63f6855554cd251461c0b8743a303c2a3b0eacaabf67a",
     "references/HEADLESS_LAUNCH.md": "sha256:018135766190895224dceb099218dee9947f97d67a611a71c25086e07504cb8d",
-    "references/ROSTER_AND_PROTOCOL.md": "sha256:808ce95a4aa71c2073b676e2ee566faf64d1b7e800d887a5f4aebaabb21e2c0b",
+    "references/ROSTER_AND_PROTOCOL.md": "sha256:32f0a84f1dc7c8641ce9691d92dc010e9ab9ec86480765614745ce8f6eafc7a5",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
-    "references/compatibility.json": "sha256:19ff1df406de35678dbb76a8a93c43995fc3674211843e24616928ed6d245550"
+    "references/compatibility.json": "sha256:89f52536b2a7c56f0c44cf307094a186ac91052c6c35da3e4a2ffced1143a0a9"
   },
-  "aggregate": "sha256:d8931d0081c4d563cc400436ece9f6bb94e5ba7bfe0a78f6f67e0e02c876193d"
+  "aggregate": "sha256:57d3c53531dec624bb476198ce95e69d909380ce496b867f8a2acd50eaec5f29"
 }
