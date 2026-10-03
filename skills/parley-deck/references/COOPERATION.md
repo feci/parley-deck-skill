@@ -55,7 +55,7 @@ Once chosen, replace the `Transport:` line in the header with the active value. 
 
 **The choice is sticky for the project.** Switching transports later is possible but requires a meta-protocol-change idea (§7), because in-flight ideas span multiple PRs/branches.
 
-**Deck bootstrap (one-time).** When `parley-deck/` is first created in a project (`parley init`), in addition to the transport the facilitator MUST confirm the **active roster, each agent's model, and each agent's reasoning/effort level** with the user as a required one-time setup step, and record the persistent per-agent choices in the deck's roster authority `parley-deck/agents.toml` via `parley roster set` (then regenerate the §2 view with `parley roster render`). The **default reasoning/effort is the strongest (highest) level the agent supports**; fall back to `cli-default` only when the level cannot be discovered. This fires **only at deck creation** — not per idea, not per later session; an already-bootstrapped deck reuses the saved selection (and the user may re-run the confirmation on request). The protocol stays **model- and reasoning-agnostic** — it mandates the confirmation and a highest-by-default, not any specific model or level. Per-agent defaults are seeded from the **user-global central config `~/.parley/agents.toml`** (lists each agent's model + reasoning), which `parley init` creates and any deck overrides per-project via `parley-deck/agents.toml`. Its `[defaults]` block also carries project-wide policy defaults — `ping_tier` (§9.0 liveness ping), `preferred_transport` (used by `parley init`), `roster_change_policy`, `speed`/`timeouts`, and `default_implementer` (the standing implementer designation of §4 Phase 5 — deliberately shipped COMMENTED OUT, a deviation from the template's active-key shape, because an active value would ship the global default set; a per-idea `implementer:` line outranks it and `default_implementer = "none"` suppresses it deck-wide). See the skill for the interactive list-roster → confirm → list-models-and-effort → pick flow. (The §9.0 readiness check only pings agent *liveness* per idea; it does not re-select models or effort.)
+**Deck bootstrap (one-time).** When `parley-deck/` is first created in a project (`parley init`), in addition to the transport the facilitator MUST confirm the **active roster, each agent's model, and each agent's reasoning/effort level** with the user as a required one-time setup step, and record the persistent per-agent choices in the deck's roster authority `parley-deck/agents.toml` via `parley roster set` (then regenerate the §2 view with `parley roster render`). The **default reasoning/effort is the strongest (highest) level the agent supports**; fall back to `cli-default` only when the level cannot be discovered. This fires **only at deck creation** — not per idea, not per later session; an already-bootstrapped deck reuses the saved selection (and the user may re-run the confirmation on request). The protocol stays **model- and reasoning-agnostic** — it mandates the confirmation and a highest-by-default, not any specific model or level. Per-agent defaults are seeded from the **user-global central config `~/.parley/agents.toml`** (lists each agent's model + reasoning), which `parley init` creates and any deck overrides per-project via `parley-deck/agents.toml`. Its `[defaults]` block also carries project-wide policy defaults — `ping_tier` (§9.0 liveness ping), `preferred_transport` (used by `parley init`), `roster_change_policy`, `quota_auto_exclude` (§9.0; presence-aware boolean), `speed`/`timeouts`, and `default_implementer` (the standing implementer designation of §4 Phase 5 — deliberately shipped COMMENTED OUT, a deviation from the template's active-key shape, because an active value would ship the global default set; a per-idea `implementer:` line outranks it and `default_implementer = "none"` suppresses it deck-wide). See the skill for the interactive list-roster → confirm → list-models-and-effort → pick flow. (The §9.0 readiness check only pings agent *liveness* per idea; it does not re-select models or effort.)
 
 **Universal invariants** that hold for every transport:
 
@@ -285,6 +285,7 @@ The agent (or user) who starts the idea creates `ideas/<slug>/00-prompt.md`:
     strict_gate: true|false     # optional; exact case-insensitive "true" opts into
                                 # the strict review gate (Phase 8); absent or any
                                 # other value keeps the default close rule
+    quota_auto_exclude: false   # optional per-idea opt-out from §9.0; recorded policy/scope govern later runs
     require_model_diversity: true|false  # optional; LE-3 — escalate (not just warn) if
                                 # every reviewer shares the implementer's model
     checks: <command>           # optional; LE-4 — verification command the driver runs
@@ -391,6 +392,8 @@ Every listed participant then **appends** their own signoff block:
 
 **Consensus rules:**
 
+Historical signers retain their filed positions under §5 and §9.0; an automatic exclusion never withdraws a veto.
+
 - ✅ from _every_ active participant = consensus reached → Phase 4, subject to the close-conditions
   already binding under §15.3 (an unresolved `DISPUTED` claim a decision depends on) and §15.6
   (the correlated-agreement duties). Signoffs do not waive them; this line adds no new condition.
@@ -441,7 +444,7 @@ Before publishing `FINAL.md`, the drafter MUST verify that every active non-faci
 
 Once `FINAL.md` is published, the idea moves from design to build. In a declared-facilitator run (`facilitator:` in `00-prompt.md`) the default is that participants implement and verify the code while the declared facilitator reads their verdicts and validator output — never implementing or verifying code itself unless `facilitator_participates: true` opts it back into participation. **Who implements is resolved by one chain, stopping at the first hit:** (1) the re-entry pin — `IMPLEMENTATION.md`'s `implementer:`, once Phase 5 has begun; (2) the per-idea designation — `implementer:` in this idea's `00-prompt.md`; (3) the standing global default — `[defaults].default_implementer`, read live from the layered config at dispatch time (§0); (4) today's chain — `FINAL.md`'s recorded `implementer:` / `drafted-by:`, else the first eligible participant (list order). The `00-prompt.md` field is a **designation** — an instruction about who should execute — while `IMPLEMENTATION.md`'s `implementer:` is the **outcome record** of who did. The per-idea field has four states: **absent** (no per-idea designation; the global default may still fire); **present with an empty value** (an incomplete designation — a blocking defect, never read as absent); **`none`** (a deliberate per-idea opt-out that suppresses the global default for this idea — no gate); or **an agent id** (a designation; `"quoted"` and `'quoted'` forms accepted). Validity gates are hard and fire on **any run that reaches an implementer, review-round, goal-check or fix-up action**: an empty value, an id outside this idea's eligible participants, or a malformed value blocks that run before it dispatches — a malformed value is never trimmed or repaired (`implementer: kimi-1  # note` is invalid, not `kimi-1`). A design-only run (`auto_implement` off) reaches none of these actions, so a defective designation stays latent until the idea is next run with `auto_implement` on. A **designated** participant who fails the §9.0 liveness ping blocks a Phase-5-reaching run behind a user-confirmed gate with exactly three recorded exits: re-designate to another eligible participant, record `implementer_waived: {agent-id} — {reason} — confirmed {date}`, or write `implementer: none`. A **global-default** id never gates: an unavailable designee, this idea's own non-participating facilitator, or a non-participant produces a one-line notice naming the designee, the cause, and those exits, and dispatch falls through to the fallback — only a malformed global-default value still hard-fails. When the pin and a live designation disagree, the driver escalates rather than honouring either silently; correction is an owner/author-recorded act — restore the designation to match the pin, or record `implementer_reassigned: {old-agent-id} to {new-agent-id} — {reason} — confirmed {date}` to retire the abandoned attempt and re-pin.
 
-Any other participant may volunteer to implement instead by posting a claim in `inbox/<from>-to-all_<slug>_impl-claim.md` (or the appropriate transport surface) before work begins; if no one else claims within a reasonable window, the drafter proceeds. **Under a live designation a claim does not override the designation** — it is surfaced as advisory information and answered by a one-line per-idea edit or a §4 escalation; with no designation, a claim is today's normal volunteer route. A designation names **who executes, never which gate applies**: quorum, roster, signoff weight and every attended boundary (core publication, channel publication, `parley protocol publish`) are unchanged and are never inherited by a designee. Designations are validated against `participants:` only — nothing reads `excluded:` — so a §9.0 exclusion of the designee must also remove the id from `participants:`, or the designation stays live. Where drafter and implementer coincide — never forbidden, two-participant decks need it — `IMPLEMENTATION.md` records the concentration in one line.
+Any other participant may volunteer to implement instead by posting a claim in `inbox/<from>-to-all_<slug>_impl-claim.md` (or the appropriate transport surface) before work begins; if no one else claims within a reasonable window, the drafter proceeds. **Under a live designation a claim does not override the designation** — it is surfaced as advisory information and answered by a one-line per-idea edit or a §4 escalation; with no designation, a claim is today's normal volunteer route. A designation names **who executes, never which gate applies**: quorum, roster, signoff weight and every attended boundary (core publication, channel publication, `parley protocol publish`) are unchanged and are never inherited by a designee. Designations are validated against the current `participants:` set (§9.0). Membership history is immutable; known signers come from that history and required signers from the current set. Nothing derives membership by subtracting `excluded:` markers. A per-idea designee or pinned implementer is never automatically excluded: a qualifying quota failure opens the existing three-exit gate with its evidence prefilled. Where drafter and implementer coincide — never forbidden, two-participant decks need it — `IMPLEMENTATION.md` records the concentration in one line.
 
 The implementer:
 
@@ -512,6 +515,8 @@ If the idea is design-only (no code artifact), Phase 5 may be reduced to a brief
 
 In a declared-facilitator run, code review and code verification stay with the participants by default; the declared facilitator consumes review verdicts rather than reviewing code itself.
 
+After a §9.0 exclusion, reviewer counts, model diversity, strict-gate requirements and independent goal-checker eligibility are re-evaluated, never waived; historical findings retain their force.
+
 Once `IMPLEMENTATION.md` is published, every active participant **except the implementer** writes `ideas/<slug>/review/round-01/<agent-id>.md`:
 
     ---
@@ -566,6 +571,8 @@ signoff process, or the operator explicitly rules on it and that ruling is quote
 into the next review artifact.
 
 ### Phase 7 — Review consensus
+
+A §9.0 exclusion does not dispose of historical signoffs or findings. Review consensus must retain them and re-evaluate every applicable gate (§5).
 
 When review discussion has converged, any participant (typically the implementer) drafts `ideas/<slug>/review/consensus.md`:
 
@@ -737,10 +744,12 @@ Escalation is not a veto — the user's answer becomes input to the next round l
 
 - **Quorum = all agents listed in `participants:` of `00-prompt.md`.**
 - **Quorum is set at the §9.0 pre-idea readiness check** and **locks once Phase 0
-  completes.** Agents excluded there (with user confirmation) do not count toward this
-  idea's quorum; a mid-idea unavailability does not silently shrink quorum — it falls to
+  completes.** Agents excluded there (with user confirmation or recorded §9.0 quota auto-exclusion)
+  do not count toward this idea's quorum; a mid-idea unavailability does not silently shrink quorum,
+  except the recorded §9.0 quota auto-exclusion, which is never silent. Otherwise it falls to
   the async rules below and the runtime watchdog. Excluding the last non-facilitator
   still requires the §1 user-authorized solo exception.
+- An excluded participant's filed signoffs, ❌s, `DISPUTED` claims and findings survive. It remains a known signer through immutable membership history; required signers follow the current `participants:`. Exclusion is never a withdrawal or disposition: a ❌ stands until its author withdraws it after owner-confirmed re-inclusion, or the owner rules and the ruling is quoted into the next artifact. Open CRITICAL/MAJOR and every strict-gate finding require an explicit disposition backed by independent evidence; disputes are never resolved by count (§15.3).
 - A valid Parley Deck idea normally has at least two active participants. A one-participant idea is valid only when a user-authorized solo exception is recorded with the auth/CLI/timeout/tooling blocker that made multi-agent execution impossible.
 - An agent joining after round 1: either catch up (read priors, write late round-1, join from round 2) or decline (❌ NON-PARTICIPANT note in consensus).
 - If an agent is inactive > 2 rounds and the idea has a deadline, others may drop them from quorum — but only after a `inbox/<from>-to-<missing>_<slug>.md` ping.
@@ -871,15 +880,90 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
   round-trip via each agent's real configured invocation; a missing CLI is unavailable
   without a probe) and build an available/unavailable table.
   - **Excluding** an unavailable agent from this idea's quorum requires **explicit user
-    confirmation** and is recorded in `00-prompt.md`
+    confirmation**, except the quota auto-exclusion rule below, and is recorded in `00-prompt.md`
     (`excluded: [<roster-id> — reason — confirmed <date>]`). Exclusion is **per-idea and
     temporary**: the agent stays in the §2 roster and is re-probed at the next idea.
+  - **Quota auto-exclusion** (idea `meta-protocol-change-quota-auto-exclude`, owner-ratified 2026-10-04).
+    This is a CLI decision over this idea's quorum only, never an organizer's interpretation of text.
+    It never writes machine or deck `agents.toml`, so `roster_change_policy` does not gate it.
+    - **Policy and scope.** `[defaults].quota_auto_exclude` is a presence-aware boolean, with a deck
+      override and a per-idea `quota_auto_exclude: false` opt-out. It defaults on for ideas created
+      after delivery; legacy ideas stay on confirmation. The resolved policy and authorized scope
+      (kickoff-only or kickoff plus mid-idea) are recorded at kickoff and reused by every later run.
+      Upgrading or resuming never widens scope; widening needs owner confirmation. Malformed or
+      ambiguous configuration/records fail closed. The floor of 2 and threshold of 60 minutes are fixed.
+    - **Authorizing evidence.** A failed invocation (nonzero exit or structured terminal provider error)
+      is a candidate only when it produced no valid completed artifact and no later attempt in the same
+      batch succeeded. A valid completed artifact or later success always wins. The adapter's recognizer
+      must establish native terminal-provider-error provenance through located CLI behavior/source plus
+      positive and adversarial negative fixtures. An unsupported adapter is diagnostic-only; `is_error`
+      alone is insufficient. Assistant-quoted errors, tool output, artifact text, disagreement and
+      slowness never authorize exclusion, even when followed by failure without a valid artifact.
+    - **Exhaustion semantics.** The error's own text (the upstream message for gateway pass-through)
+      must explicitly state exhausted account credit/account quota, or a reached/exhausted named usage
+      allowance. A stated reset must be at least 60 minutes after observation. A known shorter reset
+      does not qualify even with daily/weekly/monthly wording. Past, contradictory or unparseable resets
+      gate; they are never relabeled unknown. With no stated reset, only explicit account-credit/account-
+      quota exhaustion or an explicitly reached allowance of at least 24 hours (daily, weekly, monthly)
+      qualifies. An hourly or N-hour allowance below 24 hours needs a qualifying stated reset.
+      A bare 429, generic `quota exceeded`, bare `credit balance`, 5xx/reset timer, long Retry-After alone,
+      400, authentication error, hang or watchdog class never qualifies. Gateway-pool phrases need source
+      evidence of their cause and are not positive forms by themselves. Generic provider classification
+      is separate: a bare 503 remains a provider gate and cannot be excluded with `--yes`.
+    - **Whole-batch decision.** Kickoff runs inside `parley run`, over the exact proposed participants,
+      after every readiness probe returns; standalone `parley preflight` reports only and applies no
+      exclusion. Mid-idea application: **not yet in force** until stage 2 is delivered. Once delivered,
+      apply only at a settled dispatch batch, after every affected writer stops and before any further
+      dispatch, signoff evaluation or close. Evaluate the entire batch once, all or nothing and independent
+      of failure order. At least two distinct, usable non-facilitator participants must survive. Duplicate
+      ids and unresolved failures do not inflate the count; the facilitator never counts, even with
+      `facilitator_participates: true`. Below the floor, apply nothing and issue one blocking escalation
+      with every candidate and the arithmetic. The §1 solo exception is unchanged.
+    - **Protected roles and preserved work.** A per-idea designee, pinned implementer, or candidate who
+      has started a canonical consensus/FINAL draft blocks the entire batch. The designee/pin opens
+      Phase 5's existing three-exit gate with evidence prefilled; global-default fall-through before a pin
+      is unchanged. Re-evaluate reviewer counts, LE-7/LE-11 close, independent goal-check eligibility,
+      model diversity and strict_gate; shortfalls escalate, never waive a gate. §5 preserves every filed
+      objection and finding. Preserve partial/invalid files as incomplete, never count existence as
+      completion. A failed round resumes only through a new terminal evaluation bound to the transition
+      after survivor artifacts validate; keep the earlier round.incomplete and failed invocation.
+      Closed FINAL and IMPLEMENTATION files remain frozen. Organizer exhaustion/failover and automatic
+      replacement agents are outside this rule.
+    - **Membership authority.** `participants:` is the current set. Filter kickoff exclusions before
+      writing the first prompt participant list, creation event, manifest or dispatch; kickoff-excluded
+      ids never become known signers. Keep the kickoff quorum and every authorized revision in immutable
+      history. Mid-idea revisions rewrite `participants:` only as part of the transition; never rewrite
+      run.created or participant artifacts. Known signers come from history; required signers and every
+      dispatch/await consumer use the current set. Never subtract repeated `excluded:` display markers
+      to derive membership. Excluded ids cannot append new signoffs until owner-confirmed re-inclusion.
+    - **Durable transition and serialization.** Record evidence before applying: rule id, invocation id,
+      scrubbed excerpt, raw reset string and UTC observation/reset times. Commit one checked-durable
+      batch record with idea/run identities, prior revision, before/after sets, every candidate invocation,
+      policy/scope and evidence references. Validate under idea-scoped serialization. One driving run per
+      idea binds all driving runs whose recorded enabled scope includes mid-idea application for their
+      whole lifetime; a competing run id is rejected or serialized before dispatch. This restriction does
+      not bind policy-off, legacy or kickoff-only ideas. Reconcile prompt, manifest, captured consumers
+      and failed-round evaluation before dispatch/signoff/close. Committed-but-unreconciled state is
+      recoverable pending state; missing, contradictory or truncated history blocks. Later runs discover
+      history before acting. Read-only status/wait/organizer brief report pending state and never repair it.
+    - **Marker and notice.** Each automatic `excluded:` marker contains the automatic label, rule id,
+      UTC RFC3339 reset (or unknown), scrubbed raw provider reset, transition id and recorded date; never
+      call it confirmed. One non-blocking owner notice per transition, deduplicated by transition id,
+      lists excluded ids, decisive reasons, reset hints, survivors and remaining gates. Floor, role and
+      integrity failures instead issue one blocking escalation. status, wait and organizer brief use
+      the same current set and show automatic exclusions/reset hints/pending state. Successful reduction
+      is not wait exit 4; wait refreshes membership each poll.
+    - **Return.** No polling, timer, retry worker or automatic same-idea rejoin. Re-inclusion remains
+      owner-confirmed under the catch-up rules; the next idea probes readiness afresh. A notice may
+      suggest one owner-authorized relaunch at a known reset plus five minutes, labeled a provider
+      estimate. With unknown reset, give no relaunch suggestion.
   - **Re-including** a previously-excluded, now-available agent into quorum **also**
     requires explicit user confirmation (no silent quorum expansion).
   - Excluding the last non-facilitator still requires the §1 user-authorized solo
     exception; the facilitator stops rather than silently going solo.
-  - The quorum **locks once Phase 0 completes**; a mid-idea unavailability falls to §5
-    and the runtime watchdog, downgrading to the same per-idea, user-confirmed waive.
+  - The quorum **locks once Phase 0 completes**, except the recorded quota auto-exclusion below;
+    every other mid-idea unavailability falls to §5 and the runtime watchdog, downgrading to the
+    same per-idea, user-confirmed waive.
   - **Designated implementer.** When the launched idea designates an implementer
     (`implementer:` in `00-prompt.md`, or the standing `[defaults].default_implementer`),
     the designee's ping result is what §4 Phase 5's availability rules read: a per-idea
@@ -892,7 +976,7 @@ Declaring `facilitator:` makes the pure organizer this idea's default: participa
 Then proceed with the per-agent session-start checklist:
 
 1. Read the protocol context for this launch. An official launch (runner, interactive handoff or skill-facilitated) receives it from the shared renderer (`parley protocol packet`) with an attestation — `context_mode` (`full`, `packet`, `full-fallback` or `refused`), `source_sha256`, `packet_sha256`, `fallback_reason` — rendered from the live resolved authority (a source-role deck's own file; a consumer deck's verified core + lock + overlay), never a bundled snapshot. `full` is the default; an optimized `packet` is the explicit experimental input of the ratified packet trial, carries every block verbatim plus a complete omission index whose triggers say when to read the full source, and is never the default. These two outcomes are not the same. `full-fallback` is a valid, visible result: read all of `parley-deck/COOPERATION.md` — the live authority itself — record `context_mode=full-fallback` with its reason in your artifact, and proceed. `refused` is a **stop**: a refusal (unprovable authority, a detected secret) is never permission to emit the refused content, to substitute some other authority for it (a bundled snapshot, a cached or stale copy, a hand-assembled excerpt), or to continue that launch on unattested text — resolve it at the renderer and re-render, or report the blocker. A protocol task launch that carries **no** attestation is unresolved in the same way: obtain one from the renderer before the task starts. Only where no renderer is reachable does a launch fall back to reading the full live source, recorded as `full-fallback` with that reason — a disclosed fallback to the live authority, never a substitute for it. In every mode: note the active `Transport:` and check `meta/protocol-changelog.md` for updates. The applicability map `meta/packet-applicability.yaml` is protocol; changing it is a §7 change. A facilitator may request its audience-scoped view (`parley protocol packet --audience facilitator`) — an opt-in, verbatim, omission-indexed reading set that can never cut below the never-cut floor — and, after a compaction, may re-orient from the computed `parley organizer brief` instead of re-reading SKILL.md and the full COOPERATION.md.
-2. Read `parley-deck/inbox/` — filter for files addressed to you or `all`. Escalations addressed `to: user` that are still unanswered are context you should respect: don't cut across an active user-direction request.
+2. Read `parley-deck/inbox/` — filter for files addressed to you or `all`, and read automatic quota-exclusion notices for the current idea. Escalations addressed `to: user` that are still unanswered are context you should respect: don't cut across an active user-direction request.
 3. Read `parley-deck/ideas/*/00-prompt.md` — note open ideas where you are a participant.
 4. **Transport B/C only:** check the project's open PRs/MRs for any titled `[<slug>] design` or `[<slug>] implementation` where you are a requested reviewer or assignee. If any is awaiting your action that maps to a missing file in §3, that file is what you owe — write it first.
 5. For each open idea where you're a participant, check:

@@ -146,6 +146,22 @@ PhaseDigest it prints is mechanically derived — treat any block / DISPUTED / u
 adverse validity as the signal to open the RAW artifact and adjudicate there; the
 digest never substitutes for canonical files (residual over-trust risk, accepted).
 
+## Quota auto-exclusion notices
+
+When the CLI records a §9.0 quota auto-exclusion, read its owner notice and the current
+`participants:` plus immutable membership history before continuing. The CLI's verified native
+provider evidence, saved policy/scope, fixed floor and role gates authorize the change; an organizer
+never infers exhaustion from logs, model prose, tool output, elapsed time or disagreement.
+Standalone `parley preflight` reports candidates only. A pending transition or integrity/floor/role
+escalation blocks progress; let a mutating driver reconcile pending state before dispatch or signoff.
+Read-only status, wait and organizer brief do not repair records.
+
+Never silently re-include an excluded agent, subtract `excluded:` markers to derive quorum, or edit
+`agents.toml` to implement a per-idea exclusion. Required signers use current membership; historical
+signers and their filed vetoes, disputes and findings retain their force. Re-evaluate review, diversity,
+strict-gate and goal-check requirements after a transition. Re-inclusion is owner-confirmed; the next
+idea probes readiness again. A reset hint is a provider estimate, never permission to schedule a retry.
+
 ## File Ownership Model
 
 The canonical protocol artifact must be created by the agent whose ID appears in the file path or signoff block.

@@ -66,7 +66,7 @@ Before starting work, verify that the workflow plan covers all applicable protoc
 - Phase 7 review consensus: draft `review/consensus.md`; all participants append signoffs; agreed fixes, deferred follow-ups, and dismissed findings are explicit.
 - Phase 8 fix-up: implement agreed fixes, update `IMPLEMENTATION.md`, repeat review until there are zero agreed fixes, then mark complete.
 - Escalation to user: use `inbox/<from>-to-user_<slug>_<topic>.md` when human judgment is needed; quote the user's answer into the next round/review file.
-- Quorum and async participation: quorum is all participants in `00-prompt.md`; dropping inactive agents requires the protocol's ping/deadline rules.
+- Quorum and async participation: quorum is the current `participants:` in `00-prompt.md`; §9.0 quota auto-exclusion is a recorded CLI transition, never an organizer inference. Other exclusions retain their confirmation/ping/deadline rules. Immutable membership history preserves known signers, vetoes, disputes and findings; required signers follow the current set.
 - Participant sizing and lenses: default to 2-4 active participants, use optional per-idea `roles:` only as advisory lenses, and do not let roles change quorum, ownership, signoff weight, or drafter eligibility.
 - Conflict avoidance: one file per agent per round, append-only signoffs, never edit another agent's file, and copy external snippets when other agents may lack access.
 - Internal helpers: participants may use internal subagents/tools/retrieval/scratchpads, but those helpers are not Parley Deck participants, do not satisfy non-solo execution, and do not own canonical artifacts.
@@ -259,6 +259,23 @@ Agents are also shown with a composite display name of the form `family_model_ef
 `claude_opus-5-1m_max`). It is DERIVED for display; the stable roster ID (`claude-1`) remains the
 identity used in artifact paths and signoffs. `fast` is a startup speed on a separate axis from
 effort — same model, same effort, faster output — never a downgrade.
+
+## Quota auto-exclusion (per-idea only)
+
+The binding predicate and recovery contract live in the live protocol's §9.0. A presence-aware
+`[defaults].quota_auto_exclude` boolean supports a deck override and the per-idea `false` opt-out.
+Only newly created ideas default on; recorded policy and scope are reused on resume and never widen
+on binary upgrade. No roster file changes, and `roster_change_policy` does not gate this per-idea rule.
+
+Only a provenance-verified native terminal provider failure can authorize exclusion. The CLI waits
+for the whole readiness/dispatch batch and validates the fixed two-non-facilitator floor and protected
+roles. An unsupported adapter or ambiguous error stays on the human path. Standalone preflight is
+report-only. Never make the decision from assistant text, tool output, a hang, or disagreement.
+
+Read automatic notices and pending-transition reports from status/wait/organizer brief. Never derive
+membership from repeated `excluded:` lines. Historical objections and findings retain their force;
+re-inclusion requires owner confirmation and catch-up. A known reset plus five minutes is only a
+provider-estimated suggestion for one owner-authorized relaunch, not a timer or retry permission.
 
 ## Selection Checkpoint
 
