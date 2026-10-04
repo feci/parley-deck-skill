@@ -1,9 +1,10 @@
 # COOPERATION.md — Multi-Agent Cooperation Protocol
 
-**Workspace:** `<workspace-name>`
+**Workspace:** `parley-deck`
 **Parley deck:** `./parley-deck/`
-**Transport:** `<transport-choice>` (pick one of local-dir | github-pr | gitlab-mr at deck bootstrap — see §0)
-**Created:** `<YYYY-MM-DD>` (set at deck bootstrap)
+**Transport:** `github-pr`
+**Created:** 2026-05-09 (initial draft)
+**Protocol synced:** 2026-09-18 — parley-deck-skill 2.12.0 / parley-deck-cli 1.48.0
 **Status:** Living document — any agent may propose changes via a dedicated idea (see §7).
 
 ---
@@ -150,6 +151,12 @@ In transports B and C, each agent should also have a corresponding host account 
 
 | Agent ID       | Host handle    |
 | -------------- | -------------- |
+| `claude-1`      | `feci` |
+| `codex-1`       | `feci` |
+| `hermes-1`      | `feci` |
+| `kimi-1`        | `feci` |
+| `opencode-1`    | `feci` |
+| `zcode-1`       | `feci` |
 
 When a new agent joins:
 
@@ -899,11 +906,29 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       positive and adversarial negative fixtures. An unsupported adapter is diagnostic-only; `is_error`
       alone is insufficient. Assistant-quoted errors, tool output, artifact text, disagreement and
       slowness never authorize exclusion, even when followed by failure without a valid artifact.
+      **Owner-ratified zcode exception (2026-10-04):** the zcode recognizer may instead use provider
+      `responseBody` JSON records in stderr when the process exits nonzero, leaves no valid artifact,
+      has no later successful attempt in the batch, and ends with zcode's turn-failure line. At least
+      one provider error record must exist; every such record must identify HTTP 429 and explicit
+      "Limit Exhausted" or the allowance-exhaustion semantics below, contain a machine reset value
+      (`reset_at` or `retry_after`), and agree on the exhaustion class and reset within one second.
+      Every reset must clear the 60-minute threshold. Missing, mixed, malformed or contradictory
+      evidence gates. This is an explicit exception to native root-invocation provenance for zcode
+      only: a subagent's provider error could accompany an unrelated root failure. The owner accepts
+      that residual risk with the unchanged floor and notice; other adapters stay diagnostic-only
+      unless native provenance is established. Quoted assistant/tool text alone is not a provider
+      error record. Positive recorded stderr and adversarial negative fixtures are required.
     - **Exhaustion semantics.** The error's own text (the upstream message for gateway pass-through)
       must explicitly state exhausted account credit/account quota, or a reached/exhausted named usage
       allowance. A stated reset must be at least 60 minutes after observation. A known shorter reset
       does not qualify even with daily/weekly/monthly wording. Past, contradictory or unparseable resets
-      gate; they are never relabeled unknown. With no stated reset, only explicit account-credit/account-
+      gate; they are never relabeled unknown. A timezone-free display clock is supplemental only when
+      the same error record also contains a complete RFC3339 machine reset with Z/offset or numeric
+      seconds `retry_after`/`Retry-After`; all decisive values (including reset-after durations) agree
+      within one second, and the display clock matches that instant at a UTC offset from -12:00 to
+      +14:00 in 15-minute steps. Keep the raw display string. A missing machine value, a discarded
+      named reset value, contradiction, unmatched display clock or display-only reset still gates.
+      With no stated reset, only explicit account-credit/account-
       quota exhaustion or an explicitly reached allowance of at least 24 hours (daily, weekly, monthly)
       qualifies. An hourly or N-hour allowance below 24 hours needs a qualifying stated reset.
       A bare 429, generic `quota exceeded`, bare `credit balance`, 5xx/reset timer, long Retry-After alone,

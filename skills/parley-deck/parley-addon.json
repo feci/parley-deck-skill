@@ -1,15 +1,15 @@
 {
   "schema": "parley-addon/1",
   "files": {
-    "SKILL.md": "sha256:053526dd156382fb165a73ddd70d41a4c0ac423b90f8a81cf74deff7224cb860",
+    "SKILL.md": "sha256:a014f6c5f40169a71bdce351303a0baf894a0d8db2c0013fd810036fd407aa83",
     "agents/manifest.yaml": "sha256:542b709e6d4f3aca26f4c77139734a269a0dbe6844cb4437a7aa00f04d7acdb7",
     "agents/openai.yaml": "sha256:238587fd55a9fcba856ca7183dcdd998bebcea1e1e6794e61c8325a04ff50d9c",
     "references/ARTIFACT_TEMPLATES.md": "sha256:c47838c4d26f10a0ee8d0bf1c4e21a17b0d225dd859c4ee137c3a9400adbc785",
-    "references/COOPERATION.md": "sha256:a3b0b4d68d908ad7c71f40bb882314b66cd15fd493643f534754f33d537e2541",
+    "references/COOPERATION.md": "sha256:b222df64ca44b93da1ff588ea41b8cf5119060ca619dddeddeb0ad37374dfaf9",
     "references/HEADLESS_LAUNCH.md": "sha256:018135766190895224dceb099218dee9947f97d67a611a71c25086e07504cb8d",
-    "references/ROSTER_AND_PROTOCOL.md": "sha256:1eb95c5f4ca447c168199e38f72a9b98ff85971b8da9db836920191f5e864587",
+    "references/ROSTER_AND_PROTOCOL.md": "sha256:54566e68d035d9b7719198ec1c98aca0cbc80a3e217f6199b99650bdaddf16cd",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
     "references/compatibility.json": "sha256:89f52536b2a7c56f0c44cf307094a186ac91052c6c35da3e4a2ffced1143a0a9"
   },
-  "aggregate": "sha256:1705c5eefa6800367f6ce8baea6c8db5866734043417552b362ab813153daf2b"
+  "aggregate": "sha256:9130678ca23fc9b3f0890435952e9c8c4603987e55390a8adb65cc6cbd1a7b29"
 }

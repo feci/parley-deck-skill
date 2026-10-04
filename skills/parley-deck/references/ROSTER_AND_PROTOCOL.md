@@ -267,7 +267,10 @@ The binding predicate and recovery contract live in the live protocol's §9.0. A
 Only newly created ideas default on; recorded policy and scope are reused on resume and never widen
 on binary upgrade. No roster file changes, and `roster_change_policy` does not gate this per-idea rule.
 
-Only a provenance-verified native terminal provider failure can authorize exclusion. The CLI waits
+Only the live §9.0 evidence predicate can authorize exclusion: native terminal-provider provenance,
+or the explicitly ratified bounded zcode stderr exception. The latter requires a failed invocation,
+no completed artifact/later success, agreeing 429 exhaustion records with machine reset values,
+and the terminal turn-failure line. It retains the owner-accepted subagent-attribution risk. The CLI waits
 for the whole readiness/dispatch batch and validates the fixed two-non-facilitator floor and protected
 roles. An unsupported adapter or ambiguous error stays on the human path. Standalone preflight is
 report-only. Never make the decision from assistant text, tool output, a hang, or disagreement.

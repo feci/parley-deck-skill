@@ -149,9 +149,9 @@ digest never substitutes for canonical files (residual over-trust risk, accepted
 ## Quota auto-exclusion notices
 
 When the CLI records a §9.0 quota auto-exclusion, read its owner notice and the current
-`participants:` plus immutable membership history before continuing. The CLI's verified native
-provider evidence, saved policy/scope, fixed floor and role gates authorize the change; an organizer
-never infers exhaustion from logs, model prose, tool output, elapsed time or disagreement.
+`participants:` plus immutable membership history before continuing. The CLI's §9.0 evidence predicate
+(including the bounded, owner-ratified zcode stderr exception), saved policy/scope, fixed floor and
+role gates authorize the change; an organizer never infers exhaustion from logs, model prose, tool output, elapsed time or disagreement.
 Standalone `parley preflight` reports candidates only. A pending transition or integrity/floor/role
 escalation blocks progress; let a mutating driver reconcile pending state before dispatch or signoff.
 Read-only status, wait and organizer brief do not repair records.
@@ -225,8 +225,9 @@ Before reporting completion:
 
 ## References (on demand)
 
-- `references/COOPERATION.md` — the bundled protocol copy (portability/bootstrap only;
-  the live authority of an official launch always wins).
+- `references/COOPERATION.md` — the upstream protocol snapshot (portability/bootstrap only).
+  Replace its upstream project header and host mappings when bootstrapping, as Appendix A directs.
+  The live authority of an official launch always wins.
 - `references/HEADLESS_LAUNCH.md` — autonomous execution, headless agent
   configuration, timeout policy, and the generic CLI invocation contract.
 - `references/ARTIFACT_TEMPLATES.md` — kickoff, round, cross-review,
