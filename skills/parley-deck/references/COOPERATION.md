@@ -937,8 +937,8 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       is separate: a bare 503 remains a provider gate and cannot be excluded with `--yes`.
     - **Whole-batch decision.** Kickoff runs inside `parley run`, over the exact proposed participants,
       after every readiness probe returns; standalone `parley preflight` reports only and applies no
-      exclusion. Mid-idea application: **not yet in force** until stage 2 is delivered. Once delivered,
-      apply only at a settled dispatch batch, after every affected writer stops and before any further
+      exclusion. Mid-idea application uses the recorded enabled scope and applies only at a settled
+      dispatch batch, after every affected writer stops and before any further
       dispatch, signoff evaluation or close. Evaluate the entire batch once, all or nothing and independent
       of failure order. At least two distinct, usable non-facilitator participants must survive. Duplicate
       ids and unresolved failures do not inflate the count; the facilitator never counts, even with
