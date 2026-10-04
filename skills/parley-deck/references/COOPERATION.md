@@ -891,8 +891,8 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
     (`excluded: [<roster-id> — reason — confirmed <date>]`). Exclusion is **per-idea and
     temporary**: the agent stays in the §2 roster and is re-probed at the next idea.
   - **Quota auto-exclusion** (idea `meta-protocol-change-quota-auto-exclude`, owner-ratified 2026-10-04).
-    This is a CLI decision over this idea's quorum only, never an organizer's interpretation of text.
-    It never writes machine or deck `agents.toml`, so `roster_change_policy` does not gate it.
+    The CLI decides for this idea's quorum; organizers never infer exclusion from text. It never writes
+    machine or deck `agents.toml`, so `roster_change_policy` does not gate it.
     - **Policy and scope.** `[defaults].quota_auto_exclude` is a presence-aware boolean, with a deck
       override and a per-idea `quota_auto_exclude: false` opt-out. It defaults on for ideas created
       after delivery; legacy ideas stay on confirmation. The resolved policy and authorized scope
@@ -900,9 +900,8 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       Upgrading or resuming never widens scope; widening needs owner confirmation. Malformed or
       ambiguous configuration/records fail closed. The floor of 2 and threshold of 60 minutes are fixed.
     - **Authorizing evidence.** A failed invocation (nonzero exit or structured terminal provider error)
-      is a candidate only when it produced no valid completed artifact and no later attempt in the same
-      batch succeeded. A valid completed artifact or later success always wins. The adapter's recognizer
-      must establish native terminal-provider-error provenance through located CLI behavior/source plus
+      qualifies only without a valid completed artifact or later success in the batch; either wins.
+      The adapter must establish native terminal-provider-error provenance through CLI behavior/source plus
       positive and adversarial negative fixtures. An unsupported adapter is diagnostic-only; `is_error`
       alone is insufficient. Assistant-quoted errors, tool output, artifact text, disagreement and
       slowness never authorize exclusion, even when followed by failure without a valid artifact.
@@ -912,12 +911,12 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       one provider error record must exist; every such record must identify HTTP 429 and explicit
       "Limit Exhausted" or the allowance-exhaustion semantics below, contain a machine reset value
       (`reset_at` or `retry_after`), and agree on the exhaustion class and reset within one second.
-      Every reset must clear the 60-minute threshold. Missing, mixed, malformed or contradictory
-      evidence gates. This is an explicit exception to native root-invocation provenance for zcode
-      only: a subagent's provider error could accompany an unrelated root failure. The owner accepts
-      that residual risk with the unchanged floor and notice; other adapters stay diagnostic-only
-      unless native provenance is established. Quoted assistant/tool text alone is not a provider
-      error record. Positive recorded stderr and adversarial negative fixtures are required.
+      Every reset must clear 60 minutes. Missing, mixed, malformed or contradictory evidence gates.
+      This exception to native root-invocation provenance is zcode-only: a subagent's provider error
+      could accompany an unrelated root failure. The owner accepts that risk with the unchanged floor
+      and notice; other adapters need native provenance or stay diagnostic-only. Quoted assistant/tool
+      text alone is not a provider error record. Recorded positive stderr and adversarial negative fixtures
+      are required.
     - **Exhaustion semantics.** The error's own text (the upstream message for gateway pass-through)
       must explicitly state exhausted account credit/account quota, or a reached/exhausted named usage
       allowance. A stated reset must be at least 60 minutes after observation. A known shorter reset
@@ -935,9 +934,9 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       400, authentication error, hang or watchdog class never qualifies. Gateway-pool phrases need source
       evidence of their cause and are not positive forms by themselves. Generic provider classification
       is separate: a bare 503 remains a provider gate and cannot be excluded with `--yes`.
-    - **Whole-batch decision.** Kickoff runs inside `parley run`, over the exact proposed participants,
-      after every readiness probe returns; standalone `parley preflight` reports only and applies no
-      exclusion. Mid-idea application uses the recorded enabled scope and applies only at a settled
+    - **Whole-batch decision.** Kickoff runs inside `parley run` over the exact proposed participants
+      after all readiness probes return; standalone `parley preflight` only reports, never excludes.
+      Mid-idea application uses the recorded enabled scope and applies only at a settled
       dispatch batch, after every affected writer stops and before any further
       dispatch, signoff evaluation or close. Evaluate the entire batch once, all or nothing and independent
       of failure order. At least two distinct, usable non-facilitator participants must survive. Duplicate
