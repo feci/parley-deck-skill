@@ -162,6 +162,17 @@ signers and their filed vetoes, disputes and findings retain their force. Re-eva
 strict-gate and goal-check requirements after a transition. Re-inclusion is owner-confirmed; the next
 idea probes readiness again. A reset hint is a provider estimate, never permission to schedule a retry.
 
+For a recorded policy-on idea, use `parley quota revise --dir <root> --idea <slug> --run <run-id>
+--request <request.json>` for an owner-confirmed membership or scope change. Bind the request to the
+verbatim ruling and its committed path/blob digest, so permitted inbox archival or deletion preserves
+the authority. Follow the existing catch-up requirements; a returned author must explicitly withdraw
+its own retained veto. Knob-off ideas keep their ordinary recorded confirmations.
+
+`parley quota recover --dir <root> --idea <slug> --run <run-id>` reconciles mutable projections and
+receipts from validated history. It does not authorize changing immutable history or taking another
+host's lease. A foreign-host or unknown-boot lease needs owner-visible recovery; a PID absent on this
+host is not evidence that the holder is dead.
+
 ## File Ownership Model
 
 The canonical protocol artifact must be created by the agent whose ID appears in the file path or signoff block.

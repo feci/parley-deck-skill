@@ -280,6 +280,13 @@ membership from repeated `excluded:` lines. Historical objections and findings r
 re-inclusion requires owner confirmation and catch-up. A known reset plus five minutes is only a
 provider-estimated suggestion for one owner-authorized relaunch, not a timer or retry permission.
 
+For recorded policy-on ideas, the CLI's `quota revise` path records authorized membership/policy/scope
+revisions. The request must bind the owner's verbatim ruling to its committed source/blob digest;
+inbox archival or deletion is allowed after the ruling is quoted. Re-inclusion and catch-up never
+withdraw a historical veto by themselves. Ordinary recorded confirmations remain usable with the
+policy off. `quota recover` repairs mutable projections/receipts only from validated immutable history;
+unknown or foreign-host lease ownership stays an owner-visible gate.
+
 ## Selection Checkpoint
 
 Before every new idea, every new round, Phase 5 implementation, Phase 6 review cycle, or any requested mid-stream model change, prepare defaults first. Do not ask seven separate required questions.
