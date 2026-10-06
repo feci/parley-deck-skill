@@ -1818,7 +1818,9 @@ test("case-only spellings of one home are one destination in a single plan", () 
   assert.equal(written.length, 0, `wrote ${written.length} units into one directory twice`);
 });
 
-test("a firmlink respelling with an existing inner parent is still one nesting", () => {
+test("a firmlink respelling with an existing inner parent is still one nesting", {
+  skip: process.platform !== "darwin" && "requires macOS firmlink/chflags filesystem semantics"
+}, () => {
   // This is the arm that decided the model: realpath strings miss it (two spellings), scalar
   // dev:ino keys miss it (different anchors), and the union of the two misses it as well —
   // which is why the identity chain replaced all three rather than joining them. It had no
@@ -2143,7 +2145,9 @@ test("a symlink buried below an existing subdirectory is still located inside it
   assert.equal(fs.existsSync(path.join(away, "skills", "parley-deck")), false);
 });
 
-test("a firmlink respelling of one directory is one destination", () => {
+test("a firmlink respelling of one directory is one destination", {
+  skip: process.platform !== "darwin" && "requires macOS firmlink/chflags filesystem semantics"
+}, () => {
   // `/private/x` and `/System/Volumes/Data/private/x` are the same objects; `lstat` calls both
   // directories and `realpath` preserves both spellings, so the symlink-only touchpoint check
   // and the realpath-string containment check were both silent. Comparison is on physical
@@ -2465,7 +2469,9 @@ test("a recorded selection naming the core skill is refused", () => {
   assert.match(health.problems.join(" "), /records the core skill as an add-on/);
 });
 
-test("install is fleet-wide too: an immovable destination writes nothing anywhere", () => {
+test("install is fleet-wide too: an immovable destination writes nothing anywhere", {
+  skip: process.platform !== "darwin" && "requires macOS firmlink/chflags filesystem semantics"
+}, () => {
   // Cycle 15 deleted the removability predicate from install as well, on the argument that
   // install "already commits by rename". True of the commit, false of the fleet: a destination
   // directory carrying `uchg` makes the commit rename itself fail, and 83 units were written
@@ -2474,7 +2480,8 @@ test("install is fleet-wide too: an immovable destination writes nothing anywher
   assert.equal(installer.installCommand(context(home, { target: "all", includeUndetected: true })).ok, true);
   const victim = path.join(home, ".aionrs", "skills", "parley-worktrees");
   const before = fs.readFileSync(path.join(home, ".codex", "skills", "parley-deck", "SKILL.md"));
-  spawnSync("chflags", ["uchg", victim]);
+  const frozen = spawnSync("chflags", ["uchg", victim]);
+  assert.equal(frozen.status, 0, `failed to establish the immovable fixture: ${frozen.stderr || frozen.error}`);
   try {
     const result = installer.installCommand(context(home, { target: "all", includeUndetected: true }));
     assert.equal(result.ok, false);

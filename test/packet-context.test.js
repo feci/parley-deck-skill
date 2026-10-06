@@ -27,49 +27,33 @@ function section(text, heading, nextHeadingPrefix) {
   return end === -1 ? rest : rest.slice(0, end);
 }
 
-test("SKILL.md standing context instructions require the renderer attestation", () => {
+test("SKILL.md requires renderer attestation for the selected project launch", () => {
   const ctx = section(SKILL, "## Required Protocol Context", "## ");
-  assert.match(ctx, /parley protocol packet --phase N --track T --json/);
+  assert.match(ctx, /parley protocol packet --dir <project-root> --phase <0\.\.8> --track <track> --idea <slug> --json/);
   for (const key of ATTESTATION_KEYS) {
     assert.ok(ctx.includes(`\`${key}\``), `attestation key ${key} is not named`);
   }
-  assert.match(ctx, /live resolved authority/);
-  assert.match(ctx, /never replaces a live file that exists/);
+  assert.match(ctx, /Read the emitted `body_path`/);
+  assert.match(ctx, /Full context is the default/);
+  assert.match(ctx, /`--optimize` is an explicit experimental/);
+  assert.match(ctx, /not a default or a proven efficiency improvement/);
 });
 
-test("SKILL.md keeps full context as the default and the optimized packet explicit", () => {
-  const ctx = section(SKILL, "## Required Protocol Context", "## ");
-  assert.match(ctx, /default `context_mode` is `full`/);
-  assert.match(ctx, /`--optimize` is the explicit experimental input/);
-  assert.match(ctx, /never a default/);
-  assert.doesNotMatch(SKILL, /--optimize` by default|default(s)? to `--optimize|packet mode is enabled/i);
+test("SKILL.md distinguishes unreachable renderer fallback from refusal", () => {
+  const ctx = section(SKILL, "## Required Protocol Context", "## ").replace(/\s+/g, " ");
+  assert.match(ctx, /If the renderer is unreachable.*read the full live `parley-deck\/COOPERATION\.md`/);
+  assert.match(ctx, /`context_mode=full-fallback` with that reason/);
+  assert.match(ctx, /A reachable renderer's refusal is not unavailability/);
+  assert.match(ctx, /no attestation.*stops the launch/);
+  assert.match(ctx, /If no live protocol is available, stop the project launch/);
+  assert.match(ctx, /bundled `references\/COOPERATION\.md`.*cannot substitute for the live authority/);
+  assert.match(ctx, /`refused`: stop that launch/);
+  assert.match(ctx, /Never replace a refusal with a bundled snapshot, cached text or hand excerpt/);
 });
 
-test("SKILL.md preserves the explicit full/fallback path and refusal semantics", () => {
-  const ctx = section(SKILL, "## Required Protocol Context", "## ");
-  // Semantics, not article wording: the no-CLI path reads the live file in full and records
-  // the fallback mode together with its reason.
-  assert.match(ctx, /`context_mode=full-fallback` with (?:the|its) reason \(for example `no-parley-cli`\)/);
-  assert.match(ctx, /read the live project file `parley-deck\/COOPERATION\.md` in full/);
-  // The bundled snapshot is local orientation only; it cannot authorize a protocol task launch.
-  assert.match(ctx, /reason `bundled-snapshot`/);
-  assert.match(ctx, /LOCAL ORIENTATION ONLY/);
-  assert.match(ctx, /cannot authorize a protocol task launch/);
-  assert.match(ctx, /live authority cannot be established, that task stays blocked/);
-  assert.match(ctx, /If both are unavailable, stop and ask for the protocol\./);
-  // `refused` stays a stop and is never satisfied by substituting other protocol text,
-  // while `full-fallback` stays the disclosed read of the live authority itself.
-  assert.match(ctx, /`full-fallback` reads the live authority in full and proceeds/);
-  assert.match(ctx, /`refused` \(unprovable authority, a detected secret\) is a \*\*stop\*\*/);
-  assert.match(ctx, /never substitute another authority for it/);
-  assert.match(ctx, /never continue that launch on unattested text/);
-  // The manual hash comparison stays as the drift check for the bundled snapshot.
-  assert.match(SKILL, /shasum -a 256 <project-root>\/parley-deck\/COOPERATION\.md <skill-root>\/references\/COOPERATION\.md/);
-});
-
-test("SKILL.md core rule and startup flow point at the attested context, not a bare read", () => {
-  assert.match(SKILL, /Always load the protocol context first, the way "Required Protocol Context" says, and record its attestation\./);
-  assert.match(SKILL, /1\. Load the protocol context as "Required Protocol Context" requires \(attestation recorded\)/);
+test("SKILL.md core rule and startup flow require the attested protocol context", () => {
+  assert.match(SKILL, /First obtain and read the protocol context as specified in \*\*Required Protocol Context\*\*/);
+  assert.match(SKILL, /1\. Obtain and read the protocol context under \*\*Required Protocol Context\*\*, retain its attestation/);
 });
 
 test("packaged protocol §9 item 1 consumes the attestation and keeps the full-read fallback", () => {

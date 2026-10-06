@@ -1,5 +1,71 @@
 # Changelog
 
+## 2.14.0 — 2026-09-25
+
+Ships alongside `parley-deck-cli` 1.50.0.
+
+- Document the owner-designated implementer in the protocol core: a per-idea
+  `implementer:` field in `00-prompt.md` plus an optional standing
+  `[defaults].default_implementer` in the layered agents config, one resolution chain
+  (re-entry pin → per-idea designation → global default → existing fallback),
+  fail-closed validity gates (an empty, ineligible or malformed value blocks any run
+  that reaches an implementer, review-round, goal-check or fix-up action and is never
+  trimmed or repaired), the designated-implementer liveness gate with its three
+  recorded exits, and the shipped UNSET product default. The hunks stay byte-identical
+  across all three COOPERATION.md copies (§0, §4.0, §4 Phase 4/5, §9.0, §10).
+- State the amended Phase-5 implementer-resolution chain in the roster/protocol
+  reference.
+- `compatibility.json`: skillVersion 2.14.0, recommendedCli `>=1.50.0` (the documented
+  mechanism ships in CLI 1.50.0).
+
+## 2.13.0 — 2026-09-24
+
+Ships alongside `parley-deck-cli` 1.49.0.
+
+- Slim the installable SKILL.md core to a byte-capped quickstart (17.8 KB, under the
+  20 KB cap) and relocate the detailed material into reference files the core points
+  at (artifact templates, headless launch, roster and protocol), reducing organizer
+  read-in cost while the ratified protocol hunks stay byte-identical across all three
+  COOPERATION.md copies.
+- Document `parley wait` in the core, including the `--json` stream contract: stdout
+  carries the `{notes?, digest}` envelope on exits 0/3/4, terminal status goes to
+  stderr, and exit 1 emits no envelope; notes addressed to the user but not yet
+  evaluated are listed and flagged in the digest.
+- Carry the permissive §9.0 audience/brief sentence in the portable protocol snapshot
+  so manual facilitators see the same rule the CLI renders.
+- Recommend CLI >= 1.49.0 in `references/compatibility.json` (the core now documents
+  `parley wait`, which ships in that release); installer behavior is unchanged.
+- Add-on payload manifests regenerated; `npm test` and `prepack` gate them as before.
+
+## 2.12.1 — 2026-09-18
+
+- Fix three macOS-specific filesystem tests that failed in Linux release CI by
+  explicitly limiting firmlink and `chflags` cases to macOS. The immutable-file
+  fixture now checks that `chflags` actually succeeded.
+- Run the full test suite on macOS before the Linux job tests and builds Windows
+  portable assets, retaining automated coverage of those platform-specific cases.
+- Installer behavior and the cooperation protocol are unchanged from 2.12.0.
+
+## 2.12.0 — 2026-09-18
+
+Ships alongside `parley-deck-cli` 1.48.0.
+
+- Synchronize the portable protocol snapshot with the CLI's bootstrap protocol: automated
+  completion requires independent current-tree evidence and an available goal checker.
+- Teach manual facilitators to obtain live protocol context and record its attestation
+  through `parley protocol packet`. Full context stays the default; optimized packets are
+  experimental. Renderer refusal stops the launch; unavailable renderers use a disclosed
+  full-live-source fallback.
+- Run the portable builder through Node directly so Windows hosts do not need to execute a
+  `.cmd` shim without a shell.
+- Preserve the installer targets and existing add-on payloads. This release does not claim
+  completion of the empirical audit or measured efficiency gains.
+
+## 2.11.0 — 2026-08-29
+
+See the [published release notes](https://github.com/feci/parley-deck-skill/releases/tag/v2.11.0)
+for this earlier release; its detailed entry was not added to this changelog at publication.
+
 ## 2.10.0 — 2026-08-21
 
 Ships alongside `parley-deck-cli` 1.46.0 and the `protocol-and-skill-audit` idea it closes.
