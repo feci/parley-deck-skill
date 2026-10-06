@@ -291,7 +291,17 @@ owner decision for an intended revision. Matching an old set alone is not proof 
 With the policy off, the CLI preserves the pre-existing `participants:` edit for a known return and the
 §5 late-round-1/read-priors/join-from-round-2 path for a catch-up join. No new `included:` marker,
 committed-answer schema, exact owner directive or quota command is required for that ordinary import.
-It enters immutable history as a manual revision, not as proof of owner confirmation. The organizer
+The joiner can run `parley agents exec --agent ID --artifact parley-deck/ideas/IDEA/round-01/ID.md
+--prompt-file <catch-up-prompt> --yes` before or after the edit, including retrying its own incomplete
+stub. An edit made first shows pending catch-up; existing members can sign, but the joiner cannot
+complete the quorum or enter historical membership until import. Known excluded ids cannot use this
+dispatch exception. A kickoff-excluded id may return by a plain edit during round 1; later return
+retains catch-up duties. To decline, a pending policy-off joiner can file design consensus with
+`parley consensus signoff --agent ID --status block --notes '❌ NON-PARTICIPANT' --counter 'Continue
+without me' IDEA`. This exact note stays a BLOCK, leaves the incomplete vote missing and grants no
+membership or closure authority; resolve it through the normal protocol. NON-PARTICIPANT is not itself
+a supported status, and the exception does not apply to review consensus.
+A completed participant edit enters immutable history as a manual revision, not as proof of owner confirmation. The organizer
 still obtains the confirmation required by §9.0; a manual import alone cannot authorize withdrawal of
 a retained veto. The quoted owner-ruling or committed owner-authority path remains required for that gate.
 
@@ -310,9 +320,23 @@ gate; local PID absence never proves another host's writer stopped. Investigate 
 restore authentic terminal evidence if available. A missing original manifest needs trustworthy original
 bytes; recovery cannot invent a run or alter immutable history. Windows native crash recovery is unavailable.
 
+Applied transition notices stay archived or deleted. Before the applied receipt, a validated archived
+notice also suppresses duplication; deletion without a delivery receipt permits one benign publication
+on checked recovery. Contradictory extant notices still gate. Replay never creates another terminal evaluation.
+
 Complete, consistent allowlisted zcode records may qualify. Partial native tails and the default-console
 `[Object]` shape remain blocked. Source-derived SDK fixtures are not complete native evidence and do not
-establish AC2; the recorded native-evidence owner gate remains open for this idea.
+establish AC2. Native-positive AC2 is NOT MET and owner-waived for this release (owner
+round05-answer Q2, 2026-10-06); R5-MAJOR-2 is accepted and deferred, not fixed. zcode
+auto-exclusion may not fire on real native output; unrecognized failures use the owner-confirmed
+path. Follow-up:
+[quota-zcode-native-exhaustion-capture](https://github.com/feci/parley-deck-cli/tree/main/parley-deck/ideas/quota-zcode-native-exhaustion-capture).
+
+Capture is not automatic in this release. On the next ordinary zcode failure, keep that run's
+private, unscrubbed per-agent `parley-deck/runs/<run-id>/agents/<agent-id>/stderr.log` in place;
+never copy or commit it. By source inspection the normal runner writes this stream, but completeness
+and cleanup are unverified. The follow-up requires verified invocation/start/terminal/exit facts and
+a complete scrubbed native exhaustion before any grammar extension; no provider probe is implied.
 
 ## Selection Checkpoint
 

@@ -148,28 +148,33 @@ digest never substitutes for canonical files (residual over-trust risk, accepted
 
 ## Quota auto-exclusion notices
 
-Read each §9.0 automatic-exclusion notice, current `participants:` and immutable membership history
-before continuing. Only the CLI's evidence predicate (including the bounded owner-ratified zcode
-stderr exception), saved policy/scope, floor and role gates authorize reduction. Organizers never
-infer it from logs, model/tool text, elapsed time or disagreement. Standalone preflight only reports.
-Pending transitions and integrity/floor/role escalations block progress. A mutating driver reconciles
-pending state before dispatch/signoff; status, wait and organizer brief never repair it.
+Read §9.0 notices, current `participants:` and immutable history. Only the CLI evidence
+predicate (including the bounded owner-ratified zcode stderr exception), saved policy/scope,
+floor and role gates authorize reduction. Never infer it from logs, model/tool text, elapsed
+time or disagreement. Standalone preflight only reports. Pending transitions and integrity/
+floor/role escalations block progress. Mutating drivers reconcile before dispatch/signoff;
+status, wait and organizer brief never repair state.
 
-Never silently re-include an agent, subtract `excluded:` markers to derive quorum, or change
-`agents.toml` for an idea exclusion. Current members are required signers; historical vetoes, disputes
-and findings retain their force. Re-evaluate review, diversity, strict and goal-check gates. Return
-needs owner confirmation; the next idea re-probes. Reset hints are estimates, never retry permission.
+Never silently re-include, derive quorum from `excluded:` markers, or change `agents.toml`
+for an idea exclusion. Current members are required signers; historical vetoes, disputes and
+findings retain force. Re-evaluate review, diversity, strict and goal-check gates. Return
+needs owner confirmation; the next idea re-probes. Reset estimates are not retry permission.
 
-For policy-on owner revisions use `parley quota revise --dir <root> --idea <slug> --run <run-id>
---request <request.json>`, binding the verbatim ruling to its committed path/blob digest. Inbox
-archival must preserve that authority. Catch-up never withdraws a veto by itself. Policy-off return
-and catch-up retain the existing prompt/late-round forms; manual imports are not owner-confirmed
-authority. See `references/ROSTER_AND_PROTOCOL.md` (Quota auto-exclusion) for exact forms and gates.
+Policy-on revisions use `parley quota revise --dir <root> --idea <slug> --run <run-id>
+--request <request.json>`, binding the ruling to its committed path/blob digest. Archival must
+preserve authority. Catch-up never withdraws a veto. Policy-off return/catch-up use existing
+prompt/late-round forms; manual imports are not owner authority. See
+`references/ROSTER_AND_PROTOCOL.md` (Quota auto-exclusion) for forms and gates.
 
 `parley quota recover --dir <root> --idea <slug> --run <run-id>` repairs projections/receipts from
-validated history. It cannot change immutable history or take a foreign/unknown-boot lease; local
-PID absence does not prove another host's owner dead. A later edit after an applied revision needs
-visible correction or `quota revise`, never silent overwrite as if it were an interrupted projection.
+validated history. It cannot change history or take a foreign/unknown-boot lease; local PID
+absence does not prove another host's owner dead. Later edits after an applied revision need
+visible correction or `quota revise`, never silent overwrite as interrupted projection.
+
+Known limitation: zcode auto-exclusion may not fire on real native output; unrecognized failures
+use the owner-confirmed path. Native-positive AC2 is owner-waived for this release. Capture is not
+automatic: keep the failed run's private, unscrubbed per-agent `stderr.log` in place; never copy or
+commit it. Follow-up and capture limits: `references/ROSTER_AND_PROTOCOL.md`.
 
 ## File Ownership Model
 

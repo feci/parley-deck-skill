@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Document both stages of per-idea quota exclusion, immutable membership and recovery.
+- Disclose the owner-accepted native-zcode limitation: auto-exclusion may not fire on real
+  native output; unrecognized failures use the owner-confirmed path. Native-positive
+  evidence is waived for this release. Capture is not automatic; keep an ordinary failed
+  run's private, unscrubbed per-agent stderr.log in place, never copy or commit it. The
+  `quota-zcode-native-exhaustion-capture` follow-up in parley-deck-cli requires a verified
+  scrubbed native exhaustion before grammar changes.
+
 ## 2.14.0 — 2026-09-25
 
 Ships alongside `parley-deck-cli` 1.50.0.
