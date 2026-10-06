@@ -148,30 +148,28 @@ digest never substitutes for canonical files (residual over-trust risk, accepted
 
 ## Quota auto-exclusion notices
 
-When the CLI records a §9.0 quota auto-exclusion, read its owner notice and the current
-`participants:` plus immutable membership history before continuing. The CLI's §9.0 evidence predicate
-(including the bounded, owner-ratified zcode stderr exception), saved policy/scope, fixed floor and
-role gates authorize the change; an organizer never infers exhaustion from logs, model prose, tool output, elapsed time or disagreement.
-Standalone `parley preflight` reports candidates only. A pending transition or integrity/floor/role
-escalation blocks progress; let a mutating driver reconcile pending state before dispatch or signoff.
-Read-only status, wait and organizer brief do not repair records.
+Read each §9.0 automatic-exclusion notice, current `participants:` and immutable membership history
+before continuing. Only the CLI's evidence predicate (including the bounded owner-ratified zcode
+stderr exception), saved policy/scope, floor and role gates authorize reduction. Organizers never
+infer it from logs, model/tool text, elapsed time or disagreement. Standalone preflight only reports.
+Pending transitions and integrity/floor/role escalations block progress. A mutating driver reconciles
+pending state before dispatch/signoff; status, wait and organizer brief never repair it.
 
-Never silently re-include an excluded agent, subtract `excluded:` markers to derive quorum, or edit
-`agents.toml` to implement a per-idea exclusion. Required signers use current membership; historical
-signers and their filed vetoes, disputes and findings retain their force. Re-evaluate review, diversity,
-strict-gate and goal-check requirements after a transition. Re-inclusion is owner-confirmed; the next
-idea probes readiness again. A reset hint is a provider estimate, never permission to schedule a retry.
+Never silently re-include an agent, subtract `excluded:` markers to derive quorum, or change
+`agents.toml` for an idea exclusion. Current members are required signers; historical vetoes, disputes
+and findings retain their force. Re-evaluate review, diversity, strict and goal-check gates. Return
+needs owner confirmation; the next idea re-probes. Reset hints are estimates, never retry permission.
 
-For a recorded policy-on idea, use `parley quota revise --dir <root> --idea <slug> --run <run-id>
---request <request.json>` for an owner-confirmed membership or scope change. Bind the request to the
-verbatim ruling and its committed path/blob digest, so permitted inbox archival or deletion preserves
-the authority. Follow the existing catch-up requirements; a returned author must explicitly withdraw
-its own retained veto. Knob-off ideas keep their ordinary recorded confirmations.
+For policy-on owner revisions use `parley quota revise --dir <root> --idea <slug> --run <run-id>
+--request <request.json>`, binding the verbatim ruling to its committed path/blob digest. Inbox
+archival must preserve that authority. Catch-up never withdraws a veto by itself. Policy-off return
+and catch-up retain the existing prompt/late-round forms; manual imports are not owner-confirmed
+authority. See `references/ROSTER_AND_PROTOCOL.md` (Quota auto-exclusion) for exact forms and gates.
 
-`parley quota recover --dir <root> --idea <slug> --run <run-id>` reconciles mutable projections and
-receipts from validated history. It does not authorize changing immutable history or taking another
-host's lease. A foreign-host or unknown-boot lease needs owner-visible recovery; a PID absent on this
-host is not evidence that the holder is dead.
+`parley quota recover --dir <root> --idea <slug> --run <run-id>` repairs projections/receipts from
+validated history. It cannot change immutable history or take a foreign/unknown-boot lease; local
+PID absence does not prove another host's owner dead. A later edit after an applied revision needs
+visible correction or `quota revise`, never silent overwrite as if it were an interrupted projection.
 
 ## File Ownership Model
 

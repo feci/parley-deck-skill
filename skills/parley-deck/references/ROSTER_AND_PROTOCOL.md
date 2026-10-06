@@ -283,9 +283,36 @@ provider-estimated suggestion for one owner-authorized relaunch, not a timer or 
 For recorded policy-on ideas, the CLI's `quota revise` path records authorized membership/policy/scope
 revisions. The request must bind the owner's verbatim ruling to its committed source/blob digest;
 inbox archival or deletion is allowed after the ruling is quoted. Re-inclusion and catch-up never
-withdraw a historical veto by themselves. Ordinary recorded confirmations remain usable with the
-policy off. `quota recover` repairs mutable projections/receipts only from validated immutable history;
-unknown or foreign-host lease ownership stays an owner-visible gate.
+withdraw a historical veto by themselves. A prompt edit after a fully applied authoritative revision,
+even one matching an older membership set, raises an integrity gate. Preserve the proposed edit for the
+owner, restore the recorded participants and policy, then use `parley quota revise` with the committed
+owner decision for an intended revision. Matching an old set alone is not proof of an interrupted update.
+
+With the policy off, the CLI preserves the pre-existing `participants:` edit for a known return and the
+§5 late-round-1/read-priors/join-from-round-2 path for a catch-up join. No new `included:` marker,
+committed-answer schema, exact owner directive or quota command is required for that ordinary import.
+It enters immutable history as a manual revision, not as proof of owner confirmation. The organizer
+still obtains the confirmation required by §9.0; a manual import alone cannot authorize withdrawal of
+a retained veto. The quoted owner-ruling or committed owner-authority path remains required for that gate.
+
+For an ordinary exclusion, use `excluded: [agent-id — reason — confirmed YYYY-MM-DD]` and record the
+actual current `participants:`. The parser anchors on the final `— confirmed YYYY-MM-DD`, so the reason
+may itself contain em dashes. A note after the date, hyphen separators, an empty reason or an invalid
+date is rejected; the diagnostic names this grammar and the correction. Exclusion markers validate the
+requested edit; they never determine membership by subtraction.
+
+`parley quota recover --dir <root> --idea <slug> --run <run-id>` repairs interrupted mutable projections
+and receipts only from validated immutable history. Applied-state evidence distinguishes an interrupted
+projection from a later edit. Stop writers first. Crash settlement requires recorded matching host/boot,
+proven dead supervisor and writer PIDs, and an absent writer-owned process group. Its separate immutable
+record binds the invocation, proof and time. Missing, unknown or foreign identity stays an owner-visible
+gate; local PID absence never proves another host's writer stopped. Investigate on the original host and
+restore authentic terminal evidence if available. A missing original manifest needs trustworthy original
+bytes; recovery cannot invent a run or alter immutable history. Windows native crash recovery is unavailable.
+
+Complete, consistent allowlisted zcode records may qualify. Partial native tails and the default-console
+`[Object]` shape remain blocked. Source-derived SDK fixtures are not complete native evidence and do not
+establish AC2; the recorded native-evidence owner gate remains open for this idea.
 
 ## Selection Checkpoint
 
