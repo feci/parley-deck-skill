@@ -297,7 +297,8 @@ The joiner can run `parley agents exec --agent ID --artifact parley-deck/ideas/I
 stub. After round 1, an edit made first shows pending catch-up; existing members can sign, but the joiner cannot
 complete the quorum or enter historical membership until import. Known excluded ids cannot use this
 dispatch exception. During round 1, a policy-off join or return uses a plain participant edit,
-with or without a stale exclusion marker, as on the baseline. After round 1, new joiners and
+with or without a stale exclusion marker, as on the baseline. Do not roll status back to round-01
+to bypass catch-up. After round 1, new joiners and
 kickoff-excluded returns retain catch-up duties. To decline, a pending policy-off joiner can file design consensus with
 `parley consensus signoff --agent ID --status block --notes '❌ NON-PARTICIPANT' --counter 'Continue
 without me' IDEA`. This exact note stays a BLOCK, leaves the incomplete vote missing and grants no

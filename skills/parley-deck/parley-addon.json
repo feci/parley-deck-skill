@@ -7,9 +7,9 @@
     "references/ARTIFACT_TEMPLATES.md": "sha256:c47838c4d26f10a0ee8d0bf1c4e21a17b0d225dd859c4ee137c3a9400adbc785",
     "references/COOPERATION.md": "sha256:73613f95aabff8ed57372a535913985554014b71911cc8126ec3f7890a9d4f4e",
     "references/HEADLESS_LAUNCH.md": "sha256:018135766190895224dceb099218dee9947f97d67a611a71c25086e07504cb8d",
-    "references/ROSTER_AND_PROTOCOL.md": "sha256:d5c35ef6f0c3cf1b03ad9ef74632c0b2c6cf2c8ae25aead33e4e825201d401d2",
+    "references/ROSTER_AND_PROTOCOL.md": "sha256:2089aab0016b1616792848b0adad6cb6de70e4a04263141e3f51e6002c573f2f",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
     "references/compatibility.json": "sha256:89f52536b2a7c56f0c44cf307094a186ac91052c6c35da3e4a2ffced1143a0a9"
   },
-  "aggregate": "sha256:0f89cbf27f3dbfb7cec5f5d6a3a9cc174d3224ea55c0c49364248de6d618deb5"
+  "aggregate": "sha256:0f1579e20792ed96776845d3d5a19db3a440f7541eff310c60458850b2f23b1b"
 }
