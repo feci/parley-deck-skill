@@ -282,7 +282,8 @@ provider-estimated suggestion for one owner-authorized relaunch, not a timer or 
 
 For recorded policy-on ideas, the CLI's `quota revise` path records authorized membership/policy/scope
 revisions. The request must bind the owner's verbatim ruling to its committed source/blob digest;
-inbox archival or deletion is allowed after the ruling is quoted. Re-inclusion and catch-up never
+inbox archival, deletion or later annotation is allowed after binding. Initial binding checks the
+working copy; later reads validate the committed evidence, not mutable inbox bytes. Re-inclusion and catch-up never
 withdraw a historical veto by themselves. A prompt edit after a fully applied authoritative revision,
 even one matching an older membership set, raises an integrity gate. Preserve the proposed edit for the
 owner, restore the recorded participants and policy, then use `parley quota revise` with the committed
@@ -293,10 +294,11 @@ With the policy off, the CLI preserves the pre-existing `participants:` edit for
 committed-answer schema, exact owner directive or quota command is required for that ordinary import.
 The joiner can run `parley agents exec --agent ID --artifact parley-deck/ideas/IDEA/round-01/ID.md
 --prompt-file <catch-up-prompt> --yes` before or after the edit, including retrying its own incomplete
-stub. An edit made first shows pending catch-up; existing members can sign, but the joiner cannot
+stub. After round 1, an edit made first shows pending catch-up; existing members can sign, but the joiner cannot
 complete the quorum or enter historical membership until import. Known excluded ids cannot use this
-dispatch exception. A kickoff-excluded id may return by a plain edit during round 1; later return
-retains catch-up duties. To decline, a pending policy-off joiner can file design consensus with
+dispatch exception. During round 1, a policy-off join or return uses a plain participant edit,
+with or without a stale exclusion marker, as on the baseline. After round 1, new joiners and
+kickoff-excluded returns retain catch-up duties. To decline, a pending policy-off joiner can file design consensus with
 `parley consensus signoff --agent ID --status block --notes '❌ NON-PARTICIPANT' --counter 'Continue
 without me' IDEA`. This exact note stays a BLOCK, leaves the incomplete vote missing and grants no
 membership or closure authority; resolve it through the normal protocol. NON-PARTICIPANT is not itself
@@ -320,9 +322,26 @@ gate; local PID absence never proves another host's writer stopped. Investigate 
 restore authentic terminal evidence if available. A missing original manifest needs trustworthy original
 bytes; recovery cannot invent a run or alter immutable history. Windows native crash recovery is unavailable.
 
-Applied transition notices stay archived or deleted. Before the applied receipt, a validated archived
-notice also suppresses duplication; deletion without a delivery receipt permits one benign publication
-on checked recovery. Contradictory extant notices still gate. Replay never creates another terminal evaluation.
+Notices are owner-owned and non-authoritative. After a valid applied receipt, notice
+edits, archival, deletion and pathname changes never gate membership, signoff or driving,
+and ordinary publication is not repeated. At most one ordinary notice is published per
+settled transition, with one when the destination is safe; an unsafe destination can
+receive none. Before the receipt, any regular live or archived
+copy is preserved without interpreting its contents. If absent, checked exclusive
+publication is attempted once; unsafe paths and publication failures produce non-blocking
+diagnostics while membership and evaluation receipts still complete. A receipt records
+that the publication step finished, not proof of delivery. Genuine receipt/history,
+writer and projection corruption still gates. Replay never adds a terminal evaluation.
+
+Policy-off changes against CLI 1.50.0 are explicit: `run --yes` filters confirmed
+exclusions, and a bare preflight 503 cannot be excluded with `--yes`. During round 1,
+any policy-off join or return uses a plain participant edit, as before;
+removing a stale exclusion marker does not change that. After round 1, a new joiner
+or kickoff-excluded return must import its late round-1 artifact before signing or
+completing quorum; an exact `NON-PARTICIPANT` decline remains in Missing signoffs.
+Pending catch-up stops ordinary driving until the manual `agents exec` command
+completes it. Membership edits are frozen on final/closed ideas. Legacy ideas without
+quota history retain their prior behavior.
 
 Complete, consistent allowlisted zcode records may qualify. Partial native tails and the default-console
 `[Object]` shape remain blocked. Source-derived SDK fixtures are not complete native evidence and do not

@@ -3,6 +3,10 @@
 ## Unreleased
 
 - Document both stages of per-idea quota exclusion, immutable membership and recovery.
+- Owner-edited notices never gate membership; publication failures remain diagnostics.
+  Disclose policy-off join/signoff, decline, manual catch-up and frozen-final behavior,
+  with round-1 joins/returns restored to plain edits. Committed owner answers remain
+  authoritative after later inbox edits; the initial binding still checks working copies.
 - Disclose the owner-accepted native-zcode limitation: auto-exclusion may not fire on real
   native output; unrecognized failures use the owner-confirmed path. Native-positive
   evidence is waived for this release. Capture is not automatic; keep an ordinary failed

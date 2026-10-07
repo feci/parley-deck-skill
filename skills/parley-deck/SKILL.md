@@ -160,11 +160,10 @@ for an idea exclusion. Current members are required signers; historical vetoes, 
 findings retain force. Re-evaluate review, diversity, strict and goal-check gates. Return
 needs owner confirmation; the next idea re-probes. Reset estimates are not retry permission.
 
-Policy-on revisions use `parley quota revise --dir <root> --idea <slug> --run <run-id>
---request <request.json>`, binding the ruling to its committed path/blob digest. Archival must
-preserve authority. Catch-up never withdraws a veto. Policy-off return/catch-up use existing
-prompt/late-round forms; manual imports are not owner authority. See
-`references/ROSTER_AND_PROTOCOL.md` (Quota auto-exclusion) for forms and gates.
+Policy-on changes use `parley quota revise --dir <root> --idea <slug> --run <run-id>
+--request <request.json>` with committed owner authority. Catch-up never withdraws vetoes.
+Policy-off forms and behavior changes: `references/ROSTER_AND_PROTOCOL.md`.
+Notice edits never gate membership; publication failures are non-blocking diagnostics.
 
 `parley quota recover --dir <root> --idea <slug> --run <run-id>` repairs projections/receipts from
 validated history. It cannot change history or take a foreign/unknown-boot lease; local PID
