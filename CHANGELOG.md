@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.15.0 — 2026-10-08
+
 ### Accepted release limitations
 
 1. **Kickoff blocking escalation (R8-MINOR-1).** If the kickoff quota decision
@@ -23,7 +25,7 @@
    Disabling the policy again does not resolve this case; the generic diagnostic's
    suggestion to do so is inapplicable.
 
-Follow-up: [quota-kickoff-reporting-and-alias-guidance](https://github.com/feci/parley-deck-cli/blob/quota-auto-exclude/parley-deck/ideas/quota-kickoff-reporting-and-alias-guidance/00-prompt.md).
+Follow-up: [quota-kickoff-reporting-and-alias-guidance](https://github.com/feci/parley-deck-cli/blob/main/parley-deck/ideas/quota-kickoff-reporting-and-alias-guidance/00-prompt.md).
 
 ### Changes
 
