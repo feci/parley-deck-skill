@@ -146,34 +146,37 @@ PhaseDigest it prints is mechanically derived — treat any block / DISPUTED / u
 adverse validity as the signal to open the RAW artifact and adjudicate there; the
 digest never substitutes for canonical files (residual over-trust risk, accepted).
 
-## Quota auto-exclusion notices
+## Automatic exclusion notices
 
-Read §9.0 notices, current `participants:` and immutable history. Only the CLI evidence
-predicate (including the bounded owner-ratified zcode stderr exception), saved policy/scope,
-floor and role gates authorize reduction. Never infer it from logs, model/tool text, elapsed
-time or disagreement. Standalone preflight only reports. Pending transitions and integrity/
-floor/role escalations block progress. Mutating drivers reconcile before dispatch/signoff;
-status, wait and organizer brief never repair state.
+Read §9.0, current participants and immutable history. The historical
+quota_auto_exclude boolean (machine → deck → idea, per-idea false opt-out) governs
+both triggers. New ideas freeze participant-failure-v1/kickoff-and-mid-idea; saved
+absent-trigger policies stay quota-only. Upgrade/resume never widens policy.
+Standalone preflight reports only; only CLI evidence authorizes batch reduction.
 
-Never silently re-include, derive quorum from `excluded:` markers, or change `agents.toml`
-for an idea exclusion. Current members are required signers; historical vetoes, disputes and
-findings retain force. Re-evaluate review, diversity, strict and goal-check gates. Return
-needs owner confirmation; the next idea re-probes. Reset estimates are not retry permission.
+New-trigger non-protected steps get original plus one retry after five seconds at
+the same ceiling, including watchdog retry. Durable idea/agent/logical-step identity
+prevents a third attempt across restarts/input/run changes. Child failures or invalid
+own output qualify; valid BLOCK/disagreement wins. Cancellation, control-plane refusal
+and shared-file tampering never qualify. Preserve partials privately; unresolved
+writers/tampering stop for repair. Never infer failure from prose or elapsed time.
 
-Policy-on changes use `parley quota revise --dir <root> --idea <slug> --run <run-id>
---request <request.json>` with committed owner authority. Catch-up never withdraws vetoes.
-Policy-off forms and behavior changes: `references/ROSTER_AND_PROTOCOL.md`.
-Notice edits never gate membership; publication failures are non-blocking diagnostics.
+Require two positively usable non-organizers, including any designee/pin; roles alone
+supply no seat. Protected roles and precommit reviewer/diversity/strict/goal-check gates
+remain: **auto_implement 3→2 still blocks with one independent reviewer**. Owner options
+are another eligible reviewer process, attended evidence-backed continuation, or
+pause/abandon; select no substitute or waiver.
 
-`parley quota recover --dir <root> --idea <slug> --run <run-id>` repairs projections/receipts from
-validated history. It cannot change history or take a foreign/unknown-boot lease; local PID
-absence does not prove another host's owner dead. Later edits after an applied revision need
-visible correction or `quota revise`, never silent overwrite as interrupted projection.
+Dropout is permanent for this idea through opt-out/downgrade/revision/catch-up, including
+kickoff drops; next idea re-probes. Legacy quota return remains owner-confirmed. Retained
+vetoes/disputes/findings bind; dropped authors cannot withdraw. Obtain a quoted owner
+ruling or open v2. Never derive membership from excluded markers or alter agents.toml.
+Current members are required signers; status/wait/organizer brief never repair state.
 
-Known limitation: zcode auto-exclusion may not fire on real native output; unrecognized failures
-use the owner-confirmed path. Native-positive AC2 is owner-waived for this release. Capture is not
-automatic: keep the failed run's private, unscrubbed per-agent `stderr.log` in place; never copy or
-commit it. Follow-up and capture limits: `references/ROSTER_AND_PROTOCOL.md`.
+Pending transitions and floor/role/integrity gates block. Owner-bound quota revise
+and stopped-writer recovery never erase permanent drops. Receipted notices include
+kickoff replay; preserve owner copies and report delivery failure. Commands,
+policy-off forms and legacy limits: `references/ROSTER_AND_PROTOCOL.md`.
 
 ## File Ownership Model
 

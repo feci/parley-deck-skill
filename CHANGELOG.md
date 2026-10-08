@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 2.16.0 — 2026-10-09
+
+- New ideas use two-attempt participant-failure exclusion through the existing
+  quota_auto_exclude knob. Saved quota-only policies keep their behavior and hashes.
+- Dropout is permanent within the idea, with retained dissent and private failed-output
+  evidence. Restarts and changed run IDs do not replenish the retry slot.
+- Existing protected-role, usable-floor and precommit review/diversity gates remain:
+  auto_implement 3→2 still blocks with only one independent reviewer.
+- Repair blocked-kickoff diagnostics and kickoff notice crash replay.
+- Windows CLI remains experimental; CLI WinGet stays held. Aliased-deck and D6
+  accounting limits remain. Legacy quota native-positive waiver is unchanged.
+
 ## 2.15.0 — 2026-10-08
 
 ### Accepted release limitations
