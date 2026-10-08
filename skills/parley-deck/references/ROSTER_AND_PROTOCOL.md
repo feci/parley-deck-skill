@@ -260,25 +260,48 @@ Agents are also shown with a composite display name of the form `family_model_ef
 identity used in artifact paths and signoffs. `fast` is a startup speed on a separate axis from
 effort — same model, same effort, faster output — never a downgrade.
 
-## Quota auto-exclusion (per-idea only)
+## Versioned automatic exclusion (per-idea only)
 
-The binding predicate and recovery contract live in the live protocol's §9.0. A presence-aware
-`[defaults].quota_auto_exclude` boolean supports a deck override and the per-idea `false` opt-out.
-Only newly created ideas default on; recorded policy and scope are reused on resume and never widen
-on binary upgrade. No roster file changes, and `roster_change_policy` does not gate this per-idea rule.
+The live protocol's §9.0 binds the decision. `[defaults].quota_auto_exclude` is the
+single presence-aware boolean: machine → deck → idea precedence, with
+`quota_auto_exclude: false` as the per-idea opt-out. New ideas freeze enabled,
+`scope: kickoff-and-mid-idea`, `trigger: participant-failure-v1`. Saved omitted-trigger
+policies retain quota-only semantics and serialized hashes; upgrades/resumes never
+widen them. Explicit owner-bound revisions may widen a saved policy. No roster/model
+changes; `roster_change_policy` does not gate an idea-local reduction.
 
-Only the live §9.0 evidence predicate can authorize exclusion: native terminal-provider provenance,
-or the explicitly ratified bounded zcode stderr exception. The latter requires a failed invocation,
-no completed artifact/later success, agreeing 429 exhaustion records with machine reset values,
-and the terminal turn-failure line. It retains the owner-accepted subagent-attribution risk. The CLI waits
-for the whole readiness/dispatch batch and validates the fixed two-non-facilitator floor and protected
-roles. An unsupported adapter or ambiguous error stays on the human path. Standalone preflight is
-report-only. Never make the decision from assistant text, tool output, a hang, or disagreement.
+The new trigger gives a dispatched non-protected participant its original attempt
+and one retry after five seconds with the original ceiling. Any child error, crash,
+timeout/watchdog or missing/invalid own artifact qualifies after both failures.
+Watchdog retry shares the slot; durable idea/agent/logical-step identity prevents a
+third attempt across restarts, run IDs and input edits. A valid artifact, including
+BLOCK/disagreement, prevents dropout. Parent cancellation and policy, budget,
+protocol, telemetry or shared-artifact integrity errors never authorize dropout.
+Raw partial output remains private; tampering stops for repair.
 
-Read automatic notices and pending-transition reports from status/wait/organizer brief. Never derive
-membership from repeated `excluded:` lines. Historical objections and findings retain their force;
-re-inclusion requires owner confirmation and catch-up. A known reset plus five minutes is only a
-provider-estimated suggestion for one owner-authorized relaunch, not a timer or retry permission.
+The whole batch applies or none, after writers stop. The floor is two positively
+usable non-organizers including the designee/pin when present. Roles alone supply
+no usable seat. Protected organizer/implementer/drafters remain protected. Existing
+reviewer/diversity/strict/goal-check gates veto BEFORE commit: auto_implement 3→2
+still blocks with one independent reviewer. The escalation gives the arithmetic,
+evidence and owner options: authorize a separate eligible reviewer process, record
+attended evidence-backed continuation, or pause/abandon. No automatic waiver.
+Standalone preflight reports only; undispatched setup uncertainty is never invented
+child evidence.
+
+New-trigger dropout is permanent for this idea, including kickoff-dropped IDs and
+after policy opt-out/downgrade. Every owner/manual/recovery/catch-up rejoin path
+refuses it. The next idea probes afresh. Keep retained vetoes, disputes and findings;
+a dropped author cannot append or withdraw a signoff. An owner ruling quoted into
+the next artifact or abandonment/v2 resolves retained dissent. Read status, wait
+and organizer brief; never subtract `excluded:` display markers to derive quorum.
+
+The legacy quota predicate remains exactly as shipped: native terminal-provider
+provenance or the owner-ratified bounded zcode stderr exception, explicit exhaustion
+and its reset threshold. It retains owner-confirmed return/catch-up and known-reset
+relaunch hints. Its native-positive waiver is historical and does not limit the new
+supervisor-derived participant-failure trigger. Never infer either decision from
+assistant/tool prose, disagreement or elapsed time.
 
 For recorded policy-on ideas, the CLI's `quota revise` path records authorized membership/policy/scope
 revisions. The request must bind the owner's verbatim ruling to its committed source/blob digest;
@@ -289,7 +312,7 @@ even one matching an older membership set, raises an integrity gate. Preserve th
 owner, restore the recorded participants and policy, then use `parley quota revise` with the committed
 owner decision for an intended revision. Matching an old set alone is not proof of an interrupted update.
 
-With the policy off, the CLI preserves the pre-existing `participants:` edit for a known return and the
+Except for permanently dropped IDs, with the policy off the CLI preserves the pre-existing `participants:` edit for a known return and the
 §5 late-round-1/read-priors/join-from-round-2 path for a catch-up join. No new `included:` marker,
 committed-answer schema, exact owner directive or quota command is required for that ordinary import.
 The joiner can run `parley agents exec --agent ID --artifact parley-deck/ideas/IDEA/round-01/ID.md
@@ -332,7 +355,7 @@ copy is preserved without interpreting its contents. If absent, checked exclusiv
 publication is attempted once; unsafe paths and publication failures produce non-blocking
 diagnostics while membership and evaluation receipts still complete. A receipt records
 that the publication step finished, not proof of delivery. Genuine receipt/history,
-writer and projection corruption still gates. Replay never adds a terminal evaluation.
+writer and projection corruption still gates. Replay never adds a terminal evaluation. Kickoff publication now uses the same receipt: a crash before its publication step completes can replay it. A blocked kickoff safely creates a missing inbox; failed publication prints candidates, evidence, arithmetic and owner options to stderr.
 
 Policy-off changes against CLI 1.50.0 are explicit: `run --yes` filters confirmed
 exclusions, and a bare preflight 503 cannot be excluded with `--yes`. During round 1,
@@ -344,7 +367,7 @@ Pending catch-up stops ordinary driving until the manual `agents exec` command
 completes it. Membership edits are frozen on final/closed ideas. Legacy ideas without
 quota history retain their prior behavior.
 
-Complete, consistent allowlisted zcode records may qualify. Partial native tails and the default-console
+In legacy quota-only mode, complete, consistent allowlisted zcode records may qualify. Partial native tails and the default-console
 `[Object]` shape remain blocked. Source-derived SDK fixtures are not complete native evidence and do not
 establish AC2. Native-positive AC2 is NOT MET and owner-waived for this release (owner
 round05-answer Q2, 2026-10-06); R5-MAJOR-2 is accepted and deferred, not fixed. zcode
