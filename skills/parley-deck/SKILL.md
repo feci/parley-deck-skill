@@ -167,7 +167,10 @@ stale causes, missing/corrupt/pending history and two-person-by-design ideas ear
 later manual membership edits invalidate old cause. Policy-only revisions may retain it.
 Known distinct snapshot models are mandatory even with diversity disabled; snapshot-only
 native model identity is configured authority, not observation. Same reviewer may goal-check
-in a fresh process, with the existing 120s ceiling. Only the count changes: all current
+in a fresh process, bounded by min(track 5/15/30m, positive checker timeout); absent track
+means standard, malformed track refuses. Goal execution uses two durable attempts at the
+same frozen ceiling, including protected checkers, without widening dropout authority.
+Valid FAIL is final. Only the reviewer count changes: all current
 signer, strict clean-round, reservations, dissent and current-tree evidence duties remain.
 Unqualified cases retain attended owner options; select no substitute or wider waiver.
 

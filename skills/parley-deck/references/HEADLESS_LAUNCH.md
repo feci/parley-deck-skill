@@ -125,7 +125,9 @@ The practical consequence: a config layer that overrides `headless_args` replace
 Eligible streaming steps under the saved participant-failure policy, including headless
 signoffs, use first output 120s, stall 300s after activity and heartbeat 60s by default.
 Heartbeat does not count as activity. Overrides/disables and shorter hard/operation
-ceilings remain; readiness 90s and goal 120s are unchanged. Shared terminal classification
+ceilings remain; readiness stays90s. Goal checks use min(track5/15/30m, positive
+checker timeout), frozen across the two attempts, including protected checkers. Valid
+FAIL is final; retry grants no dropout authority. Shared terminal classification
 and cleanup feed the same original-plus-one retry after 5s, never another budget.
 Zcode and default Claude text output declare buffering, as agy already did: disable
 soft guards and retain the hard timeout. Custom streaming args may explicitly set
