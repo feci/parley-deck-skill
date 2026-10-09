@@ -290,7 +290,11 @@ Policy-only revisions may retain cause; later manual membership edits invalidate
 Markers/manual exclusions, stale causes, unknown models and missing/corrupt/pending
 history earn no exception. Only the numeric minimum changes: current signer duties,
 strict clean review, reservations, retained dissent and current-tree evidence remain.
-The same reviewer may goal-check in a fresh process, with the existing 120s ceiling.
+The same reviewer may goal-check in a fresh process. The hard ceiling is min(track
+5/15/30 minutes, positive configured checker timeout); absent track means standard,
+malformed track refuses. Original plus one retry uses the same frozen ceiling through
+existing supervision, including protected checkers, without granting dropout authority.
+Valid FAIL is final; a failed process cannot establish completion.
 Unqualified cases escalate with arithmetic/evidence and owner options: another eligible
 reviewer process, attended evidence-backed continuation, or pause/abandon.
 Standalone preflight reports only; undispatched setup uncertainty is never invented

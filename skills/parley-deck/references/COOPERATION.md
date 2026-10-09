@@ -716,10 +716,15 @@ once the runner emits `agent.usage` events.
 driver refuses to auto-complete on an `ACCEPT-WITH-RESERVATIONS` triage (reservations need
 a human to read them) or with fewer than two independent reviewers, except the
 cause-derived single-reviewer case in §9.0. Under `auto_implement` or `strict_gate`,
-before completing, the driver runs a one-shot **goal-done check**: a fresh process
+before completing, the driver runs a bounded **goal-done check**: a fresh process
 of a non-implementer verifies `FINAL.md`'s observable acceptance criteria. The sole
-remaining reviewer may perform it in a fresh process; its existing two-minute
-product ceiling stays. A confident fail escalates. **The check can only withhold a
+remaining reviewer may perform it in a fresh process. Its hard ceiling is the minimum
+of the active track's 5/15/30 minutes and a positive configured checker timeout;
+missing configuration uses the track bound, absent track means standard, and malformed
+track refuses. Goal execution, including protected checkers, uses the existing durable
+original-plus-one retry at that same frozen ceiling and the existing watchdog/buffering
+rules. A valid FAIL is final; retry never grants dropout authority or changes protected
+roles. A confident fail escalates. **The check can only withhold a
 close, never establish one.** A checker that is missing, is the implementer, or cannot be
 resolved and launched; an execution that fails or exits non-zero; and a verdict that is
 inconclusive or only a pass-with-reservations each leave completion **unverified**, and
@@ -917,7 +922,7 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       same two-attempt path only after child cleanup; elapsed time/prose alone is not evidence.
       Honor configured overrides/disables and truthful buffering declarations. Final-text-only
       transports (including zcode and default Claude text output) disable soft guards; hard ceilings
-      still bound them. Readiness90s, goal120s and existing track/operation/configured ceilings stay;
+      still bound them. Readiness90s stays; goal checks use Phase 8's track/configuration ceiling;
       manual `agents exec` and interactive paths remain hard-ceiling-only. A declared buffered
       transport cannot be diagnosed promptly from silence; no universal early-drop claim is made.
       Exec/ACP child errors of any code, crashes/start failures, watchdog/timeout and missing/invalid

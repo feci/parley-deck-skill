@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "skillPackage": "parley-deck-skill",
-  "skillVersion": "2.17.0",
+  "skillVersion": "2.18.0",
   "protocolSchema": 1,
   "projectMetadataSchema": 1,
   "compatibilityPolicy": "Report actual component versions and warn on drift; do not force global lockstep between installer, runtime skills, CLI, and project decks.",
   "projectMetadataFile": "parley-deck/meta/version.json",
   "minimumInstallerForProjectMetadata": "1.1.0",
   "runtimeMarkerFile": ".parley-deck-skill-install.json",
-  "recommendedCli": ">=1.53.0"
+  "recommendedCli": ">=1.54.0"
 }

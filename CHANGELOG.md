@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.18.0 — 2026-10-09
+
+- Align goal-check guidance with track/configuration deadlines and the existing bounded
+  retry path, including protected checkers without widening membership authority.
+- Preserve fail-closed goal and current-tree evidence requirements. Companion CLI 1.54.0
+  adds an attended durable declaration for narrow legacy unknown history; activation is
+  a separate owner action. Core 2.18.0 is staged from 2.17.0 for attended publication.
+
 ## Unreleased
 
 ## 2.17.0 — 2026-10-09
