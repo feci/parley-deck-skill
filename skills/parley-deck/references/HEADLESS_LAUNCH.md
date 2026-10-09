@@ -119,3 +119,16 @@ Do not pass placeholder brackets literally. Do not use broad bypass modes unless
 - **Nothing is appended afterwards** — no permission flag, no model flag, no thinking flag, no profile flag, no separate write-mode list.
 
 The practical consequence: a config layer that overrides `headless_args` replaces it wholesale, and can silently drop an enabling flag that a declared autonomous mode still claims. That is why the check in "Autonomous Execution" reads the effective argv rather than the declared mode.
+
+### Participant-failure watchdog scope (CLI 1.53.0)
+
+Eligible streaming steps under the saved participant-failure policy, including headless
+signoffs, use first output 120s, stall 300s after activity and heartbeat 60s by default.
+Heartbeat does not count as activity. Overrides/disables and shorter hard/operation
+ceilings remain; readiness 90s and goal 120s are unchanged. Shared terminal classification
+and cleanup feed the same original-plus-one retry after 5s, never another budget.
+Zcode and default Claude text output declare buffering, as agy already did: disable
+soft guards and retain the hard timeout. Custom streaming args may explicitly set
+buffers_stdout=false. Manual agents exec and interactive launches remain hard-only;
+this is not a universal early-hang detector. Roster snapshot identity where a CLI cannot
+bind/report its model is configured authority, not an observed native model claim.

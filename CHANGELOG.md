@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 2.17.0 — 2026-10-09
+
+- Permit one independent model-diverse reviewer only after validated automatic history
+  proves the causal reviewer loss; reuse the same predicate before membership commit
+  and during review/goal/auto-close. Marker-only exclusions remain attended.
+- Keep current signers, retained dissent, strict clean review, reservations, goal-check
+  freshness and independent current-tree acceptance evidence binding.
+- Scope the default streaming stall to300s for eligible participant-failure steps;
+  supervise headless signoffs, preserve two-attempt accounting and declared buffering.
+  Zcode/default Claude text output now truthfully declare buffering.
+- Compact protocol/skill guidance without raising size caps or changing the applicability
+  map. Windows CLI remains experimental; CLI WinGet stays held.
+
 ## 2.16.0 — 2026-10-09
 
 - New ideas use two-attempt participant-failure exclusion through the existing
