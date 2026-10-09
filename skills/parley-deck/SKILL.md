@@ -13,44 +13,44 @@ First obtain and read the protocol context as specified in **Required Protocol C
 
 ## Non-Solo Requirement
 
-A request to use `parley`, `parley-deck`, or this skill ALWAYS means a real multi-agent workflow with other available models or agents. Parley Deck is never satisfied by one agent working alone as a solo checklist, solo review, or solo process framework.
+A request to use `parley`, `parley-deck` or this skill ALWAYS requires real multi-agent
+work. Invoke available peers; each writes its own canonical artifact. A solo checklist
+or review is not Parley Deck. Claim the workflow only with peer artifacts or a protocol
+record explaining why multi-agent execution was impossible.
 
-If at least one other participant or CLI agent is available, the facilitator MUST invoke other agents. Each participant MUST create its own canonical artifact. The facilitator MUST NOT claim "Parley Deck was used" unless other participant artifacts exist, or the protocol explicitly records why multi-agent execution was impossible.
-
-If no other agent can be invoked because of auth, CLI, timeout, permissions, or tooling failure, the facilitator MUST stop before merge, finalization, or claiming completion and report the blocker to the user. The facilitator may continue only if the user explicitly authorizes a solo exception, and that exception MUST be recorded in an inbox/protocol note before work continues.
+If no peer is invokable (auth/CLI/timeout/permission/tool failure), stop before merge,
+finalization or completion and report the blocker. Continue only with an explicit user
+solo exception, recorded in inbox/protocol notes first.
 
 ## Required Protocol Context
 
-Do not run this skill from the abbreviated workflow alone. For an official project launch,
-obtain the protocol context and attestation from the shared CLI renderer before starting:
+Obtain protocol context before an official project launch; the abbreviated workflow
+alone is insufficient:
 
 ```bash
 parley protocol packet --dir <project-root> --phase <0..8> --track <track> --idea <slug> --json
 ```
 
-Read the emitted `body_path` and record `context_mode`, `source_sha256`, `packet_sha256`,
-and `fallback_reason` (absent or empty when no fallback occurred) in the participant's own artifact. Use the actual phase, track and
-idea; pass applicable `--flag` values (`strict_gate`, `auto_implement`, `pipeline`,
-`protocol_change`). Full context is the default. `--optimize` is an explicit experimental
-input for the ratified packet trial, not a default or a proven efficiency improvement.
+Read `body_path`. Record `context_mode`, `source_sha256`, `packet_sha256` and
+`fallback_reason` (empty/absent without fallback) in your own artifact. Use the actual
+phase/track/idea and applicable `--flag` values: strict_gate, auto_implement, pipeline,
+protocol_change. Full context is default; `--optimize` is the explicit experimental
+ratified packet trial, not default or proven efficiency.
 
-- `full`: read the complete emitted context from the live resolved authority.
-- `packet`: read every included block and the omission index; follow its triggers to read
-  the full source whenever an omitted section becomes relevant.
-- `full-fallback`: read the complete live authority and retain the visible fallback reason.
-- `refused`: stop that launch, resolve the authority or secret-detection problem, and
-  re-render. Never replace a refusal with a bundled snapshot, cached text or hand excerpt.
+- `full`: read the complete live resolved authority.
+- `packet`: read every included block and the omission index; follow triggers to the
+  full source when an omitted section becomes relevant.
+- `full-fallback`: read all live authority and retain the visible reason.
+- `refused`: stop, resolve the authority/secret-detection issue and re-render. Never
+  substitute bundled/cached text or a hand excerpt, or continue unattested.
 
-If the renderer is unreachable (for example, an older CLI without this command), read the
-full live `parley-deck/COOPERATION.md` and record `context_mode=full-fallback` with that
-reason. A reachable renderer's refusal is not unavailability. Any other renderer failure
-that produces no attestation (including authority or I/O errors) also stops the launch:
-resolve the error and re-render; do not reinterpret it as permission to use unattested text.
-If no live protocol is
-available, stop the project launch and report the missing authority. The bundled
-`references/COOPERATION.md` is a portability/bootstrap reference only; it cannot substitute
-for the live authority of an official launch. The live applicability map
-`parley-deck/meta/packet-applicability.yaml` is protocol and changes follow §7.
+Only an unreachable renderer (e.g. an older CLI) permits directly reading the full live
+`parley-deck/COOPERATION.md` and recording `full-fallback` with that reason. Refusal is
+not unavailability. Any other failure producing no attestation, including authority/I/O
+errors, stops the launch until resolved and re-rendered. Missing live protocol blocks
+the project launch. Bundled `references/COOPERATION.md` is portability/bootstrap only,
+never official-launch authority. The live `meta/packet-applicability.yaml` map is
+protocol and changes follow §7.
 
 ## Automation Mode
 
@@ -83,18 +83,15 @@ If the live protocol later contains an `Automation:` header, an `Automation writ
    - `github-pr` / GitHub Pull Requests
    - `gitlab-mr` / GitLab Merge Requests
 
-5. Discover candidate agents generically. Do not assume any fixed vendor, model family, or CLI command. Use this order:
-
-   - User-provided agent list in the current request.
-   - `PARLEY_HEADLESS_AGENT_CONFIG` pointing to a JSON config file.
-   - `parley-deck/meta/headless-agents.local.json` (or `parley-deck/agents.toml`) when present — the **per-project override**.
-   - `~/.parley/agents.toml` — the **user-global central default** (each agent's model + reasoning), created by `parley init` and inherited by every project unless the deck overrides it.
-   - Active agent IDs and workspace hints in `COOPERATION.md`.
-   - If still unclear, ask the user which installed CLI commands should be considered.
-
-   Precedence is low-to-high: built-in defaults → `~/.parley/agents.toml` (central) → project deck config → `PARLEY_HEADLESS_AGENT_CONFIG`. The deck overrides the central default; a field the deck leaves unset falls through to the central value.
-
-   `~/.parley/agents.toml` may also carry a `[defaults]` block of project-wide policy knobs: `ping_tier` (§9.0 liveness ping, e.g. `hosted-pong` or `none`), `preferred_transport` (the transport `parley init` seeds), `roster_change_policy` (e.g. `confirm-breaking`: auto-add newly available agents, but require user confirmation before dropping or breaking the roster), and `speed`/`timeouts`. Honor `roster_change_policy` when adjusting the roster after the liveness ping; a deck's `parley-deck/agents.toml` overrides any of these per-project.
+5. Discover candidates without assuming a vendor/model/CLI: user list →
+   `PARLEY_HEADLESS_AGENT_CONFIG` JSON → project `meta/headless-agents.local.json`
+   or `parley-deck/agents.toml` → `~/.parley/agents.toml` → active protocol IDs/workspace
+   hints → ask which installed CLIs to consider. Config precedence is built-in → machine
+   → deck/local project → environment config; unset fields inherit. `parley init`
+   creates the central per-agent model/reasoning defaults. Machine `[defaults]` also
+   carries ping_tier, preferred_transport, roster_change_policy, speed/timeouts;
+   deck defaults override. Honor roster_change_policy after liveness checks (e.g.
+   confirm-breaking auto-adds available agents but asks before dropping/breaking roster).
 
 6. For each candidate command, verify it is installed with `command -v <cli>` or an explicit configured path.
 
@@ -162,10 +159,25 @@ and shared-file tampering never qualify. Preserve partials privately; unresolved
 writers/tampering stop for repair. Never infer failure from prose or elapsed time.
 
 Require two positively usable non-organizers, including any designee/pin; roles alone
-supply no seat. Protected roles and precommit reviewer/diversity/strict/goal-check gates
-remain: **auto_implement 3→2 still blocks with one independent reviewer**. Owner options
-are another eligible reviewer process, attended evidence-backed continuation, or
-pause/abandon; select no substitute or waiver.
+supply no seat. Re-evaluate all precommit gates. The §9.0 cause-derived exception permits
+one independent reviewer only after validated latest automatic history (or the settled
+prospective decision) proves a >=2→1 reviewer loss. Match Before/After and every removed
+ID to valid typed failure/recognized quota evidence. Manual/marker-only exclusions,
+stale causes, missing/corrupt/pending history and two-person-by-design ideas earn nothing;
+later manual membership edits invalidate old cause. Policy-only revisions may retain it.
+Known distinct snapshot models are mandatory even with diversity disabled; snapshot-only
+native model identity is configured authority, not observation. Same reviewer may goal-check
+in a fresh process, with the existing 120s ceiling. Only the count changes: all current
+signer, strict clean-round, reservations, dissent and current-tree evidence duties remain.
+Unqualified cases retain attended owner options; select no substitute or wider waiver.
+
+Eligible streaming participant-failure steps, including headless signoffs, use defaults
+first 120s/stall 300s/heartbeat 60s; heartbeat is not activity. Reuse two attempts at the same
+hard ceiling and only classified terminal failures after child cleanup. Honor explicit
+window overrides/disables and buffering. Zcode/default Claude final-text output is buffered;
+soft guards are disabled, hard bounds remain. Manual agents exec/interactive stay hard-only;
+readiness 90s and other existing operation/track ceilings stay. Silence is not universal
+hang evidence. Custom streaming args may explicitly override buffers_stdout.
 
 Dropout is permanent for this idea through opt-out/downgrade/revision/catch-up, including
 kickoff drops; next idea re-probes. Legacy quota return remains owner-confirmed. Retained
@@ -223,21 +235,23 @@ For non-escalation inbox handoffs, progress notes, or mid-round discoveries, kee
 
 Before reporting completion:
 
-- Verify the user selected or confirmed the transport used for the workflow.
-- Verify facilitator, participants, model, thinking/reasoning level, speed profile, and timeout policy were either selected by the user or defaulted according to Selection Checkpoint.
-- Verify Parley Deck did not collapse to a solo facilitator run: at least one non-facilitator participant was invoked when another agent was available.
-- Verify each invoked non-facilitator participant created its own canonical artifact in the expected path before claiming a round, review, consensus, or finalization is complete.
-- If no non-facilitator participant artifact exists, verify the protocol records why multi-agent execution was impossible and that the user explicitly authorized any solo exception before merge/finalization.
-- Verify each headless agent launch used explicit, discovered, or defaulted model/profile/effort settings and sufficient timeout.
-- Verify every participant has exactly one file per completed round.
-- Verify every participant file was written by that participant's invocation; otherwise stop and report a blocker.
-- Verify any `roles:` metadata is advisory only and did not change quorum, ownership, signoff weight, or drafter eligibility.
-- Verify any internal helper/subagent use is represented only through the owning participant's canonical artifact, was not counted as a non-facilitator participant, and did not create canonical files under a helper identity that is absent from `participants:`.
-- For non-trivial implementation, verify `IMPLEMENTATION.md` includes a plan/checklist before or alongside the implementation summary.
-- Verify protocol files under `parley-deck/` are in English.
-- Verify the facilitator did not overwrite another agent's file.
-- Summarize which transport and CLIs were used, which models/thinking levels were selected, which rounds ran, where artifacts were written, and whether consensus/finalization was reached.
-- Record important orchestration issues in `parley-deck/inbox/<facilitator>-to-all_<slug>_<topic>.md` when they affect future agents.
+- Verify selected/confirmed transport and selected/defaulted facilitator, participants,
+  model, reasoning/profile/effort, speed and timeout policy (Selection Checkpoint).
+- Verify real multi-agent execution: at least one available non-facilitator was invoked
+  and wrote its canonical artifact. Missing artifacts block round/review/consensus/final
+  claims; an impossible invocation requires recorded reasons and an explicit user solo
+  exception before merge/finalization/completion. Never call a solo checklist Parley.
+- Verify every headless launch used discovered/selected/defaulted model/profile/effort
+  and sufficient timeout. Check exactly one participant-owned file per completed round,
+  expected paths and actual invocation authorship; no proxy writing or overwriting peers.
+- Verify advisory roles changed no quorum/ownership/signoff weight/drafter eligibility.
+  Internal helpers remain represented by their owner, supply no non-solo seat, and own
+  no separate canonical artifact unless their ID is an explicit participant.
+- Verify a nontrivial implementation's IMPLEMENTATION.md plan/checklist precedes or
+  accompanies its summary; all protocol files are English and all phase gates hold.
+- Summarize transport/CLIs, models/thinking levels, rounds, artifact locations and actual
+  consensus/finalization state. Record future-agent orchestration issues in
+  `inbox/<facilitator>-to-all_<slug>_<topic>.md`.
 
 ## References (on demand)
 

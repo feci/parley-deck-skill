@@ -44,19 +44,33 @@ Parley verification. Parley is for work where independent verification earns its
 
 ## 0. Choose the transport
 
-At project bootstrap, pick **exactly one** of three transports. The choice determines how phase transitions, cross-review, and signoffs are mechanically performed. The _what_ (artifacts, frontmatter, signoff rules) is identical across all three; only the _how_ differs.
+At bootstrap choose exactly one transport; artifacts/frontmatter/signoffs are identical,
+but publication and phase-transition mechanics differ (§11).
 
-| Transport                    | When to choose                                               | Day-to-day surface                |
-| ---------------------------- | ------------------------------------------------------------ | --------------------------------- |
-| **A. Local directory**       | Filesystem-only. No git host required. Simplest setup.       | Direct commits to `parley-deck/`. |
-| **B. GitHub Pull Requests**  | Project already on GitHub. Want native review UI for humans. | One long-lived PR per idea.       |
-| **C. GitLab Merge Requests** | Project on GitLab. Want native review UI for humans.         | One long-lived MR per idea.       |
+| Transport | Use | Surface |
+| --- | --- | --- |
+| **A. Local directory** | Filesystem only; no host required | Direct `parley-deck/` commits |
+| **B. GitHub Pull Requests** | GitHub projects; native review UI | One long-lived PR per idea |
+| **C. GitLab Merge Requests** | GitLab projects; native review UI | One long-lived MR per idea |
 
-Once chosen, replace the `Transport:` line in the header with the active value. The rest of the document is read with that choice in mind. The detailed mechanics for each transport live in §11.
+Set the header's `Transport:` and follow that §11 variant. The choice is sticky:
+switching requires a §7 meta-protocol-change idea because in-flight work spans branches/PRs.
 
-**The choice is sticky for the project.** Switching transports later is possible but requires a meta-protocol-change idea (§7), because in-flight ideas span multiple PRs/branches.
+**Deck bootstrap (one-time).** At deck creation (`parley init`), the facilitator MUST
+confirm the active roster and each agent's model and reasoning/effort with the user.
+Default to the highest supported effort; use `cli-default` only if undiscoverable.
+Record choices in `parley-deck/agents.toml` via `parley roster set`, then regenerate §2
+with `parley roster render`. Reuse them thereafter; re-confirm only on user request.
+This is model/effort-agnostic, not a per-idea selection gate; §9.0 checks liveness only.
+The skill gives the list-roster → confirm → list-models/effort → pick flow.
 
-**Deck bootstrap (one-time).** When `parley-deck/` is first created in a project (`parley init`), in addition to the transport the facilitator MUST confirm the **active roster, each agent's model, and each agent's reasoning/effort level** with the user as a required one-time setup step, and record the persistent per-agent choices in the deck's roster authority `parley-deck/agents.toml` via `parley roster set` (then regenerate the §2 view with `parley roster render`). The **default reasoning/effort is the strongest (highest) level the agent supports**; fall back to `cli-default` only when the level cannot be discovered. This fires **only at deck creation** — not per idea, not per later session; an already-bootstrapped deck reuses the saved selection (and the user may re-run the confirmation on request). The protocol stays **model- and reasoning-agnostic** — it mandates the confirmation and a highest-by-default, not any specific model or level. Per-agent defaults are seeded from the **user-global central config `~/.parley/agents.toml`** (lists each agent's model + reasoning), which `parley init` creates and any deck overrides per-project via `parley-deck/agents.toml`. Its `[defaults]` block also carries project-wide policy defaults — `ping_tier` (§9.0 liveness ping), `preferred_transport` (used by `parley init`), `roster_change_policy`, `quota_auto_exclude` (§9.0; historical automatic-exclusion boolean with kickoff-frozen trigger), `speed`/`timeouts`, and `default_implementer` (the standing implementer designation of §4 Phase 5 — deliberately shipped COMMENTED OUT, a deviation from the template's active-key shape, because an active value would ship the global default set; a per-idea `implementer:` line outranks it and `default_implementer = "none"` suppresses it deck-wide). See the skill for the interactive list-roster → confirm → list-models-and-effort → pick flow. (The §9.0 readiness check only pings agent *liveness* per idea; it does not re-select models or effort.)
+`parley init` creates the user-global `~/.parley/agents.toml`; deck settings override it.
+Its `[defaults]` covers `ping_tier`, `preferred_transport` (init's seed),
+`roster_change_policy`, `quota_auto_exclude` (§9.0's historical boolean; trigger freezes
+at kickoff), `speed`/`timeouts`, and Phase 5's `default_implementer`. The last ships
+COMMENTED OUT, deliberately deviating from the template's active-key shape to avoid
+setting a global designee. Per-idea `implementer:` outranks it; deck-wide
+`default_implementer = "none"` suppresses it.
 
 **Universal invariants** that hold for every transport:
 
@@ -107,33 +121,27 @@ agent's adapter, model, effort and speed live in `[roster.<id>]` blocks there; t
 generated, human-readable **view** and is NOT authoritative. Do not hand-edit it to add, remove or
 retire an agent — the edit will not take effect and will be overwritten on the next render.
 
-This changed because hand-maintenance failed at scale: across 40 decks the table had drifted into
-**nine different rosters**, 17 decks carried no roster at all, and 17 still named an agent retired
-months earlier. A table that every project edits by hand and no tool validates cannot stay correct.
-
-Change the roster with:
+Hand-maintenance drifted across 40 decks: nine rosters, 17 absent and 17 naming a
+retired agent. Use the canonical commands:
 
 ```bash
-parley roster show                                   # the canonical answer, one fixed table
-parley roster set <agent> --scope deck|machine …     # change one member (preview by default)
-parley roster sync                                   # inherit the machine roster (machine -> deck)
+parley roster show
+parley roster set <agent> --scope deck|machine …
+parley roster sync
 ```
 
-`--scope deck` writes the **committed** `parley-deck/agents.toml`; `--scope machine` writes
-`~/.parley/agents.toml` and every deck inherits it. Retiring an agent sets `active = false` — rows
-are **marked, never deleted**, so a past idea's participant list stays interpretable.
+`set` previews by default; deck scope writes committed `parley-deck/agents.toml`,
+machine scope writes `~/.parley/agents.toml`. Retire with `active = false`; never delete
+historical rows. `sync` rebases an existing deck roster onto machine values; it does
+not migrate a legacy table.
 
-**Three authority states, in this order.** (1) The deck declares `[roster.<id>]` blocks in
-`parley-deck/agents.toml` — those blocks are the membership. (2) Else a deck that predates this
-change and still has only a hand-written §2 table keeps working: it is read as a legacy roster and
-every row reports `legacy-roster`; that table remains the deck's membership until it is migrated.
-**A row in that table IS a declaration** — emptying the `[roster.*]` blocks alone falls through to
-it, not past it. (3) Else, with neither, the deck **inherits** `~/.parley/agents.toml` and every
-row reports `inherited-roster`; a change to the machine roster then reaches the deck with no deck
-edit. Inheritance is the state a deck is in when it declares nothing at all. `roster sync` does NOT migrate it — it only rebases an
-existing deck roster onto the machine values. Migrate with `parley roster migrate` (fleet,
-attended, backed up) or `parley roster set <id> --scope deck --adapter <family> --yes
---confirm-breaking` per member, then `parley roster render` to regenerate this view.
+**Authority order:** (1) deck `[roster.<id>]` blocks; (2) otherwise a legacy §2 table,
+whose rows report `legacy-roster`; (3) otherwise the machine roster, reporting
+`inherited-roster`, whose changes reach the deck without edits. A table row IS a
+declaration: clearing blocks falls through to that table, not past it. Inheritance
+requires no declaration at all. Migrate with attended, backed-up fleet
+`parley roster migrate`, or per-member `parley roster set <id> --scope deck --adapter
+<family> --yes --confirm-breaking`; then `parley roster render`.
 
 The generated view:
 
@@ -241,7 +249,9 @@ over `standard`, until the risk is disproven.
 defaults stated in the rest of §4 and in §5 (quorum), §9.0 (readiness), and §11 (transport).**
 Where a later phase says "every participant," "all reviewers," or "consensus is reached when
 every active participant signs off," read it through this table for `fast`/`standard`;
-`deliberation` uses the rule exactly as written elsewhere.
+`deliberation` uses the rule exactly as written elsewhere. The cause-derived
+single-reviewer exception in §9.0 changes only the numeric reviewer minimum;
+track-specific signer, refutation and other gates remain binding.
 
 **Invariants on every track (never dropped for speed):** at least one independent
 non-facilitator artifact (non-solo, §1); refutation-default review — the reviewer *count*
@@ -522,7 +532,9 @@ If the idea is design-only (no code artifact), Phase 5 may be reduced to a brief
 
 In a declared-facilitator run, code review and code verification stay with the participants by default; the declared facilitator consumes review verdicts rather than reviewing code itself.
 
-After a §9.0 exclusion, reviewer counts, model diversity, strict-gate requirements and independent goal-checker eligibility are re-evaluated, never waived; historical findings retain their force.
+After a §9.0 exclusion, re-evaluate reviewer count using its cause-derived exception.
+The sole reviewer must have a known distinct model even if `require_model_diversity`
+is false. Strict-gate, independent goal-check and historical-finding obligations remain.
 
 Once `IMPLEMENTATION.md` is published, every active participant **except the implementer** writes `ideas/<slug>/review/round-01/<agent-id>.md`:
 
@@ -579,7 +591,10 @@ into the next review artifact.
 
 ### Phase 7 — Review consensus
 
-A §9.0 exclusion does not dispose of historical signoffs or findings. Review consensus must retain them and re-evaluate every applicable gate (§5).
+A §9.0 exclusion does not dispose of historical signoffs or findings (§5).
+Required review-consensus signers follow the current participants through §4.0;
+on deliberation every current participant, including the implementer, signs.
+The single-reviewer exception never withdraws retained dissent.
 
 When review discussion has converged, any participant (typically the implementer) drafts `ideas/<slug>/review/consensus.md`:
 
@@ -699,10 +714,12 @@ once the runner emits `agent.usage` events.
 **Close-decision integrity (LE-7/LE-11).** Under `auto_implement`, a clean
 `outstanding_agreed_fixes == 0` is necessary but not sufficient to auto-complete: the
 driver refuses to auto-complete on an `ACCEPT-WITH-RESERVATIONS` triage (reservations need
-a human to read them) or with fewer than two independent reviewers. And under
-`auto_implement` or `strict_gate`, before completing, the driver runs a one-shot
-**goal-done check** — a fresh non-implementer agent verifies the `FINAL.md` observable
-acceptance criteria, and a confident fail escalates. **The check can only withhold a
+a human to read them) or with fewer than two independent reviewers, except the
+cause-derived single-reviewer case in §9.0. Under `auto_implement` or `strict_gate`,
+before completing, the driver runs a one-shot **goal-done check**: a fresh process
+of a non-implementer verifies `FINAL.md`'s observable acceptance criteria. The sole
+remaining reviewer may perform it in a fresh process; its existing two-minute
+product ceiling stays. A confident fail escalates. **The check can only withhold a
 close, never establish one.** A checker that is missing, is the implementer, or cannot be
 resolved and launched; an execution that fails or exits non-zero; and a verdict that is
 inconclusive or only a pass-with-reservations each leave completion **unverified**, and
@@ -867,22 +884,15 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
 (automatable via `parley preflight`) and records the result in the new idea's
 `00-prompt.md`:
 
-- **Protocol freshness.** Compare the live protocol against the installed skill's
-  packaged protocol (e.g. `parley-deck-skill status`; `protocolSha256` vs
-  `packagedProtocolSha256` in `meta/version.json`). Behaviour depends on
-  `meta/version.json` `protocolRole`:
-  - `source` → **advisory only; never auto-writes `COOPERATION.md`** (this project is
-    the protocol's upstream, so a packaged copy is older, not newer).
-  - `consumer` + a newer installed protocol → an **additive** change (a `deckVersion`
-    minor/patch bump) is **auto-synced** into `COOPERATION.md`, **preserving every
-    project-specific zone** (header, §0 transport, §2 roster — the same allowlist the
-    drift guard uses); the sync updates the `Protocol synced:` header line and records
-    `meta/protocol-sync_<ISO-timestamp>.md`. A **breaking** change (major `deckVersion`
-    bump, or one that modifies/removes existing rules) **pauses for user confirmation**.
-  - `protocolRole` missing/unknown → **do not auto-write**; ask the user once and
-    backfill the field.
-  - This sync adopts upstream-ratified text and is governed by the §7 carve-out; it is
-    not itself a meta-protocol-change idea.
+- **Protocol freshness.** Compare live and installed packaged protocol hashes
+  (`parley-deck-skill status`; `protocolSha256`/`packagedProtocolSha256` in
+  `meta/version.json`). `protocolRole: source` is advisory and NEVER auto-writes:
+  this deck is upstream, so its package may be older. For `consumer`, auto-sync a newer
+  additive minor/patch while preserving header, §0 transport and §2 roster (the drift
+  guard's allowlist); update `Protocol synced:` and record
+  `meta/protocol-sync_<ISO-timestamp>.md`. A major or rule-modifying/removing change
+  pauses for user confirmation. Missing/unknown role: ask once and backfill; no auto-write.
+  Adopting ratified upstream text uses §7's carve-out, not a new meta-protocol-change idea.
 - **Roster liveness ping.** Probe every rostered participant (a bounded liveness
   round-trip via each agent's real configured invocation; a missing CLI is unavailable
   without a probe) and build an available/unavailable table.
@@ -901,6 +911,15 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       them; widening requires owner-bound revision. Unknown/null/duplicate/malformed fields fail closed.
     - **Participant failure.** A non-protected dispatched step has two attempts total: original plus
       one retry after five seconds at the same ceiling; watchdog retry uses that same second slot.
+      Eligible streaming participant-failure steps (including headless signoffs) use existing
+      supervisor defaults: first output 120s, stall 300s after activity, heartbeat 60s. Heartbeats
+      never count as activity. Supervisor `no_first_output`/`stalled`/`timeout` outcomes enter the
+      same two-attempt path only after child cleanup; elapsed time/prose alone is not evidence.
+      Honor configured overrides/disables and truthful buffering declarations. Final-text-only
+      transports (including zcode and default Claude text output) disable soft guards; hard ceilings
+      still bound them. Readiness90s, goal120s and existing track/operation/configured ceilings stay;
+      manual `agents exec` and interactive paths remain hard-ceiling-only. A declared buffered
+      transport cannot be diagnosed promptly from silence; no universal early-drop claim is made.
       Exec/ACP child errors of any code, crashes/start failures, watchdog/timeout and missing/invalid
       own output qualify. Valid output, including BLOCK/disagreement, on either attempt wins.
       Parent cancellation, policy/budget/protocol/telemetry refusal, unresolved writers and tampering
@@ -911,30 +930,29 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       Rule `participant-failure.v1` uses supervisor facts, independent of quota recognition. Bind both
       invocation IDs/linkage, step, terminal/exit/watchdog class, validator reason, UTC times and verbatim
       evidence (secret redaction/visible truncation only); full logs/partials stay private.
-    - **Legacy quota predicate (unchanged).** A failed invocation (nonzero exit or structured terminal
-      provider error) qualifies only without a valid completed artifact or later batch success.
-      Native terminal-provider-error provenance requires CLI behavior/source and positive/adversarial
-      fixtures; unsupported adapters are diagnostic-only, and is_error alone is insufficient.
-      Assistant quotes/tool output are not provider evidence, even followed by unrelated failure.
-      **Owner-ratified zcode exception (2026-10-04):** nonzero exit, no valid artifact/later success,
-      terminal zcode turn-failure line and stderr responseBody JSON may qualify instead. At least one
-      provider record must exist; EVERY record must show HTTP 429 and explicit "Limit Exhausted" or
-      the exhaustion semantics below, include machine reset_at/retry_after, agree on class and reset
-      within one second, and clear 60 minutes. Missing/mixed/malformed/contradictory evidence gates.
-      This zcode-only exception accepts the risk of subagent error accompanying unrelated root failure;
-      other adapters need native provenance. Quoted prose is not a provider record.
-      Recorded positive stderr and adversarial fixtures remain required.
-      Exhaustion must explicitly name account credit/quota or a reached/exhausted usage allowance.
-      Stated reset must be ≥60 minutes away; short/past/unparseable/contradictory resets gate, never
-      become unknown. A timezone-free clock is supplemental only alongside
-      complete RFC3339 Z/offset or numeric seconds retry_after/Retry-After; ALL decisive values,
-      including reset-after durations, agree within one second. The clock must match
-      at -12:00..+14:00 in 15-minute steps; retain raw text. Missing/discarded machine
-      reset, contradiction, unmatched/display-only reset gates. Without reset, only explicit account
-      exhaustion or a reached ≥24-hour allowance (daily/weekly/monthly) qualifies; hourly/N-hour <24h
-      requires a qualifying reset. Bare 429, generic quota exceeded, bare credit balance, 5xx/reset timer,
-      long Retry-After alone, 400/auth/hang/watchdog do not qualify. Gateway-pool wording requires cause
-      evidence. Generic provider classification stays separate: bare 503 cannot be excluded with --yes.
+    - **Legacy quota predicate (unchanged).** Require a failed invocation (nonzero exit or
+      structured terminal provider error), no valid completed artifact and no later batch success.
+      Native provider-error provenance needs CLI behavior/source plus positive/adversarial fixtures;
+      unsupported adapters are diagnostic-only. is_error, assistant quotes or tool output are not
+      provider proof, even with an unrelated later failure.
+      **Owner-ratified zcode exception (2026-10-04):** instead allow a nonzero root exit, no valid
+      artifact/later success, terminal zcode turn-failure line and stderr responseBody JSON.
+      Require provider records, ALL HTTP429, ALL explicit "Limit Exhausted" or exhaustion below,
+      ALL with machine reset_at/retry_after, agreeing on class/reset within one second and ≥60min.
+      Missing/mixed/malformed/contradictory records gate. This zcode-only exception accepts subagent
+      error accompanying unrelated root failure; other adapters need native provenance. Quoted
+      prose is not a provider record; recorded positive stderr/adversarial fixtures remain required.
+      Exhaustion must name account credit/quota or a reached/exhausted usage allowance. Stated
+      reset must be ≥60min; short/past/unparseable/contradictory resets gate, never become unknown.
+      A timezone-free clock supplements complete RFC3339 Z/offset or numeric seconds
+      retry_after/Retry-After only. ALL decisive values (including reset-after durations) agree
+      within one second; clock matches an offset -12:00..+14:00 in 15min steps; retain raw text.
+      Missing/discarded machine reset, unmatched/display-only reset or contradiction gates.
+      Without reset only explicit account exhaustion or a reached ≥24h allowance
+      (daily/weekly/monthly) qualifies; hourly/N-hour <24h requires qualifying reset.
+      Bare429, generic quota exceeded, bare credit balance, 5xx/reset timer, long Retry-After alone,
+      400/auth/hang/watchdog do not qualify. Gateway-pool wording needs cause evidence; generic
+      provider classification stays separate (bare503 cannot be excluded with --yes).
     - **Batch/floor/gates.** `parley run` settles the exact proposed kickoff batch before the first
       authoritative prompt/list/manifest; standalone preflight only reports. Mid-idea uses saved enabled
       scope after ALL writers stop, before dispatch/signoff/close. Apply all eligible
@@ -945,38 +963,58 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       designee/pin/drafter or declare facilitator. Protect facilitator, designee, pin and started
       consensus/FINAL/review-consensus drafters; their failure blocks the batch. Designee/pin uses
       Phase 5's existing three-exit gate; global default before a pin is unchanged. Re-evaluate reviewer,
-      LE-7/LE-11, independent goal-check, model-diversity and strict_gate requirements BEFORE commit:
-      **auto_implement 3→2 still blocks with only one independent reviewer**, despite meeting the floor.
-      One blocking decision gives candidates, evidence, usable arithmetic and owner options: authorize
-      another eligible model-diverse reviewer process (recommended), record attended evidence-backed
-      continuation with fewer reviewers, or pause/abandon. Select no substitute or automatic waiver.
-      Standing owner authority may support attended continuation; §1 remains unchanged.
-    - **History/work/recovery.** Immutable kickoff and revisions bind current vs known membership;
-      kickoff drops never became known signers. Required signers/dispatch/await consumers use current
-      participants; never subtract excluded markers or rewrite run.created/participant artifacts.
-      §5 retains vetoes/disputes/findings; exclusion is not withdrawal/disposition. Keep
-      partials and earlier round.incomplete/failed invocations. Only validated survivor artifacts
-      permit a new terminal round evaluation bound to the transition. Closed FINAL/IMPLEMENTATION stay
-      frozen. Record evidence BEFORE one checked-durable batch commit: idea/run, prior revision,
-      before/after, all candidate attempts, policy/scope/trigger and evidence. Idea-scoped serialization
-      binds every driving run for its whole lifetime when saved enabled scope includes mid-idea;
-      competitors serialize/refuse; policy-off, unrecorded legacy and kickoff-only driving are unchanged.
-      Reconcile prompt/manifest/consumers/evaluation before dispatch/signoff/close; pending commits are
-      recoverable, missing/contradictory/truncated authority blocks. Status/wait/organizer brief agree
-      on current membership, drops and pending state; reads never repair. Recovery cannot change history
-      or resolve foreign/unknown writers. Organizer failover/replacement agents remain outside this rule.
-    - **Notice/return.** Markers show automatic label, rule, UTC reset/unknown, scrubbed raw reset,
-      transition/date, never "confirmed". One idempotent non-blocking notice per applied batch gives
-      IDs, reasons, hints, survivors and gates. Create safe missing inboxes;
-      blocked-kickoff delivery failure prints the decision to stderr. Kickoff notice crash replay uses
-      existing receipts; preserve owner-edited/archived copies. Delivery failure is diagnostic, never
-      rollback/proof of delivery; no exactly-once guarantee on unavailable storage. A later failed batch
-      preserves earlier history and has its own decision. Reduction is not wait exit 4; wait refreshes.
-      Participant-failure dropout is permanent for this idea, including kickoff drops, through ALL
-      revision/opt-out/downgrade/recovery/catch-up paths. No new signoff or withdrawal by a dropped author;
-      retained dissent needs owner ruling quoted into the next artifact or abandonment/v2. Only the next
-      idea probes afresh. Legacy quota rejoin remains owner-confirmed, never automatic/timer-driven;
-      its notice may suggest owner-authorized relaunch at known reset +5 minutes (provider estimate).
+      LE-7/LE-11, independent goal-check, model-diversity and strict_gate requirements BEFORE commit,
+      using the single-reviewer exception below where proved. Otherwise one blocking decision gives
+      candidates, evidence, usable arithmetic and owner options: another eligible model-diverse
+      reviewer process (recommended), attended evidence-backed continuation, or pause/abandon.
+      Select no substitute or waiver outside the exception. Standing owner authority may support
+      attended continuation; §1 remains unchanged.
+    - **Single-reviewer exception.** One independent non-implementer reviewer suffices only when
+      validated immutable history proves the latest membership-changing automatic transition reduced
+      at least two independent reviewers to exactly one. Its After must equal current membership;
+      Before and After contain the current implementer and sole reviewer. Every removed identity
+      must exactly match eligible typed `participant-failure.v1` evidence or recognized legacy rules
+      `quota.named-reset-ge-60m.v1`, `quota.account-exhausted-no-reset.v1`,
+      `quota.allowance-ge-24h-no-reset.v1` with their established provenance/reset constraints.
+      A settled prospective decision may supply that same proof before commit; it is not itself a
+      committed exclusion. Policy-only revisions preserve cause; any later manual/owner membership
+      change invalidates the old cause. Marker-only/manual exclusions, arbitrary rules, stale causes,
+      missing/corrupt/pending history and two-person-by-design ideas earn no exception.
+      The implementer and reviewer must have known, different models in the run's roster snapshot
+      (trimmed, case-insensitive; empty/unknown/cli-default is unknown), even with diversity disabled.
+      Where a CLI cannot bind/report a model, that snapshot is configured authority, not observed
+      model proof; an absent snapshot cannot qualify. Re-derive this one shared condition for
+      precommit, review, review consensus, goal check and close, never from writable gate metadata.
+      Only the numeric minimum becomes one: current signer duties, protected roles, floor,
+      reservations, retained dissent/findings, strict fresh full-scope zero-findings review (NITs
+      included) and current-tree AC evidence remain. A fresh process of the same reviewer may
+      goal-check. No qualifying record means unchanged gates; proactive manual exclusions remain
+      attended. Without a usable reviewer/floor, escalate once.
+    - **History/work/recovery.** Immutable kickoff/revisions bind current vs known membership;
+      kickoff drops never became known signers. Dispatch/await/required signers use current members;
+      never subtract markers or rewrite run.created/artifacts. Retain §5 obligations, partials and
+      earlier round.incomplete/failures. Only validated survivor artifacts allow a new terminal
+      round evaluation bound to the transition. Closed FINAL/IMPLEMENTATION stay frozen.
+      Before one checked-durable batch commit record idea/run, prior revision, Before/After, all
+      attempts, policy/scope/trigger and evidence. Saved enabled mid-idea scope serializes every
+      driving run for its lifetime; competitors serialize/refuse. Policy-off, unrecorded legacy
+      and kickoff-only driving stay unchanged. Reconcile prompt/manifest/consumers/evaluation before
+      dispatch/signoff/close. Pending commits recover; missing/contradictory/truncated authority
+      blocks. Read-only status/wait/brief agree on membership/drops/pending state and never repair.
+      Recovery cannot change history or resolve foreign/unknown writers. Organizer failover or
+      replacement agents stay outside this rule.
+    - **Notice/return.** Automatic markers show label, rule, UTC reset/unknown, scrubbed raw reset,
+      transition/date, never "confirmed". One idempotent non-blocking notice per applied batch lists
+      IDs, reasons, hints, survivors and gates. Create missing inboxes safely; blocked-kickoff
+      delivery failure prints the decision to stderr. Kickoff crash replay uses existing receipts;
+      preserve owner-edited/archived copies. Delivery failure is diagnostic, not rollback or proof
+      of delivery; unavailable storage has no exactly-once guarantee. Later failed batches preserve
+      history and get their own decision. Reduction is not wait exit4; wait refreshes membership.
+      Participant-failure dropout is permanent for this idea, including kickoff drops and every
+      revision/opt-out/downgrade/recovery/catch-up path. Dropped authors cannot sign or withdraw;
+      retained dissent needs a quoted owner ruling in the next artifact or abandonment/v2. Only
+      the next idea probes afresh. Legacy quota rejoin needs owner confirmation, never a timer;
+      its notice may suggest authorized relaunch at known reset+5min (provider estimate).
       Participant failure has no reset/relaunch suggestion.
   - **Re-including** an eligible legacy-excluded agent requires explicit user confirmation;
     participant-failure dropout cannot rejoin this idea (§5).
@@ -996,7 +1034,23 @@ Declaring `facilitator:` makes the pure organizer this idea's default: participa
 
 Then proceed with the per-agent session-start checklist:
 
-1. Read the protocol context for this launch. An official launch (runner, interactive handoff or skill-facilitated) receives it from the shared renderer (`parley protocol packet`) with an attestation — `context_mode` (`full`, `packet`, `full-fallback` or `refused`), `source_sha256`, `packet_sha256`, `fallback_reason` — rendered from the live resolved authority (a source-role deck's own file; a consumer deck's verified core + lock + overlay), never a bundled snapshot. `full` is the default; an optimized `packet` is the explicit experimental input of the ratified packet trial, carries every block verbatim plus a complete omission index whose triggers say when to read the full source, and is never the default. These two outcomes are not the same. `full-fallback` is a valid, visible result: read all of `parley-deck/COOPERATION.md` — the live authority itself — record `context_mode=full-fallback` with its reason in your artifact, and proceed. `refused` is a **stop**: a refusal (unprovable authority, a detected secret) is never permission to emit the refused content, to substitute some other authority for it (a bundled snapshot, a cached or stale copy, a hand-assembled excerpt), or to continue that launch on unattested text — resolve it at the renderer and re-render, or report the blocker. A protocol task launch that carries **no** attestation is unresolved in the same way: obtain one from the renderer before the task starts. Only where no renderer is reachable does a launch fall back to reading the full live source, recorded as `full-fallback` with that reason — a disclosed fallback to the live authority, never a substitute for it. In every mode: note the active `Transport:` and check `meta/protocol-changelog.md` for updates. The applicability map `meta/packet-applicability.yaml` is protocol; changing it is a §7 change. A facilitator may request its audience-scoped view (`parley protocol packet --audience facilitator`) — an opt-in, verbatim, omission-indexed reading set that can never cut below the never-cut floor — and, after a compaction, may re-orient from the computed `parley organizer brief` instead of re-reading SKILL.md and the full COOPERATION.md.
+1. Obtain official-launch context (runner, interactive or skill-facilitated) from the
+   shared `parley protocol packet` renderer. Retain `context_mode`, `source_sha256`,
+   `packet_sha256`, `fallback_reason`. Authority is the live source-role file or a
+   consumer's verified core + lock + overlay, never a bundled snapshot. Default `full`
+   means read it all. Experimental opt-in `packet` contains verbatim applicable blocks
+   plus a complete omission index; read omitted source when its triggers apply.
+   `full-fallback` means read the complete live authority and record the visible reason.
+   `refused` (e.g. unprovable authority or secret detection), or missing attestation,
+   stops the launch: resolve and re-render or report the blocker. Never substitute
+   bundled, cached, stale or hand-excerpted text or continue unattested. Only an
+   unreachable renderer permits direct full-live-source reading with a recorded
+   `full-fallback` reason; refusal is not unavailability. In every mode note `Transport:`
+   and check `meta/protocol-changelog.md`. The applicability map is protocol (§7).
+   A facilitator may request `parley protocol packet --audience facilitator`: an opt-in,
+   verbatim, omission-indexed view that never cuts below the never-cut floor; after
+   compaction it may re-orient from the computed `parley organizer brief` instead of
+   re-reading SKILL.md and the full COOPERATION.md.
 2. Read `parley-deck/inbox/` — filter for files addressed to you or `all`, and read automatic quota-exclusion notices for the current idea. Escalations addressed `to: user` that are still unanswered are context you should respect: don't cut across an active user-direction request.
 3. Read `parley-deck/ideas/*/00-prompt.md` — note open ideas where you are a participant.
 4. **Transport B/C only:** check the project's open PRs/MRs for any titled `[<slug>] design` or `[<slug>] implementation` where you are a requested reviewer or assignee. If any is awaiting your action that maps to a missing file in §3, that file is what you owe — write it first.

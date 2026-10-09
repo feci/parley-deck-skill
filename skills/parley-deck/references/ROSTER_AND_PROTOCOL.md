@@ -282,10 +282,17 @@ Raw partial output remains private; tampering stops for repair.
 The whole batch applies or none, after writers stop. The floor is two positively
 usable non-organizers including the designee/pin when present. Roles alone supply
 no usable seat. Protected organizer/implementer/drafters remain protected. Existing
-reviewer/diversity/strict/goal-check gates veto BEFORE commit: auto_implement 3→2
-still blocks with one independent reviewer. The escalation gives the arithmetic,
-evidence and owner options: authorize a separate eligible reviewer process, record
-attended evidence-backed continuation, or pause/abandon. No automatic waiver.
+reviewer/diversity/strict/goal-check gates run BEFORE commit. Only the §9.0 causal
+exception permits one reviewer: validated latest automatic history (or its settled
+prospective decision) must prove the exact >=2-to-1 loss, with typed failure or recognized
+quota evidence and known distinct snapshot models even if diversity is disabled.
+Policy-only revisions may retain cause; later manual membership edits invalidate it.
+Markers/manual exclusions, stale causes, unknown models and missing/corrupt/pending
+history earn no exception. Only the numeric minimum changes: current signer duties,
+strict clean review, reservations, retained dissent and current-tree evidence remain.
+The same reviewer may goal-check in a fresh process, with the existing 120s ceiling.
+Unqualified cases escalate with arithmetic/evidence and owner options: another eligible
+reviewer process, attended evidence-backed continuation, or pause/abandon.
 Standalone preflight reports only; undispatched setup uncertainty is never invented
 child evidence.
 
