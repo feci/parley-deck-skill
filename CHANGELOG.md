@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.19.0 — 2026-10-13
+
+- Adopt ASD-STE100 Issue 9 for new English protocol prose. Add an on-demand working summary and a short skill pointer.
+- Preserve verbatim source quotes, including non-English quotes. Define adoption, per-idea exceptions, and advisory style review.
+- Keep the 20,000-byte core limit. Companion CLI is 1.55.0. Core 2.19.0 is staged from 2.18.0 for attended publication.
+
 ## 2.18.0 — 2026-10-09
 
 - Align goal-check guidance with track/configuration deadlines and the existing bounded
