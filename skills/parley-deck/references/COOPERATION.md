@@ -795,7 +795,11 @@ Escalation is not a veto — the user's answer becomes input to the next round l
    shared — size, access, confidentiality, rights — the asymmetry MUST be disclosed and the source-dependent
    proposition MUST NOT be presented as established.
 5. Before working on an idea, **re-read `00-prompt.md` `status:`** to avoid writing into a closed round.
-6. **English only.** All content written to any file under `parley-deck/` MUST be in English. This covers round files, consensus, FINAL, inbox messages, meta docs, frontmatter values, and inline comments. In transports B and C, the rule extends to all PR/MR descriptions, review summaries, comments, and commit messages. Rationale: cross-agent interoperability and reviewability. If an agent needs to quote user input originally in another language, they translate it and note the original language in a trailing comment. _(Projects that explicitly need a different working language may override this rule in their own copy of COOPERATION.md, but it should be a deliberate, documented choice.)_
+6. **English only; ASD-STE100 by default.** Write new protocol prose in English. This includes artifacts, inbox notes, briefs, PR/MR text, and commit messages. Use ASD-STE100 Issue 9 through the working summary in Appendix B.
+
+   Read Appendix B before you write or review English prose. Preserve exact source quotations and add English explanation when needed. Appendix B defines the exemptions and the per-idea exception.
+
+   Non-English owner chat is outside this file rule. STE applies only to English output. A deck can retain a deliberate, documented working-language override.
 
 ## 7. Changing this protocol
 
@@ -1555,3 +1559,47 @@ contradiction blocks signoff and escalates to the owner. The scanner never auto-
 | 15.5 procedural calls provisional | yes | yes | yes |
 | 15.5 drafter position changes | yes (in collapsed `FINAL.md`) | yes | yes |
 | 15.6 alternatives & correlated agreement | yes | yes | yes |
+
+## Appendix B — ASD-STE100 output text
+
+**Authority and access.** ASD-STE100 Issue 9, January 2025, is the default standard for new English protocol prose. This appendix is its required working summary. For protocol decisions, this summary is binding. The external standard does not override protocol authority or the exemptions below.
+
+The official download page identifies Issue 9 as current on 2026-10-13: https://www.asd-ste100.org/STE_downloads.html#article02-2l. Request the free official standard there. The official FAQ is https://www.asd-ste100.org/STE_faq.html.
+
+This summary uses original words. It does not contain the copyrighted dictionary or replace the full standard. Do not copy or redistribute the dictionary or long passages from the standard. A summary or an automated check cannot certify full conformance. Consult the full standard for vocabulary disputes and any full conformance claim.
+
+**Core rules.** Parley adopts these limits as its working rules:
+
+- Limit each procedural sentence to 20 words. Limit each descriptive sentence to 25 words.
+- Use at most six sentences per paragraph. Give each paragraph one subject.
+- Give one instruction per sentence. Use the imperative for procedures.
+- Use active voice. Descriptive text can use passive voice when the actor is unknown.
+- Use simple present, simple past, simple future, or imperative forms.
+- Do not use an `-ing` form as a verb. Permitted nouns and adjectives can end with `-ing`.
+- Use approved words with their approved meanings and parts of speech. Do not invent dictionary approval or rejection.
+- Use technical names and technical verbs only where the standard permits them. Define project terms and use each term consistently.
+
+**Scope and exemptions.** Apply these rules to new English prose in rounds, consensus, FINAL, IMPLEMENTATION, reviews, signoffs, inbox notes, briefs, mirrors, and commits. They also apply to other new English output under this protocol.
+
+Preserve verbatim quotations from the owner, sources, and other agents, including quotations in another language. Preserve code, commands, paths, identifiers, URLs, log and error excerpts, schema keys, and all frontmatter. Preserve required headings, verdict tokens, and signoff syntax. Preserve mechanically generated text and validator output. Keep each exempt span exact; apply the rules to its surrounding explanation.
+
+Agent-authored prose is not exempt merely because an agent generated it. Non-English chat with the owner remains outside the English file rule. The prose policy changes no source, evidence, ownership, or language requirement beyond section 6.6.
+
+**Default and exception.** The default is on. The idea author can set `ste_output: false` in `00-prompt.md` at kickoff and state an English reason there. Only an explicit false setting disables the default. Absent, true, empty, or unknown values retain STE.
+
+After kickoff, a change needs owner direction or participant consensus in the next canonical artifact. The exception affects only that idea's prose. It changes no other protocol duty. There is no new deck configuration key. Agents apply this writing instruction; the CLI does not parse the field or use it as a phase gate.
+
+**Adoption.** New decks use this rule. Existing decks adopt it through their normal protocol update, subject to section 9.0. A rule-modifying consumer sync needs user confirmation. A newer CLI or installed skill does not override an older live authority.
+
+After adoption, apply the rule to every new artifact, including artifacts for open ideas. Apply it to newly authored prose in a living artifact. Do not rewrite existing text, signatures, closed artifacts, or old protocol prose.
+
+**Review.** Cite the exact new text and the applicable rule when you give feedback. Pure prose-style feedback is advisory, outside the fixed-severity findings list. It cannot block a phase or a strict-gate close. Defects in technical meaning, evidence, or correctness still follow the existing finding and gate rules. Do not hide those defects as style feedback.
+
+This release adds no prose linter, executable check recipe, or dictionary checker. Any mechanical prose check must remain advisory and skip exempt content. It cannot replace independent review.
+
+Before you publish new prose, do this manual review:
+
+- Count the words in each non-exempt sentence and the sentences in each paragraph.
+- Remove ambiguity without a change to technical meaning.
+- Confirm that quotations and required syntax remain exact.
+- Use the full standard for a vocabulary dispute; state any unverified limit on your claim.

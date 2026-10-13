@@ -34,7 +34,7 @@ status: round-01
 ## Non-goals
 ```
 
-Preserve the user's intent, but translate non-English user text into English for protocol files. Note the original language only when it matters.
+Follow the live writing policy. Where it adopts ASD-STE100, read Appendix B before you write English prose. Preserve verbatim source quotes, including non-English quotes. Add English explanation when needed. An older live authority keeps its own policy.
 
 Keep `participants:` as a list of agent IDs. Omit `roles:` when it is not useful. If present, `roles:` is a per-idea advisory lens map only; it must not change quorum, ownership, signoff weight, or drafter eligibility.
 

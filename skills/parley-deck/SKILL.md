@@ -11,6 +11,8 @@ Act as the facilitator agent. Every participant writes its own protocol artifact
 
 First obtain and read the protocol context as specified in **Required Protocol Context** below. Follow the resolved authority's active transport, roster, phase rules, and English-only rule for every file under `parley-deck/`.
 
+Follow the live protocol's writing policy. Where it adopts ASD-STE100, read Appendix B or `references/STE100.md` before you write or review English prose. Preserve exact evidence and required syntax. An older live authority keeps its own policy.
+
 ## Non-Solo Requirement
 
 A request to use `parley`, `parley-deck` or this skill ALWAYS requires real multi-agent
