@@ -97,5 +97,7 @@ parley quota capture status
 parley quota capture purge
 ```
 
-Status reports configuration, path, limits, and cleanup counts. Purge removes retained capture files.
+Status reports configuration, path, limits, and cleanup counts.
+It also deletes expired files, removes oldest files for the total cap, and updates `cleanup.json`.
+Purge removes retained capture files.
 Directory deletion also provides immediate cleanup. No command probes or contacts a provider for capture.
