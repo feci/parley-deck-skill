@@ -11,34 +11,31 @@
 
 ## Quickstart — start here (developers & first-timers)
 
-**New here? You do not need to read all of this.** Read this Quickstart, §4.0 (track
-selection), and §4 (the phases). Everything else is reference you open only when a task needs it.
+Read this Quickstart, §4.0, and §4's phases first. Open other references when the task needs them.
 
-**Start an idea in 5 minutes:**
+**Start an idea:**
 
-1. Create `ideas/<slug>/00-prompt.md`; set `track:` (see §4.0 — default `standard`).
-2. Each participant writes `round-01/<agent-id>.md` **independently** — write yours before reading the others'.
-3. Follow your track (§4.0): `fast` = round-1 + a collapsed `FINAL.md` signoff + one refutation-default reviewer (≤1 fix-up cycle); `standard` = the normal flow with 2 reviewers; `deliberation` = the full lifecycle for risky or protocol work.
+1. Create `ideas/<slug>/00-prompt.md` with `track:`; the default is `standard` (§4.0).
+2. Write your independent `round-01/<agent-id>.md` before you read peer answers.
+3. Follow the track: `fast` uses round 1, collapsed FINAL signoff, one refutation-default reviewer, and at most one fix-up.
+   `standard` uses the normal flow with two reviewers. `deliberation` uses the full lifecycle for risky or protocol work.
 
-**Trivial, reversible work — a typo, a doc line, a one-file rename, a dependency bump with
-green tests — does NOT need Parley at all.** Just do it; don't open an idea and don't claim
-Parley verification. Parley is for work where independent verification earns its cost.
+Trivial reversible work needs no Parley idea or verification claim: typos, documentation lines, one-file renames, and dependency bumps with passing tests.
+Use Parley when independent verification earns its cost.
 
-**Who are you? → read this:**
+| Role | Read | Work |
+| --- | --- | --- |
+| Developer/implementer | Quickstart, §4.0, §4, §6 | Choose track; write plan/implementation; run checks |
+| Reviewer | Phase 6–8 | Try to break acceptance criteria; file findings |
+| PM/designer | Quickstart, §1 | State outcome, constraints, non-goals, risk tolerance |
+| Facilitator | Quickstart, §4, §5, §9, active §11 transport | Open ideas; obtain consensus; maintain roster |
 
-| If you are…               | Read                                          | You do                                                    |
-| ------------------------- | --------------------------------------------- | --------------------------------------------------------- |
-| Developer / implementer   | Quickstart, §4.0, §4 phases, §6               | pick the track, write the plan/implementation, run checks |
-| Reviewer                  | §4 Phase 6–8 (refutation-default)             | try to break the acceptance criteria, file findings       |
-| PM / designer             | Quickstart, §1                                | state the outcome, constraints, non-goals, risk tolerance |
-| Facilitator               | Quickstart, §4, §5, §9, your §11 transport    | open ideas, drive consensus, keep the roster; a deck declaring `facilitator:` may run it as the pure organizer by default — participants implement and verify code, the facilitator reads verdicts (`facilitator_participates: true` restores full participation) |
+A declared `facilitator:` can act as pure organizer. Participants implement and verify; it reads verdicts.
+`facilitator_participates: true` restores participation. V2 exhaustion succession follows §9.0.
 
-**Core vs reference (progressive disclosure).** The **core** every participant needs is
-§0–§8 **and §15 (verification integrity), which binds on every track**. The rest are
-**reference appendices** — skip them until a task needs them: **§9** session-start checklist,
-**§10** escalation to the user, **§11** transport mechanics, **§12** pipelines & action stages,
-**§13** retrospective optimization, **§14** automated outer loop. (§10 sits physically between
-§8 and §9 in this document; it is numbered, not ordered.)
+The core is §0–§8 and §15, which binds on every track.
+Reference sections: §9 session start, §10 summary, §11 transports, §12 pipelines/actions, §13 retrospectives, §14 automated loops.
+Open each when its task applies. Section numbers do not determine physical order; §10 sits between §8 and §9.
 
 ---
 
@@ -93,36 +90,34 @@ The protocol is designed to scale to **any number of agents (≥ 2)** and is **a
 
 ### Non-solo execution requirement
 
-A request to use `parley`, `parley-deck`, or this protocol ALWAYS means a real multi-agent workflow with other available models or agents. Parley Deck is never satisfied by one agent working alone as a solo checklist, solo review, or solo process framework.
+A request to use `parley`, `parley-deck`, or this protocol requires real work by multiple agents.
+A solo checklist, review, or process does not satisfy it. If another participant or CLI agent is
+available, the facilitator MUST invoke it. Each participant MUST write its own canonical artifact.
+Claim Parley use only with those artifacts, or an explicit protocol record that explains why
+multi-agent execution was impossible.
 
-If at least one other participant or CLI agent is available, the facilitator MUST invoke other agents. Each participant MUST create its own canonical artifact. The facilitator MUST NOT claim "Parley Deck was used" unless other participant artifacts exist, or the protocol explicitly records why multi-agent execution was impossible.
-
-If no other agent can be invoked because of auth, CLI, timeout, permissions, or tooling failure, the facilitator MUST stop before merge, finalization, or claiming completion and report the blocker to the user. Work may continue only if the user explicitly authorizes a solo exception. That exception MUST be recorded in `inbox/` or the active idea's protocol notes before work continues.
+If auth, CLI, timeout, permission, or tool failure prevents every other agent from participation,
+stop before merge, finalization, or a completion claim. Report the blocker. Only an explicit user
+solo exception permits continuation. Record that exception in `inbox/` or the idea's protocol notes first.
 
 ### Participant sizing and lenses
 
-Use enough participants to get genuinely different analysis without creating coordination drag:
-
-- Default to 2–4 active participants for normal ideas.
-- Use per-idea roles or lenses when distinct perspectives materially improve coverage.
-- Add more participants only for cleanly separable modules, review scopes, or competing hypotheses.
-- Avoid multi-agent overhead for sequential same-file work or tightly coupled edits.
-
-Per-idea role/lens metadata is advisory only. It does not change quorum, signoff weight, artifact ownership, drafter eligibility, or the non-solo requirement.
+Default to 2–4 active participants. Use enough agents for different analysis without needless coordination.
+Add participants for separable modules, review scopes, or competing hypotheses. Avoid extra agents for
+sequential changes to one file or tightly coupled work. Optional per-idea roles and lenses are advisory.
+They change no quorum, signoff weight, artifact ownership, drafter eligibility, or the non-solo requirement.
 
 ### Internal helpers
 
-An agent MAY use internal helper mechanisms such as subagents, retrieval, tools, scratchpads, or additional model calls to produce its own canonical artifact. These helpers are not Parley Deck participants, do not count toward the non-solo requirement, do not sign off, and do not own protocol files. Participant-spawned helpers MUST NOT create canonical round, review, consensus, or signoff files under a separate helper identity unless that identity is explicitly listed in the idea's `participants:` list. The named participant remains fully accountable for its own file and signoff.
+Participants may use internal subagents, tools, retrieval, scratchpads, or other model calls.
+These helpers are not participants. They supply no non-solo evidence, own no protocol files, and do not sign.
+A helper MUST NOT create a canonical round, review, consensus, or signoff file under a separate identity
+unless `participants:` explicitly lists that identity. The named participant remains accountable for its file and signoff.
 
 ## 2. Active agents (roster)
 
-**The roster's authority is `parley-deck/agents.toml`, not this table.** Membership and each
-agent's adapter, model, effort and speed live in `[roster.<id>]` blocks there; the table below is a
-generated, human-readable **view** and is NOT authoritative. Do not hand-edit it to add, remove or
-retire an agent — the edit will not take effect and will be overwritten on the next render.
-
-Hand-maintenance drifted across 40 decks: nine rosters, 17 absent and 17 naming a
-retired agent. Use the canonical commands:
+**Roster authority:** `parley-deck/agents.toml`. Its `[roster.<id>]` blocks own membership,
+adapter, model, effort, and speed. The §2 table is a generated view. Do not edit it by hand.
 
 ```bash
 parley roster show
@@ -130,18 +125,17 @@ parley roster set <agent> --scope deck|machine …
 parley roster sync
 ```
 
-`set` previews by default; deck scope writes committed `parley-deck/agents.toml`,
-machine scope writes `~/.parley/agents.toml`. Retire with `active = false`; never delete
-historical rows. `sync` rebases an existing deck roster onto machine values; it does
-not migrate a legacy table.
+`set` previews by default. Deck scope writes committed `parley-deck/agents.toml`;
+machine scope writes `~/.parley/agents.toml`. Retire with `active = false`; retain historical rows.
+`sync` rebases an existing deck roster onto machine values. It does not migrate a legacy table.
 
-**Authority order:** (1) deck `[roster.<id>]` blocks; (2) otherwise a legacy §2 table,
-whose rows report `legacy-roster`; (3) otherwise the machine roster, reporting
-`inherited-roster`, whose changes reach the deck without edits. A table row IS a
-declaration: clearing blocks falls through to that table, not past it. Inheritance
-requires no declaration at all. Migrate with attended, backed-up fleet
-`parley roster migrate`, or per-member `parley roster set <id> --scope deck --adapter
-<family> --yes --confirm-breaking`; then `parley roster render`.
+Authority order: deck blocks, then a legacy §2 table (`legacy-roster`), then the machine roster
+(`inherited-roster`). Machine changes reach an inherited deck without edits. A table row is a
+declaration. Removal of deck blocks falls through to that table. Inheritance needs no declaration.
+
+Migrate through attended, backed-up `parley roster migrate`, or per-member
+`parley roster set <id> --scope deck --adapter <family> --yes --confirm-breaking`.
+Then run `parley roster render`.
 
 The generated view:
 
@@ -190,7 +184,8 @@ When an agent leaves the project, mark its row as inactive (do not delete it) so
     │       │   └── ...
     │       ├── consensus.md         ← created once everyone is ready to sign off
     │       ├── FINAL.md             ← static, self-contained authoritative artifact (plan / spec / ADR)
-    │       ├── IMPLEMENTATION.md    ← living execution doc (Progress / Decision Log / Surprises / Outcomes)
+    │       ├── IMPLEMENTATION.md    ← original living execution document
+    │       ├── role-handover/        ← successor execution records under §9.0
     │       └── review/              ← Phase 6–8 code review lifecycle
     │           ├── round-01/
     │           │   ├── <agent-id-1>.md
@@ -214,63 +209,43 @@ This section describes the **conceptual** flow and the **artifacts** produced. T
 
 ### 4.0 — Track selection (conditional rigor)
 
-Not every change needs the full lifecycle. Each idea runs on one of three **tracks**, set as
-`track: fast | standard | deliberation` in `00-prompt.md` (default `standard`). The track is a
-**mechanical routing decision** from the classifier below — it scales ceremony to risk. Round
-content (analysis, review, refutation) is always model-driven; only the routing is objective.
+Set `track: fast | standard | deliberation` in `00-prompt.md`; absent means `standard`.
+The classifier scales ceremony to risk. Routing is mechanical; analysis, review, and refutation remain model-driven.
 
-**Classifier — check the `deliberation` triggers first; first match wins:**
+Evaluate all `deliberation` triggers first. If none applies, evaluate every `fast` condition; otherwise use `standard`.
 
-| → `deliberation` if ANY                                                                                                                                                                                                                                              | → `fast` if ALL                                                                                              | → `standard` (default)                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| protocol change (§7); security / auth / secrets / payments / privacy / production infra; data migration / irreversible / destructive op; `strict_gate: true`; `auto_implement`; pipeline or action block (§12); public-API or persisted-schema break; > ~15 files / ~1000 LOC | fully reversible; ≤ ~3–5 files / ~300 LOC; no security or data surface; mechanically verifiable (lint / type / test) | everything that is neither forced to `deliberation` nor fully `fast` |
+| `deliberation` if ANY | `fast` if ALL | `standard` |
+| --- | --- | --- |
+| protocol change (§7); security/auth/secrets/payments/privacy/production infrastructure; migration/irreversible/destructive operation; `strict_gate: true`; `auto_implement`; pipeline/action (§12); public API or persisted-schema break; >~15 files/~1000 LOC | fully reversible; ≤~3–5 files/~300 LOC; no security/data surface; mechanically verifiable by lint/type/test | neither prior class |
 
-**Classifier ordering is normative and fail-safe:** evaluate all `deliberation` triggers
-first; if none fire, evaluate the `fast` conditions; otherwise `standard`. On any doubt or
-boundary case — the 6–14-file band, the `~300`–`~1000` LOC gap, or an unconfirmed-but-plausible
-security / privacy / production / data-migration / pipeline / API-break / schema-break
-trigger — **fail closed to the stricter track**: `standard` over `fast`, and `deliberation`
-over `standard`, until the risk is disproven.
+On doubt, use the stricter track until risk is disproved: standard over fast, deliberation over standard.
+This includes 6–14 files, ~300–~1000 LOC, and plausible unconfirmed security/privacy/production/migration/pipeline/API/schema risks.
 
-**Per-track behavior** (the invariants below hold on every track):
+| Aspect | `fast` | `standard` | `deliberation` |
+| --- | --- | --- | --- |
+| §9.0 readiness | skipped | full | full |
+| Phase 2 cross-review | skipped | at most 2, then escalate/upgrade | at most 3 after round 1, then escalate |
+| Consensus/FINAL | collapsed FINAL with signoffs | separate, drafted simultaneously | separate |
+| Reviewers | 1 model-diverse | 2 | all non-implementers |
+| Review consensus | reviewer's ACCEPT | reviewers who reviewed sign | all participants sign |
+| Fix-up | cap 1; fix-only verification permitted | cap 2; fix-only verification for narrow fixes | cap 5; strict_gate available |
+| Agent timeout | ~5 minutes | ~15 minutes | ~30 minutes |
+| Auto-advance | full, except the signoff | human gate at FINAL→implementation | human gate at each transition |
 
-| Aspect                        | `fast`                                     | `standard` (default)                        | `deliberation`                          |
-| ----------------------------- | ------------------------------------------ | ------------------------------------------- | --------------------------------------- |
-| §9.0 readiness ping           | skipped                                     | full                                        | full                                    |
-| Cross-review rounds (Phase 2) | skipped                                     | capped at 2, then escalate/upgrade          | capped at 3 after round 1, then escalate |
-| Consensus + FINAL (Phase 3–4) | collapsed: one `FINAL.md` with embedded signoffs | separate, drafted simultaneously        | separate                                |
-| Reviewers (Phase 6)           | 1 (model-diverse)                           | 2                                           | all non-implementers                    |
-| Review consensus (Phase 7)    | the one reviewer's ✅ = consensus            | reviewers who reviewed sign off             | all participants sign off               |
-| Fix-up (Phase 8)              | cap 1 cycle; fix-only verification ok       | cap 2 cycles; fix-only verify for narrow fixes | cap 5 cycles; `strict_gate` available |
-| Timeout per agent             | ~5 min                                      | ~15 min                                     | ~30 min                                 |
-| Auto-advance                  | full (pause only for the one signoff)       | auto-advance; human gate at FINAL→implementation | human gate at each transition      |
+This table overrides full-lifecycle defaults in §4, §5, §9.0, and §11.
+Read later "every participant/reviewer" duties through it; deliberation keeps their full form.
+The cause-derived §9.0 exception changes only reviewer minimums, never signer/refutation/other duties.
 
-**This table is the single authoritative per-track gate. It OVERRIDES the full-lifecycle
-defaults stated in the rest of §4 and in §5 (quorum), §9.0 (readiness), and §11 (transport).**
-Where a later phase says "every participant," "all reviewers," or "consensus is reached when
-every active participant signs off," read it through this table for `fast`/`standard`;
-`deliberation` uses the rule exactly as written elsewhere. The cause-derived
-single-reviewer exception in §9.0 changes only the numeric reviewer minimum;
-track-specific signer, refutation and other gates remain binding.
+Every track retains: an independent non-facilitator artifact (§1), refutation-default review, round-1 independence, append-only signoffs, canonical files, §14's human brake, English, and no secrets.
+Round-1 independence is a cooperative convention unless kickoff selects §11.B sub-branches or isolated staging.
+The reviewer count can shrink; refutation discipline cannot. `LE-N` tags are references; their rule text binds.
 
-**Invariants on every track (never dropped for speed):** at least one independent
-non-facilitator artifact (non-solo, §1); refutation-default review — the reviewer *count*
-shrinks by track, the refutation discipline never does; round-1 independence discipline
-(Phase 1; an unenforced cooperative convention unless kickoff selects §11.B sub-branches or
-per-agent isolated staging);
-append-only ✅/🟡/❌ signoffs; files-canonical audit trail; the §14 human brake; English-only;
-no-secrets. (Rules tagged `LE-N` below are the loop-engineering rules; the tag is only a
-reference id — the rule text is what binds.)
-
-**Binding, challenge & mid-idea upgrade.** The track is binding once Phase 0 closes, but any
-participant may **force-upgrade** to a stricter track — an `inbox/` note before round-1 closes,
-or a reviewer filing a MAJOR/CRITICAL finding that cites a trigger. Down-tiering below the
-classifier floor requires a recorded user OK. If implementation later reveals a higher-risk
-surface (e.g. it now touches auth), any participant force-upgrades and the idea **re-runs the
-current phase** under the stricter track's rules. Upgrading from `fast` also reinstates any
-phase `fast` skipped (cross-review, a separate consensus/FINAL step) for the remainder of the
-idea. With only two participants, `standard`'s "2 reviewers" degrades to 1 (the trigger
-accounts for roster size, not just risk).
+The track binds after Phase 0. Any participant can force-upgrade through an inbox note before round 1 closes.
+A reviewer can force-upgrade through a MAJOR/CRITICAL finding that cites a trigger.
+A lower track than the classifier floor requires recorded user approval.
+New implementation risk requires a stricter track and repetition of the current phase under its rules.
+An upgrade from fast also restores its skipped cross-review and separate consensus/FINAL phases for the remaining idea.
+With two participants, standard's two-reviewer rule becomes one; roster size and risk both affect the trigger.
 
 ### 4.0.1 — Loop-engineering rules (LE-N), in plain English
 
@@ -280,7 +255,7 @@ loop-engineering work). The tag is only a reference id; the rule text is what bi
 - **LE-1 — Refutation-default review.** A reviewer assumes the implementation is wrong and records concrete attempts to break each acceptance criterion; a "no findings" review counts only with refutation attempts shown.
 - **LE-2 — Driver auto-advance.** A deterministic driver may advance mechanical phase transitions; it never authors participant content or decides contested issues.
 - **LE-3 — Model diversity.** A reviewer sharing the implementer's model is likelier to rubber-stamp; `require_model_diversity: true` turns an all-shared-model reviewer set into a hard gate.
-- **LE-4 — Verification command.** `checks:` in `00-prompt.md` is the build/test gate the driver runs (as `sh -c`) at Phase 5/8. `checks:` accepts either a scalar command (today's behavior) or an optional named list of `{name, command}` criteria (each expects exit 0); the list form activates the **completion contract** — the driver runs every criterion and writes the per-criterion result table into the `## Validation evidence` section of `IMPLEMENTATION.md` each cycle (overwriting the prior entry; git history preserves earlier cycles), with output secret-scrubbed and truncated.
+- **LE-4 — Verification command.** The driver runs `checks:` through `sh -c` at Phase 5/8. A scalar command retains existing behavior. An optional named list of `{name, command}` criteria activates the **completion contract**; each command must exit 0. Each cycle, the driver replaces the `## Validation evidence` criterion table in the active execution record. Git history preserves earlier entries. Scrub secrets and truncate output.
 - **LE-5 — Loop budgets.** Driver runs are bounded by max steps / wall-clock / cost.
 - **LE-7 / LE-11 — Close-decision integrity.** Before an auto-driven close, a goal-done check verifies FINAL's observable acceptance criteria; it can only withhold a close, never establish one — a missing, self or unavailable checker, a failed run, or an inconclusive or reserved verdict leaves completion unverified and escalates, and a textual pass never replaces current-tree criterion evidence. Reservations or too-few reviewers escalate rather than close.
 - **LE-10 — Candidate remediation.** Remediation ideas may start as `status: candidate`.
@@ -295,6 +270,7 @@ The agent (or user) who starts the idea creates `ideas/<slug>/00-prompt.md`:
     created: YYYY-MM-DD
     track: fast | standard | deliberation   # §4.0; default standard; deliberation is forced by the classifier triggers
     participants: [<agent-id-1>, <agent-id-2>, ...]
+    organizer: <agent-id>       # optional ordinary-participant organizer; v2 succession uses §9.0
     roles:                         # optional; advisory per-idea lenses only
       <agent-id-1>: <lens-or-role>
       <agent-id-2>: <lens-or-role>
@@ -449,7 +425,7 @@ The drafter writes:
 
 `FINAL.md` is the **single source of truth**. If later invalidated, open a new idea (`<slug>-v2`) — do **not** edit the old FINAL. Update `00-prompt.md` `status: final` and optionally move the dir to `ideas/archived/<slug>/` after implementation.
 
-The sections above the References are **written at design time and frozen** with the rest of `FINAL.md` — it is static; the *living* companion is `IMPLEMENTATION.md` (Phase 5). For complex, `auto_implement`, designated (`implementer:` set), driver-managed, or pipeline ideas, `FINAL.md` plus `IMPLEMENTATION.md` MUST be self-contained enough that a fresh agent or the auto-drive driver can implement or resume **from them alone**, without session transcripts. **Observable acceptance criteria** state success as behavior a reviewer or the driver can check (e.g. "after X, Y is true"). For trivial or design-only ideas these added sections may be `N/A`.
+Freeze all sections above References at design time with `FINAL.md`. The active execution record (Phase 5) is its living companion. For complex, `auto_implement`, designated, driver-managed, or pipeline ideas, both artifacts MUST support implementation and resume without session transcripts. **Observable acceptance criteria** state behavior that a reviewer or driver can check. These added sections may be `N/A` for trivial or design-only ideas.
 
 **Idempotence & recovery** states what state matters, what is safe to rerun, and what needs a human gate; it is required for `auto_implement` / action / pipeline ideas, where the driver treats it as the recovery contract.
 
@@ -459,16 +435,71 @@ Before publishing `FINAL.md`, the drafter MUST verify that every active non-faci
 
 ### Phase 5 — Implementation
 
-Once `FINAL.md` is published, the idea moves from design to build. In a declared-facilitator run (`facilitator:` in `00-prompt.md`) the default is that participants implement and verify the code while the declared facilitator reads their verdicts and validator output — never implementing or verifying code itself unless `facilitator_participates: true` opts it back into participation. **Who implements is resolved by one chain, stopping at the first hit:** (1) the re-entry pin — `IMPLEMENTATION.md`'s `implementer:`, once Phase 5 has begun; (2) the per-idea designation — `implementer:` in this idea's `00-prompt.md`; (3) the standing global default — `[defaults].default_implementer`, read live from the layered config at dispatch time (§0); (4) today's chain — `FINAL.md`'s recorded `implementer:` / `drafted-by:`, else the first eligible participant (list order). The `00-prompt.md` field is a **designation** — an instruction about who should execute — while `IMPLEMENTATION.md`'s `implementer:` is the **outcome record** of who did. The per-idea field has four states: **absent** (no per-idea designation; the global default may still fire); **present with an empty value** (an incomplete designation — a blocking defect, never read as absent); **`none`** (a deliberate per-idea opt-out that suppresses the global default for this idea — no gate); or **an agent id** (a designation; `"quoted"` and `'quoted'` forms accepted). Validity gates are hard and fire on **any run that reaches an implementer, review-round, goal-check or fix-up action**: an empty value, an id outside this idea's eligible participants, or a malformed value blocks that run before it dispatches — a malformed value is never trimmed or repaired (`implementer: kimi-1  # note` is invalid, not `kimi-1`). A design-only run (`auto_implement` off) reaches none of these actions, so a defective designation stays latent until the idea is next run with `auto_implement` on. A **designated** participant who fails the §9.0 liveness ping blocks a Phase-5-reaching run behind a user-confirmed gate with exactly three recorded exits: re-designate to another eligible participant, record `implementer_waived: {agent-id} — {reason} — confirmed {date}`, or write `implementer: none`. A **global-default** id never gates: an unavailable designee, this idea's own non-participating facilitator, or a non-participant produces a one-line notice naming the designee, the cause, and those exits, and dispatch falls through to the fallback — only a malformed global-default value still hard-fails. When the pin and a live designation disagree, the driver escalates rather than honouring either silently; correction is an owner/author-recorded act — restore the designation to match the pin, or record `implementer_reassigned: {old-agent-id} to {new-agent-id} — {reason} — confirmed {date}` to retire the abandoned attempt and re-pin.
+The **active execution record** is `IMPLEMENTATION.md` before succession, then the handover selected by validated v2 history.
+That history takes priority over the legacy role chain below.
 
-Any other participant may volunteer to implement instead by posting a claim in `inbox/<from>-to-all_<slug>_impl-claim.md` (or the appropriate transport surface) before work begins; if no one else claims within a reasonable window, the drafter proceeds. **Under a live designation a claim does not override the designation** — it is surfaced as advisory information and answered by a one-line per-idea edit or a §4 escalation; with no designation, a claim is today's normal volunteer route. A designation names **who executes, never which gate applies**: quorum, roster, signoff weight and every attended boundary (core publication, channel publication, `parley protocol publish`) are unchanged and are never inherited by a designee. Designations are validated against the current `participants:` set (§9.0). Membership history is immutable; known signers come from that history and required signers from the current set. Nothing derives membership by subtracting `excluded:` markers. A per-idea designee or pinned implementer is never automatically excluded: a recorded automatic-exclusion failure opens the existing three-exit gate with its evidence prefilled. Where drafter and implementer coincide — never forbidden, two-participant decks need it — `IMPLEMENTATION.md` records the concentration in one line.
+After publication of `FINAL.md`, participants implement and verify code. A declared facilitator reads their verdicts and validator output.
+It does not implement or verify code unless `facilitator_participates: true` or §9.0 v2 succession permits implementation.
+
+Resolve the implementer through this chain. Stop at the first hit:
+
+1. Phase-5 re-entry pin: `IMPLEMENTATION.md` → `implementer:`.
+2. Per-idea designation: `00-prompt.md` → `implementer:`.
+3. Standing default: `[defaults].default_implementer`, from live layered configuration at dispatch (§0).
+4. `FINAL.md` → `implementer:` / `drafted-by:`, then the first eligible participant in list order.
+
+The prompt designation states who must execute. The implementation pin records who did execute.
+The per-idea field has four states: absent permits the global default; empty blocks as incomplete;
+`none` suppresses the global default without a gate; an agent ID designates that agent.
+Single and double quotes around an ID are accepted.
+
+Empty, malformed, or ineligible designations block every run that reaches an implementer, review-round, goal-check, or fix-up action.
+Never trim or repair malformed values: `implementer: kimi-1  # note` is invalid.
+A design-only run (`auto_implement` off) leaves that defect latent until a later implementation run.
+
+A per-idea designee that fails the §9.0 ping blocks a run that reaches Phase 5.
+The user-confirmed gate has exactly three recorded exits:
+re-designate an eligible participant; record `implementer_waived: {agent-id} — {reason} — confirmed {date}`;
+or set `implementer: none`.
+An unavailable, non-participant, or non-participating-facilitator global default does not block.
+Print one notice with the designee, cause, and those exits, then use the fallback.
+A malformed global default still blocks.
+
+A conflict between the pin and live designation escalates. The owner or author must record its correction.
+Restore the designation to the pin, or record
+`implementer_reassigned: {old-agent-id} to {new-agent-id} — {reason} — confirmed {date}`
+to retire the abandoned attempt and re-pin.
+
+Before work, another participant may claim implementation through
+`inbox/<from>-to-all_<slug>_impl-claim.md` or the transport surface.
+With no claim after a reasonable window, the drafter proceeds.
+A live designation makes the claim advisory. Answer it through a per-idea edit or §4 escalation.
+Without a designation, the normal volunteer route applies.
+
+A designation changes only the executor. It transfers no quorum, roster, signoff weight, or attended publication authority.
+Core publication, channel publication, and `parley protocol publish` retain their gates.
+Validate designations against current `participants:` (§9.0). Immutable history supplies known signers; current membership supplies required signers.
+Never derive membership by subtraction of `excluded:` markers.
+A per-idea designee or pin cannot be automatically excluded under the legacy rules.
+Its recorded failure opens the three-exit gate with evidence prefilled.
+The drafter may also implement, including with two participants. Record that concentration in the active execution record in one line.
+
+**V2 handover contract (§9.0).** The successor owns one `role-handover/<transition-id>.md`.
+Use ordinary `status:`/`implementer:` execution keys plus transition, predecessor, successor, roles, phase, base path/hash, branch, HEAD, and date.
+Add `## Takeover` and `## Resume state` to the existing living sections. State the next action and canonical resume paths.
+Before Phase 5, base is `none`. At implementation, this file must satisfy every Phase 5 field and required section below.
+Later handovers bind the previous execution record by exact hash. Preserve its bytes and inherit its progress, cycles, validation, and findings.
+One `ResolveActiveExecution` helper selects the tip from validated history, never filename order.
+Every current-state reader/writer uses it: dispatch, checks, evidence, status/wait/brief, review, goal check, and close.
+A missing/corrupt tip or changed base blocks without fallback. Completion updates the active record, never the predecessor.
+Commit history before handover dispatch. Only the selected successor can write the pending handover; ordinary work waits for validation.
 
 The implementer:
 
 - Creates a branch in the **target code repo** per that repo's branching convention (e.g. `feature/<slug>` off the integration branch).
-- For multi-file changes or changes outside `parley-deck/`, opens or updates `IMPLEMENTATION.md` with a short implementation plan/checklist before making code changes. For risky plans, the implementer may use the active transport surface or `inbox/` for a brief feedback window before proceeding. Reviewers may block material divergence from that plan through the normal review process. This is not a new phase or artifact.
-- Implements strictly to `FINAL.md`. Any unavoidable deviation is logged in `IMPLEMENTATION.md` — not silently absorbed into the code.
-- On completion, finalizes `ideas/<slug>/IMPLEMENTATION.md`:
+- Before multi-file changes or changes outside `parley-deck/`, open or update the active execution record with a short plan/checklist. Risky plans may receive a brief feedback window through the active transport or `inbox/`. Reviewers may block material divergence through normal review. This adds no phase or artifact.
+- Implement strictly to `FINAL.md`. Record unavoidable deviations in the active execution record.
+- On completion, finalize the active execution record with this schema:
 
         ---
         idea: <slug>
@@ -483,48 +514,44 @@ The implementer:
         ---
 
         ## Summary of work
-        (What was built. Which parts of FINAL.md this covers.)
+        (Work completed and FINAL.md coverage.)
 
         ## Implementation plan / checklist
-        (Required before multi-file changes or changes outside `parley-deck/`; "N/A" is valid for trivial or design-only work.)
+        (Plan before multi-file or non-deck changes; "N/A" for trivial/design-only work.)
 
         - [ ] Files or areas to change:
         - [ ] Checks to run:
         - [ ] Review or risk notes:
 
         ## Deviations from FINAL.md
-        (Any divergence, with rationale. "None" is a valid answer.)
+        (Deviations and rationale; "None" is valid.)
 
         ## Notes for reviewers
-        (Areas that need extra attention, known trade-offs, out-of-scope items.)
+        (Review focus, trade-offs, and out-of-scope items.)
 
         ## Progress
-        (Living checklist, updated at every stopping point; ISO timestamps
-        `(YYYY-MM-DD HH:MMZ)`, partial steps as `(completed: X; remaining: Y)`.
-        Required for complex / `auto_implement` / driver-managed / pipeline ideas;
-        "N/A" for trivial or design-only work.)
+        (Checklist at each stopping point, with ISO timestamps `(YYYY-MM-DD HH:MMZ)`.
+        Use `(completed: X; remaining: Y)` for partial steps.)
 
         ## Decision Log
-        (Decisions made *after* FINAL.md — Decision / Rationale / Date·Author.
-        Deviations still go under `## Deviations from FINAL.md` above.)
+        (Decisions after FINAL.md: Decision / Rationale / Date·Author.
+        Record deviations under `## Deviations from FINAL.md`.)
 
         ## Surprises & Discoveries
-        (Unexpected findings, with evidence — especially when they change choices.)
+        (Unexpected findings and evidence, especially changes to choices.)
 
         ## Validation evidence
-        (Which FINAL.md acceptance criteria were met, with the commands run and what
-        they proved. When `checks:` is a list (LE-4 completion contract), the driver
-        populates this section automatically each cycle; the implementer does not
-        hand-write it.)
+        (Commands and their FINAL.md criterion evidence. For a `checks:` list, the driver
+        writes this section each cycle; the implementer must not write it manually.)
 
         ## Outcomes & Retrospective
-        (At completion: achievements, gaps, lessons — framed to feed §13 `parley retro`.)
+        (At completion: achievements, gaps, and lessons for §13 `parley retro`.)
 
-`IMPLEMENTATION.md` is the **living** companion to the static `FINAL.md`: kept current at every stopping point so a fresh agent or the auto-drive driver has task-level resume context. §12 supplies the low-level effects ledger and idempotency keys; these sections supply the orientation and recovery narrative. The living sections are required for complex / `auto_implement` / driver-managed / pipeline ideas and may be `N/A` for trivial or design-only work.
+Keep the active execution record current at every stopping point. It supplies resume context; §12 supplies the effects ledger and idempotency keys. Its living sections supply orientation and recovery. They are required for complex, `auto_implement`, driver-managed, or pipeline ideas; trivial or design-only work may use `N/A`.
 
-The implementer publishes `IMPLEMENTATION.md` (commit/PR/MR — see §11) and signals "open for review".
+Publish the active execution record through the §11 transport and signal "open for review".
 
-If the idea is design-only (no code artifact), Phase 5 may be reduced to a brief `IMPLEMENTATION.md` describing where the design output was applied. Phases 6–8 still apply unless the participants agree in `consensus.md` that review is not required.
+A design-only idea may use a brief active execution record that states where the design was applied. Phases 6–8 still apply unless `consensus.md` waives review.
 
 ### Phase 6 — Code review rounds
 
@@ -536,7 +563,7 @@ After a §9.0 exclusion, re-evaluate reviewer count using its cause-derived exce
 The sole reviewer must have a known distinct model even if `require_model_diversity`
 is false. Strict-gate, independent goal-check and historical-finding obligations remain.
 
-Once `IMPLEMENTATION.md` is published, every active participant **except the implementer** writes `ideas/<slug>/review/round-01/<agent-id>.md`:
+After publication of the active execution record, every active participant **except the implementer** writes `ideas/<slug>/review/round-01/<agent-id>.md`:
 
     ---
     agent: <agent-id>
@@ -592,7 +619,7 @@ into the next review artifact.
 ### Phase 7 — Review consensus
 
 A §9.0 exclusion does not dispose of historical signoffs or findings (§5).
-Required review-consensus signers follow the current participants through §4.0;
+Required review-consensus signers follow current participants, including a v2 successor, through §4.0;
 on deliberation every current participant, including the implementer, signs.
 The single-reviewer exception never withdraws retained dissent.
 
@@ -626,9 +653,10 @@ Signoff blocks use the same `✅ ACCEPT / 🟡 ACCEPT-WITH-RESERVATIONS / ❌ BL
 
 ### Phase 8 — Fix-up
 
-The implementer applies the **Agreed fixes** from `review/consensus.md` on the same branch. On completion, they append a new section to `IMPLEMENTATION.md`:
+Apply the **Agreed fixes** from `review/consensus.md` on the same branch.
+On completion, append the fix-up section to the active execution record:
 
-When `checks:` is a list (LE-4 completion contract), closing additionally requires the latest driver run to be all-pass at the current HEAD: the driver vetoes `status: complete` while any criterion fails (it can only fail a close claim, never auto-pass one — the same shape as `strict_gate`, and independent of it). A failing criterion is recorded in `## Validation evidence` and escalates via stopping judgment rather than auto-retrying.
+A `checks:` list requires the latest driver criteria to pass at current HEAD before close. The driver vetoes `status: complete` if any criterion fails. It never auto-passes a close claim; this gate is independent of `strict_gate`. Record failures in `## Validation evidence`. Escalate through stopping judgment without automatic retry.
 
     ## Fix-up cycle N
     status: complete
@@ -641,9 +669,9 @@ When `checks:` is a list (LE-4 completion contract), closing additionally requir
     ### Deviations from agreed fixes
     (Any item that turned out to be infeasible or required a different approach, with rationale. "None" is a valid answer.)
 
-They also update the top-level frontmatter: bump `status:` to `fix-up-cycle-N`, update `head-commit:`. Then publish per the active transport (see §11) with message `[<agent-id>] <slug>: IMPLEMENTATION.md fix-up cycle N — ready for re-review`.
+Update the active execution record's top-level frontmatter: bump `status:` to `fix-up-cycle-N`, update `head-commit:`. Then publish per the active transport (see §11) with message `[<agent-id>] <slug>: IMPLEMENTATION.md fix-up cycle N — ready for re-review`.
 
-Phases 6 → 7 → 8 repeat until a Phase 7 consensus lists **zero Agreed fixes**. At that point the implementer sets `status: complete` in `IMPLEMENTATION.md` frontmatter and publishes with `[<agent-id>] <slug>: IMPLEMENTATION.md — complete`. The implementation PR/MR is merged (B/C) or the idea is simply marked closed (A). Later invalidation follows the same rule as FINAL.md: open a new idea, do not edit the closed IMPLEMENTATION.md.
+Repeat Phases 6 → 7 → 8 until Phase 7 lists **zero Agreed fixes**. Set `status: complete` in the active execution record. Publish with `[<agent-id>] <slug>: IMPLEMENTATION.md — complete`. Merge the implementation PR/MR (B/C), or mark the idea closed (A). Later invalidation requires a new idea. Never edit a closed execution record.
 
 #### Strict review gate (optional)
 
@@ -721,7 +749,7 @@ of a non-implementer verifies `FINAL.md`'s observable acceptance criteria. The s
 remaining reviewer may perform it in a fresh process. Its hard ceiling is the minimum
 of the active track's 5/15/30 minutes and a positive configured checker timeout;
 missing configuration uses the track bound, absent track means standard, and malformed
-track refuses. Goal execution, including protected checkers, uses the existing durable
+track refuses. Goal execution, including protected checkers, uses §9.0 v2 exhaustion suppression when applicable. Otherwise it uses the existing durable
 original-plus-one retry at that same frozen ceiling and the existing watchdog/buffering
 rules. A valid FAIL is final; retry never grants dropout authority or changes protected
 roles. A confident fail escalates. **The check can only withhold a
@@ -771,7 +799,8 @@ Escalation is not a veto — the user's answer becomes input to the next round l
 
 ## 5. Quorum and async participation
 
-- **Quorum = all agents listed in `participants:` of `00-prompt.md`.**
+- **Quorum = current `participants:` in `00-prompt.md`, reconciled with immutable §9.0 history.**
+- A frozen external facilitator enters quorum only through the v2 implementation-takeover exception. It supplies no floor seat or independent review.
 - **Quorum is set at the §9.0 pre-idea readiness check** and **locks once Phase 0
   completes.** Agents excluded there (with user confirmation or recorded §9.0 versioned automatic exclusion)
   do not count toward this idea's quorum; a mid-idea unavailability does not silently shrink quorum,
@@ -803,46 +832,29 @@ Escalation is not a veto — the user's answer becomes input to the next round l
 
 ## 7. Changing this protocol
 
-Open an idea under `ideas/meta-protocol-change-<topic>/` and run the full lifecycle (Phase 0 → Phase 4 at minimum; Phases 5–8 only if the change implies code work). The resulting FINAL.md supersedes this doc; the drafting agent updates `COOPERATION.md` in-place and logs the change in `meta/protocol-changelog.md`:
+Open `ideas/meta-protocol-change-<topic>/`. Complete Phases 0–4, plus 5–8 for code changes.
+FINAL.md supersedes this document. The drafter updates `COOPERATION.md` and `meta/protocol-changelog.md`:
 
     ## YYYY-MM-DD — <short description>
     Idea: ideas/meta-protocol-change-<topic>/
     Drafted by: <agent-id>
     Summary: <1–2 sentences>
 
-**Blast radius — a CORE change is not a deck change.** The protocol is moving to a single global
-core in `~/.parley/protocol/core/<version>/`, of which each deck's `COOPERATION.md` is a generated
-view (idea `meta-protocol-change-global-core-protocol`). One core change therefore reaches every
-project at once, so the two are not the same act:
+**Global core:** `~/.parley/protocol/core/<version>/` supplies generated views across projects.
+Changes require a meta idea and explicit user ratification. Only the owner publishes write-once releases; symlinked stores refuse.
+`parley protocol publish` requires a controlling terminal; ordinary pipes and `/dev/null` fail.
+This prevents quiet/normal-path changes, not privileged access: an agent can allocate a pty.
+Agents propose only. No agent-accessible publication path writes a release.
 
-- A **core** change requires the meta-protocol-change idea above **and explicit user ratification**.
-  **Changing the global core is the user's call, and the tooling is built to keep it that way.**
-  It is a rule backed by mechanism, not a proof: an agent runs with the user's own privileges, so
-  what the tooling guarantees is that a change cannot happen *quietly* or *through the normal
-  path* — releases are write-once and `parley protocol publish` refuses without a
-  controlling terminal. That refusal stops an ordinary agent run, whose stdin is a pipe or
-  `/dev/null`; it does not stop an agent that allocates a pty. An agent that needs different rules
-  proposes them; it does not apply them.
-- A **deck** change — the deck's own overlay (`parley-deck/protocol-overlay.md`) — is a smaller act
-  and goes through a normal idea in that deck. The overlay is **partially implemented**: the file
-  grammar, the `parley.protocol-lock/v2` lock and composition at the terminal boundary exist and are
-  extend-only; the roster-annotation identity slot and the removal of prose-matched zone addressing
-  do NOT. Do not rely on the parts that are absent.
+**Deck overlay:** `parley-deck/protocol-overlay.md` affects one deck under its normal idea process.
+Implemented: file grammar, `parley.protocol-lock/v2`, extend-only terminal-boundary composition.
+Not implemented: roster-annotation identity slot or removal of prose-matched zone addressing. Do not rely on them.
 
-**Not yet in force — do not rely on it.** Per-idea version pinning (an open idea completing under
-the version it started with) and the `DETECTED-UNATTRIBUTED` tamper signal are **ratified but not
-implemented**. They are ranks 2 and 4 of the implementation plan. Until they ship, an idea does NOT
-carry a pinned protocol version, and this section states that rather than describing an intended
-future as present fact. What IS in force today, and no more than this: releases are
-write-once and are refused through a symlinked store, `parley protocol publish` refuses when it
-cannot see a controlling terminal (which stops an ordinary agent run, not one that allocates a
-pty), and no agent-accessible code path writes a release.
+Per-idea version pinning and `DETECTED-UNATTRIBUTED` tamper detection remain unimplemented (ratified ranks 2 and 4).
+Open ideas are unpinned. Only write-once, symlink, and terminal gates are active.
 
-**Carve-out — a version sync is not a protocol change.** Adopting an upstream-ratified
-protocol version via the §9.0 freshness sync — when it is additive/compatible and
-preserves the project-specific zones — is a maintenance sync, **not** a protocol change,
-and does **not** require a meta-protocol-change idea. A breaking sync pauses for user
-confirmation (§9.0); any genuine *new* rule still goes through this section.
+**Version-sync exception (§9.0):** upstream-ratified additive/compatible adoption needs no meta idea if project-specific zones remain intact.
+A breaking sync requires user confirmation. New rules still follow this section.
 
 ## 8. Inbox (lightweight channel)
 
@@ -858,7 +870,7 @@ Examples:
 
 Inbox messages are outside the round/consensus protocol. Recipients read them at session start. If an inbox thread starts to look like a design discussion, promote it to `ideas/<slug>/`.
 
-Mid-round discoveries, handoffs, and progress notes may use `inbox/`, but substantive decisions and positions that influence a phase transition MUST be mirrored in the next round/review file, `consensus.md`, `FINAL.md`, or `IMPLEMENTATION.md`. Inbox messages are coordination aids, not a substitute for canonical artifacts.
+Use `inbox/` for discoveries, handoffs, and progress notes. Mirror phase-affecting decisions and positions into the next round/review, `consensus.md`, `FINAL.md`, or active execution record. Inbox notes never replace canonical artifacts.
 
 **In transports B and C**, casual inbox-style chatter _may_ additionally happen in PR/MR conversations or in a dedicated chat channel, but **escalations to the user (`to-user`) and any handoff that influences phase transitions MUST be filed as inbox files**. PR/MR threads are too easy to bury and not durable enough for audit purposes.
 
@@ -877,7 +889,7 @@ requires a normal idea/round/consensus artifact authored by a participant.
 3. Round 1 = independent analysis; later rounds = cross-review.
 4. Consensus = all ✅ signoffs in `consensus.md`. In B/C, also mirrored by native PR/MR review approvals; the file wins on conflict.
 5. The **idea initiator** (`author:` in `00-prompt.md`) drafts `FINAL.md`. Closing the idea is a single transaction (commit in A, PR/MR merge in B/C) that sweeps in any orphaned files.
-6. Full dev flow: **idea → implementation → code review → fix-up**. The implementer resolves by one chain — the `IMPLEMENTATION.md` pin, a per-idea `implementer:` designation, the owner-set `[defaults].default_implementer` (ships unset), then today's chain — `FINAL.md`'s recorded implementer/drafter, else the first eligible participant; every non-implementer participant reviews; the same signoff mechanism gates each cycle; fix-up/review iterates until zero Agreed fixes.
+6. Flow: **idea → implementation → review → fix-up**. Validated v2 role history has priority. Otherwise use the Phase 5 chain: implementation pin, per-idea designation, owner-set default (unset initially), FINAL implementer/drafter, first eligible participant. Every non-implementer reviews. Signoffs gate each cycle; repeat until zero Agreed fixes.
 7. **Any agent can escalate to the user** via `inbox/<from>-to-user_...md`. The user's answer is quoted into the next round/review file for the audit trail.
 8. **English only** in every `parley-deck/` file _and_ every PR/MR description, comment, review, or commit message (unless the project deliberately overrides).
 9. Change the protocol the same way you'd change any other artifact: open an idea.
@@ -909,36 +921,50 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
     confirmation**, except the versioned automatic-exclusion rule below, and is recorded in `00-prompt.md`
     (`excluded: [<roster-id> — reason — confirmed <date>]`). Exclusion is **per-idea and
     temporary**: the agent stays in the §2 roster and is re-probed at the next idea.
-  - **Automatic exclusion** (quota v1 and participant-failure v1; ideas
-    `meta-protocol-change-quota-auto-exclude` and `meta-protocol-change-participant-dropout`).
-    Only CLI-recorded decisions authorize reduction; no prose/disagreement/time inference or roster edits.
-    - **Policy.** The single presence-aware `[defaults].quota_auto_exclude` boolean follows machine →
-      deck → idea precedence; per-idea false opts out. New ideas freeze enabled,
-      scope `kickoff-and-mid-idea`, trigger `participant-failure-v1`. Saved absent-trigger policies
-      retain quota-only behavior and identical bytes/hashes; unrecorded legacy ideas retain confirmation.
-      Scope/trigger are immutable authority projected into the prompt. Upgrade/resume never widens
-      them; widening requires owner-bound revision. Unknown/null/duplicate/malformed fields fail closed.
-    - **Participant failure.** A non-protected dispatched step has two attempts total: original plus
-      one retry after five seconds at the same ceiling; watchdog retry uses that same second slot.
-      Eligible streaming participant-failure steps (including headless signoffs) use existing
-      supervisor defaults: first output 120s, stall 300s after activity, heartbeat 60s. Heartbeats
-      never count as activity. Supervisor `no_first_output`/`stalled`/`timeout` outcomes enter the
-      same two-attempt path only after child cleanup; elapsed time/prose alone is not evidence.
-      Honor configured overrides/disables and truthful buffering declarations. Final-text-only
-      transports (including zcode and default Claude text output) disable soft guards; hard ceilings
-      still bound them. Readiness90s stays; goal checks use Phase 8's track/configuration ceiling;
-      manual `agents exec` and interactive paths remain hard-ceiling-only. A declared buffered
-      transport cannot be diagnosed promptly from silence; no universal early-drop claim is made.
-      Exec/ACP child errors of any code, crashes/start failures, watchdog/timeout and missing/invalid
-      own output qualify. Valid output, including BLOCK/disagreement, on either attempt wins.
-      Parent cancellation, policy/budget/protocol/telemetry refusal, unresolved writers and tampering
-      never authorize dropout. Preserve invalid own output before retry;
-      shared edits stop for repair. Bind idea/agent/logical step: restart, run ID and
-      prompt edits grant no third attempt. Unsettled starts need host/boot/PID stopped-writer
-      proof, never invented success. Kickoff uses the same bound within its proposed readiness batch.
-      Rule `participant-failure.v1` uses supervisor facts, independent of quota recognition. Bind both
-      invocation IDs/linkage, step, terminal/exit/watchdog class, validator reason, UTC times and verbatim
-      evidence (secret redaction/visible truncation only); full logs/partials stay private.
+  - **Automatic exclusion** (versioned quota and participant-failure policy).
+    Only CLI-recorded decisions authorize it. Prose, disagreement, elapsed time, and roster edits supply no authority.
+    - **Policy.** Presence-aware `[defaults].quota_auto_exclude` follows machine → deck → idea; per-idea false opts out.
+      New ideas freeze enabled, scope `kickoff-and-mid-idea`, trigger `participant-failure-v2`.
+      Saved v1 behavior stays unchanged. Saved omitted-trigger policies keep quota-only behavior and identical bytes/hashes.
+      Unrecorded legacy ideas require confirmation. Immutable scope/trigger project into the prompt; upgrade/resume never widens them.
+      Widening requires owner-bound revision. Unknown, null, duplicate, or malformed fields block.
+    - **Two-attempt path.** Except v2 exhaustion below, a non-protected step gets the original attempt plus one retry after five seconds.
+      Both attempts use the same ceiling; watchdog retry consumes the second slot.
+      Eligible streaming steps, including signoffs, use first output 120s, stall 300s after activity, heartbeat 60s.
+      Heartbeats are not activity. Honor configured overrides/disables and truthful buffering.
+      Buffered final-text transports, including zcode and default Claude text, disable soft guards; hard ceilings remain.
+      Readiness stays 90s. Goal checks use Phase 8's track/configuration ceiling. Manual `agents exec` and interactive paths remain hard-ceiling-only.
+      Buffered silence cannot support a universal early-drop claim.
+      Exec/ACP errors of any code, crashes/start failures, missing/invalid own output, and supervisor `no_first_output`/`stalled`/`timeout` qualify after cleanup.
+      Valid output, including BLOCK/disagreement, on either attempt wins.
+      Parent cancellation, policy/budget/protocol/telemetry refusal, unresolved writers, and tampering never authorize dropout.
+      Preserve invalid own output before retry; shared edits block for repair. Bind idea, agent, and logical step.
+      Restart, run ID, and prompt changes grant no third attempt. Unsettled starts require host/boot/PID stopped-writer proof, never invented success.
+      Kickoff uses the same bound within its readiness batch.
+      Rule `participant-failure.v1` uses supervisor facts independently of quota recognition.
+      It binds both invocation IDs/linkage, step, terminal/exit/watchdog class, validator reason, UTC times, and verbatim decisive evidence.
+      Only secret redaction and visible truncation may alter it. Full logs/partials stay private.
+    - **Provider exhaustion in v2.** `provider-exhaustion.v1` requires failed execution and explicit exhausted account credit, token, quota, or named usage allowance.
+      Native authority requires CLI behavior/source and positive/adversarial fixtures. Unsupported adapters remain diagnostic-only.
+      The bounded zcode stderr exception below applies; no new gateway waiver exists.
+      Assistant text, quotes, tool output, `is_error`, generic quota text, context/response/session budgets, bare429/5xx, auth, overload, and watchdogs do not qualify.
+      Malformed, mixed, contradictory, or truncated framing/class evidence rejects. Reset proof is separate.
+      Short, absent, past, malformed, or contradictory resets become unknown; they never cause a retry of proven exhaustion.
+      The legacy 60-minute threshold stays unchanged. Valid output or an already in-flight later success wins.
+      Validate output before suppression. Persist invocation/validation proof before return.
+      A terminal-to-validation crash blocks admission until reconciliation without another child. Missing/corrupt pending proof blocks for repair.
+      After the first qualifying attempt, start no retry, probe, or reconnection for that identity in this idea, including protected roles.
+      Common admission enforces this across steps, prompts, runs, restart, policy downgrade/opt-out, recovery, and blocked membership batches.
+      SDK retries before terminal observation remain outside this boundary.
+      Scope is one agent in one idea. Provider/model/gateway labels prove no shared account; peer inference and machine caches are deferred.
+    - **Private zcode capture.** Default off; only owner machine configuration enables it, never ideas/prompts.
+      Capture failed-invocation stderr after termination, without provider calls. Keep scrubbed provider-error framing/fields only.
+      Remove credentials, authorization, cookies, prompts, requests, and unrelated responses before storage. Uncertain scrubbing writes nothing.
+      Store in `~/.parley/captures/zcode/`: directories 0700, exclusive files 0600, no symlinks.
+      Caps: 256 KiB/file, 2 MiB total, seven days. Each use deletes expired files, then oldest files to fit.
+      Mark removals `[REDACTED]` and caps `[TRUNCATED]`. Disable stops new captures. Owner purge/directory deletion gives immediate cleanup.
+      No idle deletion is guaranteed. Captures grant no authority or grammar expansion; lost required framing means incomplete evidence.
+      The follow-up's provenance/completeness review still applies.
     - **Legacy quota predicate (unchanged).** Require a failed invocation (nonzero exit or
       structured terminal provider error), no valid completed artifact and no later batch success.
       Native provider-error provenance needs CLI behavior/source plus positive/adversarial fixtures;
@@ -962,69 +988,72 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       Bare429, generic quota exceeded, bare credit balance, 5xx/reset timer, long Retry-After alone,
       400/auth/hang/watchdog do not qualify. Gateway-pool wording needs cause evidence; generic
       provider classification stays separate (bare503 cannot be excluded with --yes).
-    - **Batch/floor/gates.** `parley run` settles the exact proposed kickoff batch before the first
-      authoritative prompt/list/manifest; standalone preflight only reports. Mid-idea uses saved enabled
-      scope after ALL writers stop, before dispatch/signoff/close. Apply all eligible
-      candidates together or none, independent of order. Two distinct usable non-facilitators must remain;
-      facilitator never counts, even with facilitator_participates. Participant-failure mode requires
-      positive execution or validated phase evidence, including designee/pin when present; no role-only
-      seat or unresolved failure counted usable. An undeclared organizer must already be a protected
-      designee/pin/drafter or declare facilitator. Protect facilitator, designee, pin and started
-      consensus/FINAL/review-consensus drafters; their failure blocks the batch. Designee/pin uses
-      Phase 5's existing three-exit gate; global default before a pin is unchanged. Re-evaluate reviewer,
-      LE-7/LE-11, independent goal-check, model-diversity and strict_gate requirements BEFORE commit,
-      using the single-reviewer exception below where proved. Otherwise one blocking decision gives
-      candidates, evidence, usable arithmetic and owner options: another eligible model-diverse
-      reviewer process (recommended), attended evidence-backed continuation, or pause/abandon.
-      Select no substitute or waiver outside the exception. Standing owner authority may support
-      attended continuation; §1 remains unchanged.
-    - **Single-reviewer exception.** One independent non-implementer reviewer suffices only when
-      validated immutable history proves the latest membership-changing automatic transition reduced
-      at least two independent reviewers to exactly one. Its After must equal current membership;
-      Before and After contain the current implementer and sole reviewer. Every removed identity
-      must exactly match eligible typed `participant-failure.v1` evidence or recognized legacy rules
-      `quota.named-reset-ge-60m.v1`, `quota.account-exhausted-no-reset.v1`,
-      `quota.allowance-ge-24h-no-reset.v1` with their established provenance/reset constraints.
-      A settled prospective decision may supply that same proof before commit; it is not itself a
-      committed exclusion. Policy-only revisions preserve cause; any later manual/owner membership
-      change invalidates the old cause. Marker-only/manual exclusions, arbitrary rules, stale causes,
-      missing/corrupt/pending history and two-person-by-design ideas earn no exception.
-      The implementer and reviewer must have known, different models in the run's roster snapshot
-      (trimmed, case-insensitive; empty/unknown/cli-default is unknown), even with diversity disabled.
-      Where a CLI cannot bind/report a model, that snapshot is configured authority, not observed
-      model proof; an absent snapshot cannot qualify. Re-derive this one shared condition for
-      precommit, review, review consensus, goal check and close, never from writable gate metadata.
-      Only the numeric minimum becomes one: current signer duties, protected roles, floor,
-      reservations, retained dissent/findings, strict fresh full-scope zero-findings review (NITs
-      included) and current-tree AC evidence remain. A fresh process of the same reviewer may
-      goal-check. No qualifying record means unchanged gates; proactive manual exclusions remain
-      attended. Without a usable reviewer/floor, escalate once.
-    - **History/work/recovery.** Immutable kickoff/revisions bind current vs known membership;
-      kickoff drops never became known signers. Dispatch/await/required signers use current members;
-      never subtract markers or rewrite run.created/artifacts. Retain §5 obligations, partials and
-      earlier round.incomplete/failures. Only validated survivor artifacts allow a new terminal
-      round evaluation bound to the transition. Closed FINAL/IMPLEMENTATION stay frozen.
-      Before one checked-durable batch commit record idea/run, prior revision, Before/After, all
-      attempts, policy/scope/trigger and evidence. Saved enabled mid-idea scope serializes every
-      driving run for its lifetime; competitors serialize/refuse. Policy-off, unrecorded legacy
-      and kickoff-only driving stay unchanged. Reconcile prompt/manifest/consumers/evaluation before
-      dispatch/signoff/close. Pending commits recover; missing/contradictory/truncated authority
-      blocks. Read-only status/wait/brief agree on membership/drops/pending state and never repair.
-      Recovery cannot change history or resolve foreign/unknown writers. Organizer failover or
-      replacement agents stay outside this rule.
-    - **Notice/return.** Automatic markers show label, rule, UTC reset/unknown, scrubbed raw reset,
-      transition/date, never "confirmed". One idempotent non-blocking notice per applied batch lists
-      IDs, reasons, hints, survivors and gates. Create missing inboxes safely; blocked-kickoff
-      delivery failure prints the decision to stderr. Kickoff crash replay uses existing receipts;
-      preserve owner-edited/archived copies. Delivery failure is diagnostic, not rollback or proof
-      of delivery; unavailable storage has no exactly-once guarantee. Later failed batches preserve
-      history and get their own decision. Reduction is not wait exit4; wait refreshes membership.
-      Participant-failure dropout is permanent for this idea, including kickoff drops and every
-      revision/opt-out/downgrade/recovery/catch-up path. Dropped authors cannot sign or withdraw;
-      retained dissent needs a quoted owner ruling in the next artifact or abandonment/v2. Only
-      the next idea probes afresh. Legacy quota rejoin needs owner confirmation, never a timer;
-      its notice may suggest authorized relaunch at known reset+5min (provider estimate).
-      Participant failure has no reset/relaunch suggestion.
+    - **Batch and floor.** `parley run` settles the exact kickoff batch before the first authoritative prompt/list/manifest; standalone preflight only reports.
+      Mid-idea settlement uses saved enabled scope after ALL writers stop, before dispatch/signoff/close.
+      Apply all eligible candidates together or none, independent of order. Require two distinct usable non-facilitators.
+      A declared facilitator never counts, including participation or implementation takeover.
+      Participant-failure policies require positive execution or validated phase evidence, including designee/pin; unresolved failures and role-only seats do not count.
+      Legacy policies protect facilitator, designee, pin, and started consensus/FINAL/review-consensus drafters. Their failure blocks the batch.
+      An undeclared legacy organizer must hold a protected role or declare facilitator. A global default before its pin stays unchanged.
+      Designee/pin failure uses Phase 5's three-exit gate, except v2 exhaustion succession below.
+    - **V2 succession.** Freeze original participant order and organizer identity at kickoff. `organizer:` names an ordinary participant organizer.
+      Otherwise, `facilitator:` supplies it. Conflicts block; `author: user` supplies no identity.
+      The initial implementer may be unresolved. Before the first transition, resolve Phase 5's existing chain and bind its identity/source.
+      Unresolved affected roles block succession; ordinary participant loss can proceed. Malformed/conflicting authority still blocks.
+      Only exhaustion removes protected roles in v2. Protected transient failures keep legacy gates.
+      Settle all losses before selection: organizer loss transfers organization to the implementer; implementer loss transfers implementation to the organizer.
+      Both losses transfer both roles to the first remaining original participant. One holder of both counts as both losses.
+      Ordinary participant loss transfers neither role. The facilitator implementation restriction yields to this order.
+      The selected counterpart/first participant needs positive usability. Never skip an unusable selection or choose a new roster identity.
+      A frozen organizer outside membership permits a role-only transition.
+      If that frozen facilitator takes implementation, append it to current membership as a known/required signer.
+      This sole automatic membership addition supplies no floor seat or independent review.
+      Typed `role_transition.v1` history binds before/after membership and roles, source hashes, evidence, and one active handover pointer.
+      Validated history outranks retired pins/designations. Never fabricate `implementer_reassigned` confirmation.
+      Preserve predecessor bytes. The successor writes `role-handover/<transition-id>.md` under Phase 5's handover contract.
+      Until validation, admit only its selected author's handover action. Complete shared drafts stay, including unsigned drafts.
+      Missing drafts use current eligible selectors. Structurally valid incomplete shared drafts without signoffs may move byte-exactly to a recorded archive.
+      Bind original path, author, hash, and archive before successor authorship at the canonical path.
+      Any signoff, malformed identity/frontmatter, or truncated syntax blocks partial-draft recovery. Participant rounds/reviews never move.
+      Closed FINAL and execution records stay frozen. The CLI enforces supervised actions; an external organizer must follow the protocol itself.
+    - **Review gates.** Before commit, re-evaluate reviewer count, LE-7/LE-11, independent goal check, model diversity, and strict_gate.
+      A successor cannot review its own code. Its prior findings stay binding; require fresh independent current-tree evidence.
+      One reviewer suffices only when immutable history proves the latest automatic membership transition reduced ≥2 independent reviewers to exactly one.
+      After must equal current membership. Before and After contain the sole reviewer and, without succession, the same implementer.
+      For validated succession, count each set without its own implementer/facilitator. The successor belongs to After.
+      Only the frozen-facilitator exception permits the successor's absence from Before.
+      Every removed identity needs exact typed `participant-failure.v1`, v2 `provider-exhaustion.v1`, or legacy evidence:
+      `quota.named-reset-ge-60m.v1`, `quota.account-exhausted-no-reset.v1`, `quota.allowance-ge-24h-no-reset.v1`.
+      Retain each rule's provenance/reset constraints. A settled prospective decision supplies the same precommit proof, without committed exclusion authority.
+      Policy-only revisions preserve cause; later manual/owner membership changes invalidate it.
+      Markers, manual exclusions, arbitrary rules, stale causes, missing/corrupt/pending history, and two-person-by-design ideas earn no exception.
+      Implementer/reviewer models must be known and distinct in the run snapshot, even with diversity disabled.
+      Trim and compare case-insensitively; empty/unknown/cli-default and absent snapshots cannot qualify.
+      Unbound/unreported model values supply configured authority, not observed-model proof.
+      Re-derive this shared condition at precommit, review, review consensus, goal check, and close; writable gate metadata supplies no authority.
+      Only the numeric minimum changes. Keep signer duties, applicable protection, floor, reservations, retained dissent/findings, and current-tree AC evidence.
+      Strict review remains fresh, independent, full-scope, and zero-findings, including NITs. The same reviewer may goal-check in a fresh process.
+      Without eligible succession/floor/review, escalate once with candidates, evidence, arithmetic, and owner options:
+      an eligible model-diverse reviewer process (recommended), attended evidence-backed continuation, or pause/abandon.
+      Select no substitute or waiver automatically. Standing owner authority can support attended continuation; §1 stays unchanged.
+    - **History and recovery.** Immutable kickoff/revisions distinguish current and known membership; kickoff drops never became known signers.
+      Current members control dispatch/await/required signers. Never subtract markers or rewrite run.created/artifacts.
+      Retain §5 obligations, partials, and earlier incomplete/failure records. Only validated survivor artifacts permit transition-bound terminal re-evaluation.
+      Before checked-durable commit, bind idea/run, prior revision, Before/After, attempts, policy/scope/trigger, evidence, and role transition.
+      Saved enabled mid-idea scope serializes each driving run for its lifetime; competitors serialize/refuse.
+      Policy-off, unrecorded legacy, and kickoff-only driving stay unchanged.
+      Reconcile prompt/manifest/consumers/evaluation before dispatch/signoff/close. Recover pending commits; missing/contradictory/truncated authority blocks.
+      Read-only status/wait/brief agree on membership/drops/pending state without repair. Recovery never changes history or resolves foreign/unknown writers.
+      Other organizer failover and replacement agents remain outside this rule.
+    - **Notice and return.** Markers show label, rule, UTC reset/unknown, scrubbed raw reset, transition/date, never "confirmed".
+      One idempotent non-blocking notice per applied batch lists IDs, reasons, hints, survivors, gates, and takeover.
+      Create missing inboxes safely. Blocked-kickoff delivery failure prints the decision to stderr; crash replay uses existing receipts.
+      Preserve owner-edited/archived copies. Delivery failure is diagnostic, not rollback or delivery proof; unavailable storage has no exactly-once guarantee.
+      Later failed batches retain history and get their own decision. Reduction is not wait exit4; wait refreshes membership.
+      Participant-failure/provider-exhaustion drops are permanent through kickoff, revision, opt-out/downgrade, recovery, and catch-up.
+      Dropped authors cannot sign or withdraw. Retained dissent needs a quoted owner ruling in the next artifact or abandonment/v2.
+      Only the next idea probes afresh. Legacy quota rejoin needs owner confirmation, never a timer.
+      Its notice may suggest authorized relaunch at known reset+5min (provider estimate). Permanent dropout has no reset/relaunch suggestion.
   - **Re-including** an eligible legacy-excluded agent requires explicit user confirmation;
     participant-failure dropout cannot rejoin this idea (§5).
   - Excluding the last non-facilitator still requires the §1 user-authorized solo
@@ -1034,12 +1063,12 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
     same per-idea, user-confirmed waive.
   - **Designated implementer.** When the launched idea designates an implementer
     (`implementer:` in `00-prompt.md`, or the standing `[defaults].default_implementer`),
-    the designee's ping result is what §4 Phase 5's availability rules read: a per-idea
+    the designee's ping result is what §4 Phase 5's availability rules read: except v2 exhaustion succession above, a per-idea
     designee failing the ping gates a Phase-5-reaching run behind the recorded three-exit
     confirmation; a global-default designee failing it is surfaced as a one-line notice and
     dispatch falls through to the default chain — there is no gate at that layer.
 
-Declaring `facilitator:` makes the pure organizer this idea's default: participants own drafting, implementation, and code verification while the facilitator reads their verdicts and validator output (`facilitator_participates: true` restores full participation).
+Section 9.0 v2 exhaustion succession can transfer implementation to a declared facilitator. Otherwise, declaring `facilitator:` makes the pure organizer this idea's default: participants own drafting, implementation, and code verification while the facilitator reads their verdicts and validator output (`facilitator_participates: true` restores full participation).
 
 Then proceed with the per-agent session-start checklist:
 
@@ -1065,7 +1094,7 @@ Then proceed with the per-agent session-start checklist:
 4. **Transport B/C only:** check the project's open PRs/MRs for any titled `[<slug>] design` or `[<slug>] implementation` where you are a requested reviewer or assignee. If any is awaiting your action that maps to a missing file in §3, that file is what you owe — write it first.
 5. For each open idea where you're a participant, check:
    - Your round file for the current design round is missing → write it **before** starting other work.
-   - `IMPLEMENTATION.md` exists and `review/round-0N/<your-id>.md` is missing → write your review file **before** starting other work.
+   - The active execution record exists and `review/round-0N/<your-id>.md` is missing → write your review file **before** starting other work.
 6. Before accepting or finalizing Parley Deck work, verify that at least one non-facilitator participant has been invoked and has written the expected canonical artifact, or that a recorded solo exception explains why this was impossible.
 7. Only then proceed to the user's current task.
 
@@ -1100,13 +1129,13 @@ The simplest transport. Everything happens through commits to `parley-deck/` in 
 3. Sweeps any uncommitted contributions from other agents (with permission, or after a reasonable interval).
 4. Bundles all of the above into a **single commit** with message `[<drafter>] <slug>: FINAL.md + close idea`. The body summarizes what was included (and notes any swept-in files authored by others).
 
-**Phase 5 — Implementation.** Implementer creates `feature/<slug>` in the target code repo, implements, then commits `IMPLEMENTATION.md` to `parley-deck/` with message `[<agent>] <slug>: IMPLEMENTATION.md — ready for review`. The `branch:` field in IMPLEMENTATION.md frontmatter points at the code-repo branch.
+**Phase 5 — Implementation.** Create `feature/<slug>` in the target code repo. Implement, then commit the active execution record to `parley-deck/`. Use `[<agent>] <slug>: IMPLEMENTATION.md — ready for review`. Its `branch:` points at the code-repo branch.
 
 **Phase 6 — Code review.** Each non-implementer commits their `review/round-NN/<agent-id>.md`. No native review surface — discussion lives in the review files.
 
 **Phase 7 — Review consensus.** Drafter commits `review/consensus.md`; signoffs appended in follow-up commits.
 
-**Phase 8 — Fix-up.** Implementer pushes fix-up commits to `feature/<slug>` (in code repo), then updates `IMPLEMENTATION.md` (in parley-deck) with the fix-up cycle section and a new commit `[<agent>] <slug>: IMPLEMENTATION.md fix-up cycle N — ready for re-review`. When complete, status flips to `complete` in a final commit `[<agent>] <slug>: IMPLEMENTATION.md — complete`. The code-repo branch may or may not be merged — that is the code repo's own concern, not this protocol's.
+**Phase 8 — Fix-up.** Push fixes to the code repo's `feature/<slug>`. Add the cycle section to the active execution record. Commit with `[<agent>] <slug>: IMPLEMENTATION.md fix-up cycle N — ready for re-review`. At completion, set its status to `complete`; commit `[<agent>] <slug>: IMPLEMENTATION.md — complete`. The code repo controls whether its branch merges.
 
 **Inbox.** Files in `parley-deck/inbox/`, as described in §8.
 
@@ -1173,7 +1202,7 @@ The merge IS the close-idea transaction. After this point, the design discussion
 
 1. Creates branch `feature/<slug>` off the integration branch of the **code repo** (which may equal the parley-deck repo).
 2. Implements per the merged `FINAL.md` (referencing the parley-deck-repo commit SHA).
-3. On completion, commits `IMPLEMENTATION.md` on the implementation branch and opens the same PR as the code (it lives at `ideas/<slug>/IMPLEMENTATION.md`, which the recommended branch protection below requires a PR for — the previous wording said "directly … no PR needed" and contradicted it) with message `[<agent>] <slug>: IMPLEMENTATION.md — ready for review`. The frontmatter `implementation-pr:` field is filled in step 4.
+3. Commit the active execution record on the implementation branch, in the same PR as the code. Use `[<agent>] <slug>: IMPLEMENTATION.md — ready for review`. Section 11.B branch protection covers its `ideas/<slug>/` path. Fill its `implementation-pr:` field in step 4.
 4. Opens a **Draft PR** in the code repo titled `[<slug>] implementation` against the integration branch. Description references the merged design PR URL and the `FINAL.md` permalink. Labels: `implementation`, `phase:review-round-01`. Reviewers: all participants except the implementer.
 5. Switches the PR to Ready-for-review when implementation is complete (i.e. when reviews can begin).
 
@@ -1195,13 +1224,13 @@ The implementer responds in Phase 7, not via a PR review.
 **Phase 8 — Fix-up.** Implementer:
 
 1. Pushes fix-up commits to `feature/<slug>` in the code repo.
-2. Updates `IMPLEMENTATION.md` in parley-deck (new fix-up cycle section, bumped frontmatter) with commit `[<agent>] <slug>: IMPLEMENTATION.md fix-up cycle N — ready for re-review`.
+2. Update the active execution record with the cycle section and frontmatter. Commit `[<agent>] <slug>: IMPLEMENTATION.md fix-up cycle N — ready for re-review`.
 3. **Re-requests review** from the participants on the implementation PR (GitHub: dismiss stale reviews if needed and click _Re-request review_).
 4. Bumps the PR label to `phase:review-round-(N+1)` or `phase:review-consensus` as appropriate.
 
 Phases 6 → 7 → 8 iterate until a Phase 7 consensus lists **zero Agreed fixes**. When that consensus is reached:
 
-1. Implementer sets `status: complete` in `IMPLEMENTATION.md` frontmatter, commits `[<agent>] <slug>: IMPLEMENTATION.md — complete`.
+1. Set `status: complete` in the active execution record. Commit `[<agent>] <slug>: IMPLEMENTATION.md — complete`.
 2. Implementer **merges the implementation PR** (Merge commit, not squash) with message `[<agent>] <slug>: implementation — complete`.
 3. PR label flips to `phase:complete`. Branch is deleted.
 
@@ -1312,7 +1341,7 @@ The protocol works for any number of agents ≥ 2. Roles, models, and runtimes a
 ### 12.1 Block model
 A pipeline is an ordered list of **blocks**. Each block is exactly one invocation of the existing cooperation engine; the pipeline layer only sequences blocks, records gates, and (for action blocks) executes approved side effects through the driver. Block kinds:
 - `deliberation` — runs Phase 1–4, produces one typed stage artifact.
-- `implementation` — runs Phase 5–8 unchanged, produces `IMPLEMENTATION.md` plus code state.
+- `implementation` — runs Phase 5–8 unchanged; produces the active execution record and code state.
 - `action` — runs Phase 1–4 to reach consensus on an action plan, then enters `execute`, a driver-only sub-phase that performs approved side effects.
 - `watcher` — defines monitoring/alerting policy; breach handling opens a gated follow-up by default.
 
@@ -1364,7 +1393,7 @@ A retro pass selects a diverse set of hard past cases (the **coreset**), diagnos
 - **Protocol harness** — `COOPERATION.md` and any in-repo copy kept in lockstep by the drift guard. Changeable only via a meta-protocol-change idea (§7) with human approval; a retro pass must never edit it directly.
 - **Runtime / shared harness — Repository Instruction Files** — tracked, shared files: skills, CLI behavior, helper scripts, docs, and repo-level instruction files. Changeable via an ordinary idea and the full review gate (a meta idea if the change alters protocol semantics).
 - **Local harness — Agent Local Memory** — operator-local, non-canonical state (caches, ignored launch config, per-machine memory). A retro pass may report observations only; it must never canonicalize them or infer protocol rules from one operator's local setup.
-- **Evidence corpus** — structured Parley Deck artifacts (`ideas/*` rounds, `review/`, `consensus.md`, `FINAL.md`, `IMPLEMENTATION.md`, run event logs) are the primary evidence. Raw session transcripts are secondary, off by default, and quarantined; include them only with recorded provenance. Within this corpus, a retro pass SHOULD surface **confident-error** signals — a dismissed `CRITICAL`/`MAJOR` finding, an unsupported assumption that shaped `FINAL.md`, or a missed risk that caused fix-up churn — drawn from the `IMPLEMENTATION.md` Outcomes & Surprises sections and the `consensus.md` blind-spots fields. This is diagnostic evidence only: **never** a new review severity, a blame label, or a merge gate.
+- **Evidence corpus** — structured Parley Deck artifacts (`ideas/*` rounds, `review/`, `consensus.md`, `FINAL.md`, `IMPLEMENTATION.md`, `role-handover/`, run event logs) are the primary evidence. Raw session transcripts are secondary, off by default, and quarantined; include them only with recorded provenance. Within this corpus, a retro pass SHOULD surface **confident-error** signals — a dismissed `CRITICAL`/`MAJOR` finding, an unsupported assumption that shaped `FINAL.md`, or a missed risk that caused fix-up churn — drawn from the active execution record's Outcomes & Surprises sections and the `consensus.md` blind-spots fields. This is diagnostic evidence only: **never** a new review severity, a blame label, or a merge gate.
 
 ### 13.3 Acceptance gate
 
@@ -1387,42 +1416,31 @@ Changing this section follows §7 (a meta-protocol-change idea). This section wa
 
 ## 14. Automated outer loop (loop engineering) — the human brake
 
-Parley Deck is a loop-engineering substrate: the human (or a full quorum) owns the
-*decisions*, and automation may own only *discovery*. Any **automated, standing, or
-scheduled loop** — anything not driven by a human in the current session: a cron job, a CI
-hook, an MCP trigger, the `parley loop tick` command — is bound by this brake.
+Humans or full quorum own decisions; automation can discover candidates.
+This brake binds every automated, standing, or scheduled loop without a human driving the current session.
+Examples include cron, CI, MCP triggers, and `parley loop tick`.
 
 ### 14.1 What an automated loop MAY do
 
-- Discover candidate signals (new commits, CI results, issues, a signals file, monitoring
-  breaches) and **draft Phase 0/1 prompts only**.
-- A loop-drafted idea is always a non-active **`status: candidate`**: it carries provenance
-  and a `## Promotion` note, and it does **not** claim a `participants:` quorum (the non-solo
-  Phase-0 invariant — a loop must not staff a quorum it cannot itself convene). This is the
-  same shape the §12.11 monitoring watcher uses.
+- Discover commits, CI results, issues, signal files, or monitoring breaches; draft only Phase 0/1 prompts.
+- Use non-active `status: candidate`, provenance, and `## Promotion`; claim no `participants:` quorum.
+  A loop cannot staff a quorum it cannot convene. Section 12.11 uses the same watcher form.
 
 ### 14.2 What an automated loop MUST NOT do without a recorded human or full-quorum gate
 
-- Promote a candidate to quorum (staff `participants:` / flip `status: candidate` →
-  `round-01`), or otherwise start a deliberation or a `parley run`.
+- Staff participants, promote candidate to round-01, start deliberation, or start `parley run`.
 - Implement, write code, or apply fixes.
-- Land, merge, push, or finalize (`FINAL.md` / closing an idea).
-- Modify the active roster (`parley-deck/agents.toml`; §2 is the generated view).
-- Override, bypass, reopen, or re-draft a consensus or signoff.
+- Land, merge, push, finalize FINAL, or close an idea.
+- Modify the active roster in `parley-deck/agents.toml`; §2 is its generated view.
+- Override, bypass, reopen, or redraft consensus or signoffs.
 
 ### 14.3 Fail-safe
 
-The brake is fail-safe by construction: when an automated loop is uncertain, it does **less**
-— it drafts a candidate and stops, or escalates to the inbox (§8) — never more. A scheduled
-tick that is disabled, mis-configured, or sees no new signals writes nothing and exits
-cleanly. Promotion of any candidate into an active idea is always a human action or an
-explicit manifest action, recorded in the idea and (where it changes phase) mirrored into the
-canonical round/consensus artifacts.
-
-Tooling that runs an automated loop (e.g. a `parley loop tick` command) is governed by this
-section but specified separately; such tooling is **disabled by default** and, even when
-enabled, may at most scaffold `status: candidate` idea prompts. This section was ratified by
-idea `automation-outer-loop` (2026-06-24).
+Uncertainty permits only a candidate draft and stop, or inbox escalation (§8).
+Disabled/misconfigured ticks and ticks without new signals write nothing and exit cleanly.
+Promotion requires a human or explicit manifest action, recorded in the idea and mirrored canonically when phase changes.
+Loop tooling follows this section but has a separate specification. It is disabled by default.
+Even enabled tooling may at most scaffold candidate prompts. Authority: `automation-outer-loop` (2026-06-24).
 
 ## 15. Verification integrity
 

@@ -1,16 +1,17 @@
 {
   "schema": "parley-addon/1",
   "files": {
-    "SKILL.md": "sha256:64d5236baa0aece207becaa9def8e6fba24776f148dd2289281efa0855341df1",
+    "SKILL.md": "sha256:33154bead53b8808a057fe5194c669acfcbac1a587ad38ac618d600f2c9c0ad6",
     "agents/manifest.yaml": "sha256:542b709e6d4f3aca26f4c77139734a269a0dbe6844cb4437a7aa00f04d7acdb7",
     "agents/openai.yaml": "sha256:238587fd55a9fcba856ca7183dcdd998bebcea1e1e6794e61c8325a04ff50d9c",
-    "references/ARTIFACT_TEMPLATES.md": "sha256:0f3cfe1b475c4958a56d5fbe0dfa1f077e5f5e6c41acb777922b6e172b698a1d",
-    "references/COOPERATION.md": "sha256:aae6e830dafcae1e60324a6e90df8c7dce04eb1cea8dee7d2618c38c179fe3ec",
-    "references/HEADLESS_LAUNCH.md": "sha256:cf73755465a2a96303019b49b66ea4aca8caf788da9243343f0ab127c7bab443",
-    "references/ROSTER_AND_PROTOCOL.md": "sha256:579f4a4375f50e3c15b5815dbc71d0579647e66f9831cf7f69be8960890d4750",
+    "references/ARTIFACT_TEMPLATES.md": "sha256:ca3afbc42baee3160b96eff4e2d794a6846fda81f8b83ebde749538825dcb431",
+    "references/COOPERATION.md": "sha256:b9284d7d7062ef49d59439a23117dd7434e494340b5b564a64651a12eb324709",
+    "references/EXHAUSTION_AND_HANDOVER.md": "sha256:9dcaa19cbf86086db9099c708357c262a9a470ccfaff619f8adca63a3d76e78b",
+    "references/HEADLESS_LAUNCH.md": "sha256:f90b2c6823e9aa3fcaa2add3306e6187d534f228b7ffcd5cd16c6db9f8460fdf",
+    "references/ROSTER_AND_PROTOCOL.md": "sha256:d2711122a882988b6d4dccce1ecd80ea85149d679d456d58435b16ed7f0208c0",
     "references/STE100.md": "sha256:f9eab1935e9681bf13360140cd3673f59598b66e64d94cb13b0ac6e35449ab63",
     "references/WORKED_EXAMPLES.md": "sha256:946bb5c0f76199651526e6a52eea158162e37051f58e553287864663b4f3c3cc",
-    "references/compatibility.json": "sha256:34779a4b65e057f0ec69226f31dfdf7c73300aa006907fcc9f631616b531cc76"
+    "references/compatibility.json": "sha256:376d960baac0c26b9b91fff18912195c2b7c227ef58135e89b55173871043ba6"
   },
-  "aggregate": "sha256:dd436c98a289a4a868e8bdaf129208220a09604ab6b5435d9aaef024d8c9becd"
+  "aggregate": "sha256:6f52032e7c0a4065e9a052f180b4a387d199afc6351c949969b84b562de0b483"
 }

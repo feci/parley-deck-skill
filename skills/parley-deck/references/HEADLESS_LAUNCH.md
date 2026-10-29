@@ -134,3 +134,12 @@ soft guards and retain the hard timeout. Custom streaming args may explicitly se
 buffers_stdout=false. Manual agents exec and interactive launches remain hard-only;
 this is not a universal early-hang detector. Roster snapshot identity where a CLI cannot
 bind/report its model is configured authority, not an observed native model claim.
+
+## Native exhaustion support
+
+Read `EXHAUSTION_AND_HANDOVER.md` before you interpret provider failures.
+Codex recognition requires explicit effective `exec --json` and discovered version exactly `0.165.0`.
+Default Codex text, other Codex versions, Kimi, and Claude remain diagnostic-only.
+Do not change default argv or persistent adapter configuration to obtain evidence.
+An opt-in JSON invocation needs ordinary smoke verification. Never induce exhaustion or probe again for evidence.
+Zcode retains the reviewed bounded grammar and its native-positive provenance limit.

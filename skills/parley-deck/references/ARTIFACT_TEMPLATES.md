@@ -347,3 +347,30 @@ After each fix-up cycle, the implementer also updates the top-level frontmatter 
 The new `## Fix-up cycle <N>` section is appended below the existing content. Do not rewrite earlier fix-up cycles.
 
 Repeat Phases 6-8 until review consensus lists zero agreed fixes. Then set `IMPLEMENTATION.md` frontmatter `status: complete` and publish/merge according to the selected transport.
+
+## Successor execution record
+
+Resolve the active execution path from validated typed role history before every current implementation read or write.
+Without role history, use the initial `IMPLEMENTATION.md`. A handover never rewrites its predecessor.
+Only the selected successor authors `role-handover/<transition-id>.md`:
+
+```yaml
+idea: <slug>
+transition: <immutable-transition-id>
+author: <successor>
+organizer: <after-organizer>
+implementer: <after-implementer>
+phase: <transition-phase>
+base: <prior-path-or-none>
+base-sha256: <exact-prior-hash-or-empty>
+takeover-branch: <branch-at-transition>
+takeover-head: <head-at-transition>
+date: YYYY-MM-DD
+status: in-progress
+```
+
+Include non-empty `## Takeover` and `## Resume state` sections. Name affected roles, the next action, and exact canonical resume paths.
+Before Phase 5, `base: none` is valid and supplies no review readiness.
+When implementation starts, add every ordinary Phase 5 field and section from the implementation template.
+Inherit progress, cycle count, evidence, and findings through the exact base chain. Never compact predecessor records.
+Complete shared drafts remain at their canonical paths. Only checked incomplete unsigned drafts may move through recorded archive authority.
