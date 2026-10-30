@@ -371,6 +371,7 @@ test("doctor reports missing and malformed installs", () => {
     "plugin.json",
     "references/ARTIFACT_TEMPLATES.md",
     "references/COOPERATION.md",
+    "references/EXHAUSTION_AND_HANDOVER.md",
     "references/HEADLESS_LAUNCH.md",
     "references/ROSTER_AND_PROTOCOL.md",
     "references/STE100.md",

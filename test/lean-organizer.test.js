@@ -56,10 +56,10 @@ const RELOCATION = {
 // The §9.0 pure-organizer sentence was missing from all three copies at round-01
 // review (kimi-1 K1-F1) and added in fix-up F20.
 const PROTOCOL_HUNKS = [
-  "a deck declaring `facilitator:` may run it as the pure organizer by default",
-  "In a declared-facilitator run (`facilitator:` in `00-prompt.md`) the default is that participants implement and verify the code",
+  "A declared `facilitator:` can act as pure organizer. Participants implement and verify; it reads verdicts.",
+  "After publication of `FINAL.md`, participants implement and verify code. A declared facilitator reads their verdicts and validator output.",
   "In a declared-facilitator run, code review and code verification stay with the participants by default",
-  "Declaring `facilitator:` makes the pure organizer this idea's default",
+  "declaring `facilitator:` makes the pure organizer this idea's default",
   "`parley protocol packet --audience facilitator`",
   "may re-orient from the computed `parley organizer brief`",
   "one blocking `parley wait`",

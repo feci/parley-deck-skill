@@ -61,7 +61,7 @@ Before starting work, verify that the workflow plan covers all applicable protoc
 - Phase 2 cross-review rounds: each participant writes its own next-round file, explicitly addresses every other participant, and provides counter-proposals for disagreements.
 - Phase 3 consensus: draft `consensus.md`, then each participant appends its own signoff block. All active participants must accept, or blockers start another round.
 - Phase 4 finalization: the initiator or agreed drafter writes `FINAL.md`, updates status, and closes the idea per transport rules.
-- Phase 5 implementation: the implementer resolves by one chain — the `IMPLEMENTATION.md` pin, a per-idea `implementer:` designation in `00-prompt.md`, the standing `[defaults].default_implementer` (ships unset), then today's chain — `FINAL.md`'s recorded implementer/drafter, else the first eligible participant; a claim does not override a live designation (**with no designation, a claim remains the normal volunteer route**); implementation must follow `FINAL.md`; deviations go into `IMPLEMENTATION.md`.
+- Phase 5 implementation: the implementer resolves by one chain — validated role history, then the initial `IMPLEMENTATION.md` pin, a per-idea `implementer:` designation in `00-prompt.md`, the standing `[defaults].default_implementer` (ships unset), then today's chain — `FINAL.md`'s recorded implementer/drafter, else the first eligible participant; a claim does not override a live designation (**with no designation, a claim remains the normal volunteer route**); implementation must follow `FINAL.md`; deviations go into `IMPLEMENTATION.md`.
 - Phase 6 code review: every non-implementer writes `review/round-NN/<agent-id>.md` with fixed severities `CRITICAL`, `MAJOR`, `MINOR`, and `NIT`.
 - Phase 7 review consensus: draft `review/consensus.md`; all participants append signoffs; agreed fixes, deferred follow-ups, and dismissed findings are explicit.
 - Phase 8 fix-up: implement agreed fixes, update `IMPLEMENTATION.md`, repeat review until there are zero agreed fixes, then mark complete.
@@ -265,12 +265,12 @@ effort — same model, same effort, faster output — never a downgrade.
 The live protocol's §9.0 binds the decision. `[defaults].quota_auto_exclude` is the
 single presence-aware boolean: machine → deck → idea precedence, with
 `quota_auto_exclude: false` as the per-idea opt-out. New ideas freeze enabled,
-`scope: kickoff-and-mid-idea`, `trigger: participant-failure-v1`. Saved omitted-trigger
+`scope: kickoff-and-mid-idea`, `trigger: participant-failure-v2`. Saved omitted-trigger
 policies retain quota-only semantics and serialized hashes; upgrades/resumes never
 widen them. Explicit owner-bound revisions may widen a saved policy. No roster/model
 changes; `roster_change_policy` does not gate an idea-local reduction.
 
-The new trigger gives a dispatched non-protected participant its original attempt
+Non-exhaustion participant failure gives a dispatched non-protected participant its original attempt
 and one retry after five seconds with the original ceiling. Any child error, crash,
 timeout/watchdog or missing/invalid own artifact qualifies after both failures.
 Watchdog retry shares the slot; durable idea/agent/logical-step identity prevents a
@@ -281,7 +281,7 @@ Raw partial output remains private; tampering stops for repair.
 
 The whole batch applies or none, after writers stop. The floor is two positively
 usable non-organizers including the designee/pin when present. Roles alone supply
-no usable seat. Protected organizer/implementer/drafters remain protected. Existing
+no usable seat. Protected transient failures retain their gates. Proven v2 exhaustion follows `EXHAUSTION_AND_HANDOVER.md`. Existing
 reviewer/diversity/strict/goal-check gates run BEFORE commit. Only the §9.0 causal
 exception permits one reviewer: validated latest automatic history (or its settled
 prospective decision) must prove the exact >=2-to-1 loss, with typed failure or recognized
@@ -495,3 +495,5 @@ When the skill or workflow exposes a protocol ambiguity that should persist for 
 ## Keep It Small
 
 Run the minimum number of rounds needed for the user's goal. Do not add new skills, scripts, roster entries, transports, or protocol changes unless the user approves them.
+
+For v2 exhaustion, owner-order succession, active execution records, and capture controls, read `EXHAUSTION_AND_HANDOVER.md`.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.20.0 — 2026-10-29
+
+- Document v2 native exhaustion, immediate suppression, owner-order succession, and successor-owned execution records.
+- Preserve saved policies, independent review, exact predecessor bytes, and all filed positions.
+- Explain exact Codex JSON support, Zcode provenance limits, machine-only private capture, and account-alias scope.
+- Apply the signed protocol hunks within the existing skill and packet limits. Core publication remains owner-only.
+
 ## 2.19.0 — 2026-10-13
 
 - Adopt ASD-STE100 Issue 9 for new English protocol prose. Add an on-demand working summary and a short skill pointer.
