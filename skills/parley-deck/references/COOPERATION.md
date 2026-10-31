@@ -99,6 +99,7 @@ multi-agent execution was impossible.
 If auth, CLI, timeout, permission, or tool failure prevents every other agent from participation,
 stop before merge, finalization, or a completion claim. Report the blocker. Only an explicit user
 solo exception permits continuation. Record that exception in `inbox/` or the idea's protocol notes first.
+A §9.0 v3 automatic exclusion is a standing owner exception.
 
 ### Participant sizing and lenses
 
@@ -587,7 +588,7 @@ After publication of the active execution record, every active participant **exc
 
 **Refutation-default (LE-1).** Reviewers assume the implementation is wrong until they fail to break it: for each observable acceptance criterion, attempt a failing case or run the relevant check, and record those attempts under `## Refutation attempts`. A "no findings" review is credible only with refutation attempts recorded — the driver's review-artifact validation requires the section. **Model diversity (LE-3):** a checker sharing the implementer's model is likelier to rubber-stamp; under auto-drive the driver warns when every reviewer shares the implementer's model, and `require_model_diversity: true` makes it a hard gate.
 
-If there is no invokable non-implementer reviewer, the implementation MUST NOT be merged or marked complete under Parley Deck. The implementer MUST report the blocker and continue only after either another reviewer is added or the user explicitly authorizes a recorded solo exception.
+If there is no invokable non-implementer reviewer, the implementation MUST NOT be merged or marked complete under Parley Deck. The implementer MUST report the blocker and continue only after either another reviewer is added or the user explicitly authorizes a recorded solo exception. §9.0 v3 is the only exception.
 
 Rules for later review rounds mirror Phase 2: never edit another reviewer's file, respond in your own next-round file with `responding-to:` listing prior review files, address every other active reviewer explicitly.
 
@@ -806,9 +807,9 @@ Escalation is not a veto — the user's answer becomes input to the next round l
   do not count toward this idea's quorum; a mid-idea unavailability does not silently shrink quorum,
   except the recorded §9.0 versioned automatic exclusion, which is never silent. Otherwise it falls to
   the async rules below and the runtime watchdog. Excluding the last non-facilitator
-  still requires the §1 user-authorized solo exception.
+  still requires the §1 user-authorized solo exception, except §9.0 v3.
 - An excluded participant's filed signoffs, ❌s, `DISPUTED` claims and findings survive. It remains a known signer through immutable membership history; required signers follow the current `participants:`. Exclusion is never a withdrawal or disposition: a ❌ stands until its eligible author withdraws it after owner-confirmed legacy-quota re-inclusion, or the owner rules and the ruling is quoted into the next artifact. Participant-failure dropout is permanent for this idea, including kickoff drops and after policy opt-out/downgrade; no ordinary revision, recovery or catch-up can re-add the author. Its retained dissent requires an owner ruling or abandonment/v2. Open CRITICAL/MAJOR and every strict-gate finding require an explicit disposition backed by independent evidence; disputes are never resolved by count (§15.3).
-- A valid Parley Deck idea normally has at least two active participants. A one-participant idea is valid only when a user-authorized solo exception is recorded with the auth/CLI/timeout/tooling blocker that made multi-agent execution impossible.
+- A valid Parley Deck idea normally has at least two active participants. A one-participant idea is valid only when a user-authorized solo exception is recorded with the auth/CLI/timeout/tooling blocker that made multi-agent execution impossible, or a §9.0 v3 automatic exclusion leaves one role holder.
 - An agent joining after round 1: either catch up (read priors, write late round-1, join from round 2) or decline (❌ NON-PARTICIPANT note in consensus).
 - If an agent is inactive > 2 rounds and the idea has a deadline, others may drop them from quorum — but only after a `inbox/<from>-to-<missing>_<slug>.md` ping.
 - For ideas with **only two participants**, the same rules apply unchanged: both must sign off ✅ for consensus, and disagreement still requires counter-proposals rather than tie-breaking. If a tie cannot be broken in rounds, escalate to the user (§4).
@@ -923,40 +924,9 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
     temporary**: the agent stays in the §2 roster and is re-probed at the next idea.
   - **Automatic exclusion** (versioned quota and participant-failure policy).
     Only CLI-recorded decisions authorize it. Prose, disagreement, elapsed time, and roster edits supply no authority.
-    - **Policy.** Presence-aware `[defaults].quota_auto_exclude` follows machine → deck → idea; per-idea false opts out.
-      New ideas freeze enabled, scope `kickoff-and-mid-idea`, trigger `participant-failure-v2`.
-      Saved v1 behavior stays unchanged. Saved omitted-trigger policies keep quota-only behavior and identical bytes/hashes.
-      Unrecorded legacy ideas require confirmation. Immutable scope/trigger project into the prompt; upgrade/resume never widens them.
-      Widening requires owner-bound revision. Unknown, null, duplicate, or malformed fields block.
-    - **Two-attempt path.** Except v2 exhaustion below, a non-protected step gets the original attempt plus one retry after five seconds.
-      Both attempts use the same ceiling; watchdog retry consumes the second slot.
-      Eligible streaming steps, including signoffs, use first output 120s, stall 300s after activity, heartbeat 60s.
-      Heartbeats are not activity. Honor configured overrides/disables and truthful buffering.
-      Buffered final-text transports, including zcode and default Claude text, disable soft guards; hard ceilings remain.
-      Readiness stays 90s. Goal checks use Phase 8's track/configuration ceiling. Manual `agents exec` and interactive paths remain hard-ceiling-only.
-      Buffered silence cannot support a universal early-drop claim.
-      Exec/ACP errors of any code, crashes/start failures, missing/invalid own output, and supervisor `no_first_output`/`stalled`/`timeout` qualify after cleanup.
-      Valid output, including BLOCK/disagreement, on either attempt wins.
-      Parent cancellation, policy/budget/protocol/telemetry refusal, unresolved writers, and tampering never authorize dropout.
-      Preserve invalid own output before retry; shared edits block for repair. Bind idea, agent, and logical step.
-      Restart, run ID, and prompt changes grant no third attempt. Unsettled starts require host/boot/PID stopped-writer proof, never invented success.
-      Kickoff uses the same bound within its readiness batch.
-      Rule `participant-failure.v1` uses supervisor facts independently of quota recognition.
-      It binds both invocation IDs/linkage, step, terminal/exit/watchdog class, validator reason, UTC times, and verbatim decisive evidence.
-      Only secret redaction and visible truncation may alter it. Full logs/partials stay private.
-    - **Provider exhaustion in v2.** `provider-exhaustion.v1` requires failed execution and explicit exhausted account credit, token, quota, or named usage allowance.
-      Native authority requires CLI behavior/source and positive/adversarial fixtures. Unsupported adapters remain diagnostic-only.
-      The bounded zcode stderr exception below applies; no new gateway waiver exists.
-      Assistant text, quotes, tool output, `is_error`, generic quota text, context/response/session budgets, bare429/5xx, auth, overload, and watchdogs do not qualify.
-      Malformed, mixed, contradictory, or truncated framing/class evidence rejects. Reset proof is separate.
-      Short, absent, past, malformed, or contradictory resets become unknown; they never cause a retry of proven exhaustion.
-      The legacy 60-minute threshold stays unchanged. Valid output or an already in-flight later success wins.
-      Validate output before suppression. Persist invocation/validation proof before return.
-      A terminal-to-validation crash blocks admission until reconciliation without another child. Missing/corrupt pending proof blocks for repair.
-      After the first qualifying attempt, start no retry, probe, or reconnection for that identity in this idea, including protected roles.
-      Common admission enforces this across steps, prompts, runs, restart, policy downgrade/opt-out, recovery, and blocked membership batches.
-      SDK retries before terminal observation remain outside this boundary.
-      Scope is one agent in one idea. Provider/model/gateway labels prove no shared account; peer inference and machine caches are deferred.
+    - **Policy.** Presence-aware `[defaults].quota_auto_exclude` follows machine → deck → idea; per-idea false opts out. New ideas freeze enabled, scope `kickoff-and-mid-idea`, trigger `participant-failure-v3`. V3 keeps every v2 rule; only its floor and review gates below differ. Saved v1/v2 behavior stays unchanged. Saved omitted-trigger policies keep quota-only behavior and identical bytes/hashes. Unrecorded legacy ideas require confirmation. Immutable scope/trigger project into the prompt; upgrade/resume never widens them. Widening requires owner-bound revision. Unknown, null, duplicate, or malformed fields block.
+    - **Two-attempt path.** Except v2 exhaustion below, a non-protected step gets the original attempt plus one retry after five seconds. Both attempts use the same ceiling; watchdog retry consumes the second slot. Eligible streaming steps, including signoffs, use first output 120s, stall 300s after activity, heartbeat 60s. Heartbeats are not activity. Honor configured overrides/disables and truthful buffering. Buffered final-text transports, including zcode and default Claude text, disable soft guards; hard ceilings remain. Readiness stays 90s. Goal checks use Phase 8's track/configuration ceiling. Manual `agents exec` and interactive paths remain hard-ceiling-only. Buffered silence cannot support a universal early-drop claim. Exec/ACP errors of any code, crashes/start failures, missing/invalid own output, and supervisor `no_first_output`/`stalled`/`timeout` qualify after cleanup. Valid output, including BLOCK/disagreement, on either attempt wins. Parent cancellation, policy/budget/protocol/telemetry refusal, unresolved writers, and tampering never authorize dropout. Preserve invalid own output before retry; shared edits block for repair. Bind idea, agent, and logical step. Restart, run ID, and prompt changes grant no third attempt. Unsettled starts require host/boot/PID stopped-writer proof, never invented success. Kickoff uses the same bound within its readiness batch. Rule `participant-failure.v1` uses supervisor facts independently of quota recognition. It binds both invocation IDs/linkage, step, terminal/exit/watchdog class, validator reason, UTC times, and verbatim decisive evidence. Only secret redaction and visible truncation may alter it. Full logs/partials stay private.
+    - **Provider exhaustion in v2.** `provider-exhaustion.v1` requires failed execution and explicit exhausted account credit, token, quota, or named usage allowance. Native authority requires CLI behavior/source and positive/adversarial fixtures. Unsupported adapters remain diagnostic-only. The bounded zcode stderr exception below applies; no new gateway waiver exists. Assistant text, quotes, tool output, `is_error`, generic quota text, context/response/session budgets, bare429/5xx, auth, overload, and watchdogs do not qualify. Malformed, mixed, contradictory, or truncated framing/class evidence rejects. Reset proof is separate. Short, absent, past, malformed, or contradictory resets become unknown; they never cause a retry of proven exhaustion. The legacy 60-minute threshold stays unchanged. Valid output or an already in-flight later success wins. Validate output before suppression. Persist invocation/validation proof before return. A terminal-to-validation crash blocks admission until reconciliation without another child. Missing/corrupt pending proof blocks for repair. After the first qualifying attempt, start no retry, probe, or reconnection for that identity in this idea, including protected roles. Common admission enforces this across steps, prompts, runs, restart, policy downgrade/opt-out, recovery, and blocked membership batches. SDK retries before terminal observation remain outside this boundary. Scope is one agent in one idea. Provider/model/gateway labels prove no shared account; peer inference and machine caches are deferred.
     - **Private zcode capture.** Default off; only owner machine configuration enables it, never ideas/prompts.
       Capture failed-invocation stderr after termination, without provider calls. Keep scrubbed provider-error framing/fields only.
       Remove credentials, authorization, cookies, prompts, requests, and unrelated responses before storage. Uncertain scrubbing writes nothing.
@@ -965,77 +935,10 @@ Before creating `ideas/<slug>/00-prompt.md`, the facilitator runs a readiness ch
       Mark removals `[REDACTED]` and caps `[TRUNCATED]`. Disable stops new captures. Owner purge/directory deletion gives immediate cleanup.
       No idle deletion is guaranteed. Captures grant no authority or grammar expansion; lost required framing means incomplete evidence.
       The follow-up's provenance/completeness review still applies.
-    - **Legacy quota predicate (unchanged).** Require a failed invocation (nonzero exit or
-      structured terminal provider error), no valid completed artifact and no later batch success.
-      Native provider-error provenance needs CLI behavior/source plus positive/adversarial fixtures;
-      unsupported adapters are diagnostic-only. is_error, assistant quotes or tool output are not
-      provider proof, even with an unrelated later failure.
-      **Owner-ratified zcode exception (2026-10-04):** instead allow a nonzero root exit, no valid
-      artifact/later success, terminal zcode turn-failure line and stderr responseBody JSON.
-      Require provider records, ALL HTTP429, ALL explicit "Limit Exhausted" or exhaustion below,
-      ALL with machine reset_at/retry_after, agreeing on class/reset within one second and ≥60min.
-      Missing/mixed/malformed/contradictory records gate. This zcode-only exception accepts subagent
-      error accompanying unrelated root failure; other adapters need native provenance. Quoted
-      prose is not a provider record; recorded positive stderr/adversarial fixtures remain required.
-      Exhaustion must name account credit/quota or a reached/exhausted usage allowance. Stated
-      reset must be ≥60min; short/past/unparseable/contradictory resets gate, never become unknown.
-      A timezone-free clock supplements complete RFC3339 Z/offset or numeric seconds
-      retry_after/Retry-After only. ALL decisive values (including reset-after durations) agree
-      within one second; clock matches an offset -12:00..+14:00 in 15min steps; retain raw text.
-      Missing/discarded machine reset, unmatched/display-only reset or contradiction gates.
-      Without reset only explicit account exhaustion or a reached ≥24h allowance
-      (daily/weekly/monthly) qualifies; hourly/N-hour <24h requires qualifying reset.
-      Bare429, generic quota exceeded, bare credit balance, 5xx/reset timer, long Retry-After alone,
-      400/auth/hang/watchdog do not qualify. Gateway-pool wording needs cause evidence; generic
-      provider classification stays separate (bare503 cannot be excluded with --yes).
-    - **Batch and floor.** `parley run` settles the exact kickoff batch before the first authoritative prompt/list/manifest; standalone preflight only reports.
-      Mid-idea settlement uses saved enabled scope after ALL writers stop, before dispatch/signoff/close.
-      Apply all eligible candidates together or none, independent of order. Require two distinct usable non-facilitators.
-      A declared facilitator never counts, including participation or implementation takeover.
-      Participant-failure policies require positive execution or validated phase evidence, including designee/pin; unresolved failures and role-only seats do not count.
-      Legacy policies protect facilitator, designee, pin, and started consensus/FINAL/review-consensus drafters. Their failure blocks the batch.
-      An undeclared legacy organizer must hold a protected role or declare facilitator. A global default before its pin stays unchanged.
-      Designee/pin failure uses Phase 5's three-exit gate, except v2 exhaustion succession below.
-    - **V2 succession.** Freeze original participant order and organizer identity at kickoff. `organizer:` names an ordinary participant organizer.
-      Otherwise, `facilitator:` supplies it. Conflicts block; `author: user` supplies no identity.
-      The initial implementer may be unresolved. Before the first transition, resolve Phase 5's existing chain and bind its identity/source.
-      Unresolved affected roles block succession; ordinary participant loss can proceed. Malformed/conflicting authority still blocks.
-      Only exhaustion removes protected roles in v2. Protected transient failures keep legacy gates.
-      Settle all losses before selection: organizer loss transfers organization to the implementer; implementer loss transfers implementation to the organizer.
-      Both losses transfer both roles to the first remaining original participant. One holder of both counts as both losses.
-      Ordinary participant loss transfers neither role. The facilitator implementation restriction yields to this order.
-      The selected counterpart/first participant needs positive usability. Never skip an unusable selection or choose a new roster identity.
-      A frozen organizer outside membership permits a role-only transition.
-      If that frozen facilitator takes implementation, append it to current membership as a known/required signer.
-      This sole automatic membership addition supplies no floor seat or independent review.
-      Typed `role_transition.v1` history binds before/after membership and roles, source hashes, evidence, and one active handover pointer.
-      Validated history outranks retired pins/designations. Never fabricate `implementer_reassigned` confirmation.
-      Preserve predecessor bytes. The successor writes `role-handover/<transition-id>.md` under Phase 5's handover contract.
-      Until validation, admit only its selected author's handover action. Complete shared drafts stay, including unsigned drafts.
-      Missing drafts use current eligible selectors. Structurally valid incomplete shared drafts without signoffs may move byte-exactly to a recorded archive.
-      Bind original path, author, hash, and archive before successor authorship at the canonical path.
-      Any signoff, malformed identity/frontmatter, or truncated syntax blocks partial-draft recovery. Participant rounds/reviews never move.
-      Closed FINAL and execution records stay frozen. The CLI enforces supervised actions; an external organizer must follow the protocol itself.
-    - **Review gates.** Before commit, re-evaluate reviewer count, LE-7/LE-11, independent goal check, model diversity, and strict_gate.
-      A successor cannot review its own code. Its prior findings stay binding; require fresh independent current-tree evidence.
-      One reviewer suffices only when immutable history proves the latest automatic membership transition reduced ≥2 independent reviewers to exactly one.
-      After must equal current membership. Before and After contain the sole reviewer and, without succession, the same implementer.
-      For validated succession, count each set without its own implementer/facilitator. The successor belongs to After.
-      Only the frozen-facilitator exception permits the successor's absence from Before.
-      Every removed identity needs exact typed `participant-failure.v1`, v2 `provider-exhaustion.v1`, or legacy evidence:
-      `quota.named-reset-ge-60m.v1`, `quota.account-exhausted-no-reset.v1`, `quota.allowance-ge-24h-no-reset.v1`.
-      Retain each rule's provenance/reset constraints. A settled prospective decision supplies the same precommit proof, without committed exclusion authority.
-      Policy-only revisions preserve cause; later manual/owner membership changes invalidate it.
-      Markers, manual exclusions, arbitrary rules, stale causes, missing/corrupt/pending history, and two-person-by-design ideas earn no exception.
-      Implementer/reviewer models must be known and distinct in the run snapshot, even with diversity disabled.
-      Trim and compare case-insensitively; empty/unknown/cli-default and absent snapshots cannot qualify.
-      Unbound/unreported model values supply configured authority, not observed-model proof.
-      Re-derive this shared condition at precommit, review, review consensus, goal check, and close; writable gate metadata supplies no authority.
-      Only the numeric minimum changes. Keep signer duties, applicable protection, floor, reservations, retained dissent/findings, and current-tree AC evidence.
-      Strict review remains fresh, independent, full-scope, and zero-findings, including NITs. The same reviewer may goal-check in a fresh process.
-      Without eligible succession/floor/review, escalate once with candidates, evidence, arithmetic, and owner options:
-      an eligible model-diverse reviewer process (recommended), attended evidence-backed continuation, or pause/abandon.
-      Select no substitute or waiver automatically. Standing owner authority can support attended continuation; §1 stays unchanged.
+    - **Legacy quota predicate (unchanged).** Require a failed invocation (nonzero exit or structured terminal provider error), no valid completed artifact and no later batch success. Native provider-error provenance needs CLI behavior/source plus positive/adversarial fixtures; unsupported adapters are diagnostic-only. is_error, assistant quotes or tool output are not provider proof, even with an unrelated later failure. **Owner-ratified zcode exception (2026-10-04):** instead allow a nonzero root exit, no valid artifact/later success, terminal zcode turn-failure line and stderr responseBody JSON. Require provider records, ALL HTTP429, ALL explicit "Limit Exhausted" or exhaustion below, ALL with machine reset_at/retry_after, agreeing on class/reset within one second and ≥60min. Missing/mixed/malformed/contradictory records gate. This zcode-only exception accepts subagent error accompanying unrelated root failure; other adapters need native provenance. Quoted prose is not a provider record; recorded positive stderr/adversarial fixtures remain required. Exhaustion must name account credit/quota or a reached/exhausted usage allowance. Stated reset must be ≥60min; short/past/unparseable/contradictory resets gate, never become unknown. A timezone-free clock supplements complete RFC3339 Z/offset or numeric seconds retry_after/Retry-After only. ALL decisive values (including reset-after durations) agree within one second; clock matches an offset -12:00..+14:00 in 15min steps; retain raw text. Missing/discarded machine reset, unmatched/display-only reset or contradiction gates. Without reset only explicit account exhaustion or a reached ≥24h allowance (daily/weekly/monthly) qualifies; hourly/N-hour <24h requires qualifying reset. Bare429, generic quota exceeded, bare credit balance, 5xx/reset timer, long Retry-After alone, 400/auth/hang/watchdog do not qualify. Gateway-pool wording needs cause evidence; generic provider classification stays separate (bare503 cannot be excluded with --yes).
+    - **Batch and floor.** `parley run` settles the exact kickoff batch before the first authoritative prompt/list/manifest; standalone preflight only reports. Mid-idea settlement uses saved enabled scope after ALL writers stop, before dispatch/signoff/close. Apply all eligible candidates together or none, independent of order. Require two distinct usable non-facilitators. V3 requires one usable organizer or implementer holder; participants are optional. A declared facilitator never counts, including participation or implementation takeover. Participant-failure policies require positive execution or validated phase evidence, including designee/pin; unresolved failures and role-only seats do not count. Legacy policies protect facilitator, designee, pin, and started consensus/FINAL/review-consensus drafters. Their failure blocks the batch. An undeclared legacy organizer must hold a protected role or declare facilitator. A global default before its pin stays unchanged. Designee/pin failure uses Phase 5's three-exit gate, except v2 exhaustion succession below.
+    - **V2 succession.** Freeze original participant order and organizer identity at kickoff. `organizer:` names an ordinary participant organizer. Otherwise, `facilitator:` supplies it. Conflicts block; `author: user` supplies no identity. The initial implementer may be unresolved. Before the first transition, resolve Phase 5's existing chain and bind its identity/source. Unresolved affected roles block succession; ordinary participant loss can proceed. Malformed/conflicting authority still blocks. Only exhaustion removes protected roles in v2. Protected transient failures keep legacy gates. Settle all losses before selection: organizer loss transfers organization to the implementer; implementer loss transfers implementation to the organizer. Both losses transfer both roles to the first remaining original participant. One holder of both counts as both losses. Ordinary participant loss transfers neither role. The facilitator implementation restriction yields to this order. The selected counterpart/first participant needs positive usability. Never skip an unusable selection or choose a new roster identity. A frozen organizer outside membership permits a role-only transition. If that frozen facilitator takes implementation, append it to current membership as a known/required signer. This sole automatic membership addition supplies no floor seat or independent review. Typed `role_transition.v1` history binds before/after membership and roles, source hashes, evidence, and one active handover pointer. Validated history outranks retired pins/designations. Never fabricate `implementer_reassigned` confirmation. Preserve predecessor bytes. The successor writes `role-handover/<transition-id>.md` under Phase 5's handover contract. Until validation, admit only its selected author's handover action. Complete shared drafts stay, including unsigned drafts. Missing drafts use current eligible selectors. Structurally valid incomplete shared drafts without signoffs may move byte-exactly to a recorded archive. Bind original path, author, hash, and archive before successor authorship at the canonical path. Any signoff, malformed identity/frontmatter, or truncated syntax blocks partial-draft recovery. Participant rounds/reviews never move. Closed FINAL and execution records stay frozen. The CLI enforces supervised actions; an external organizer must follow the protocol itself.
+    - **Review gates.** Before commit, re-evaluate reviewer count, LE-7/LE-11, independent goal check, model diversity, and strict_gate. A successor cannot review its own code. Its prior findings stay binding; require fresh independent current-tree evidence. One reviewer suffices only when immutable history proves the latest automatic membership transition reduced ≥2 independent reviewers to exactly one. After must equal current membership. Before and After contain the sole reviewer and, without succession, the same implementer. For validated succession, count each set without its own implementer/facilitator. The successor belongs to After. Only the frozen-facilitator exception permits the successor's absence from Before. Every removed identity needs exact typed `participant-failure.v1`, v2 `provider-exhaustion.v1`, or legacy evidence: `quota.named-reset-ge-60m.v1`, `quota.account-exhausted-no-reset.v1`, `quota.allowance-ge-24h-no-reset.v1`. Retain each rule's provenance/reset constraints. A settled prospective decision supplies the same precommit proof, without committed exclusion authority. Policy-only revisions preserve cause; later manual/owner membership changes invalidate it. Markers, manual exclusions, arbitrary rules, stale causes, missing/corrupt/pending history, and two-person-by-design ideas earn no exception. Implementer/reviewer models must be known and distinct in the run snapshot, even with diversity disabled. Trim and compare case-insensitively; empty/unknown/cli-default and absent snapshots cannot qualify. Unbound/unreported model values supply configured authority, not observed-model proof. Re-derive this shared condition at precommit, review, review consensus, goal check, and close; writable gate metadata supplies no authority. Only the numeric minimum changes. Keep signer duties, applicable protection, floor, reservations, retained dissent/findings, and current-tree AC evidence. Strict review remains fresh, independent, full-scope, and zero-findings, including NITs. The same reviewer may goal-check in a fresh process. In v3, zero reviewers suffice when the same proof shows automatic exclusion removed every independent reviewer. That close needs green checks and current-tree AC evidence. It records `independent review: none`, never a pass. The driver hands that close to the organizer. Without eligible succession/floor/review, escalate once with candidates, evidence, arithmetic, and owner options: an eligible model-diverse reviewer process (recommended), attended evidence-backed continuation, or pause/abandon. Select no substitute or waiver automatically. Standing owner authority can support attended continuation; §1 stays unchanged.
     - **History and recovery.** Immutable kickoff/revisions distinguish current and known membership; kickoff drops never became known signers.
       Current members control dispatch/await/required signers. Never subtract markers or rewrite run.created/artifacts.
       Retain §5 obligations, partials, and earlier incomplete/failure records. Only validated survivor artifacts permit transition-bound terminal re-evaluation.

@@ -1,8 +1,8 @@
 # Provider exhaustion and role handover
 
-The live protocol governs. This reference explains CLI 1.56.0 and skill/core 2.20.0.
+The live protocol governs. This reference explains CLI 1.57.0 and skill/core 2.21.0.
 
-New ideas freeze `participant-failure-v2`. Saved policies retain their trigger, bytes, and hashes.
+New ideas freeze `participant-failure-v3`, which keeps every v2 rule. Saved policies retain their trigger, bytes, and hashes.
 Only an owner-bound revision may widen a saved policy. It freezes original order and organizer identity at that boundary.
 Use `parley run --organizer <participant>` or `--facilitator <external-organizer>` for new CLI runs.
 An undeclared organizer has no inferred identity. `author: user` supplies no organizer identity.
@@ -33,7 +33,7 @@ Apply the owner order to the complete loss set:
 - Both losses transfer both roles to the first remaining participant in frozen original order.
 - One identity with both roles counts as both losses. Ordinary participant loss transfers neither role.
 
-Never skip an unusable selected successor. Require positive usability and two distinct non-facilitators after the whole batch.
+Never skip an unusable selected successor. Require positive usability after the whole batch: v2 needs two distinct non-facilitators, v3 one usable role holder.
 Only the frozen declared facilitator can enter membership through implementation takeover. It becomes a required signer.
 It remains excluded from the floor and independent review. An external organizer loss can change roles without membership deletion.
 If a gate fails, commit no membership transition and issue one blocking decision. Exhaustion suppression still holds.
@@ -57,6 +57,27 @@ The single-reviewer exception proves the complete causal Before/After transition
 Also exclude the frozen facilitator. Require distinct known snapshot models, even with diversity disabled.
 Only the numeric minimum changes. Current signers, reservations, strict review, and independent current-tree evidence remain required.
 A fresh reviewer process performs the goal check. A valid FAIL remains final.
+
+Protected transient failures keep their existing gates. Code-mutating steps gain no automatic retry.
+
+## Optional participants (v3)
+
+The owner set this rule on 2026-10-31: "ak hocijaky agent nema tokeny hned ho vyluc, pokial existuje organizer alebo
+implementer, tak moze parley pokracovat, participanti su volitelny". Translation: "If any agent has no tokens, exclude
+it at once. While an organizer or an implementer exists, Parley can continue. Participants are optional."
+
+- New ideas freeze `participant-failure-v3`. Saved v1 and v2 ideas keep their floor and gates.
+- The batch floor is one usable organizer or implementer holder after succession. A usable frozen facilitator counts
+  when it holds a role. If nobody can hold a role, the batch applies nothing and escalates once.
+- The exception covers automatic exclusion only. An idea that starts with one participant by choice still needs the §1
+  user solo exception.
+- Zero independent reviewers suffice only when validated immutable history proves that the latest automatic
+  transition removed every remaining independent reviewer. Manual exclusions, markers, and stale or missing history
+  earn nothing.
+- The CLI driver does not auto-close such an idea. It stops at review and hands the close to the organizer.
+- The organizer closes with green checks and current-tree AC evidence, and records `independent review: none` in the
+  execution record and the release note. A missing review is never a pass, and no agent gives a verdict on its own work.
+- Filed dissent, findings, and the no-retry exhaustion rule do not change.
 
 ## Adapter limits
 
