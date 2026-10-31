@@ -15,7 +15,7 @@ This package includes six skills: the core cooperation protocol and five add-ons
 for design, design enforcement, tracker-ready tickets, parallel worktrees, and
 software-procurement bidding.
 
-## Output text in 2.20.0
+## Output text in 2.21.0
 
 New decks use ASD-STE100 Issue 9 for new English protocol prose.
 Read the [working summary](skills/parley-deck/references/STE100.md) before you write or review that prose.

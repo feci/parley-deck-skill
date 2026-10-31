@@ -22,7 +22,8 @@ record explaining why multi-agent execution was impossible.
 
 If no peer is invokable (auth/CLI/timeout/permission/tool failure), stop before merge,
 finalization or completion and report the blocker. Continue only with an explicit user
-solo exception, recorded in inbox/protocol notes first.
+solo exception, recorded in inbox/protocol notes first. A §9.0 v3 automatic exclusion is a
+standing owner exception.
 
 ## Required Protocol Context
 
@@ -149,9 +150,9 @@ digest never substitutes for canonical files (residual over-trust risk, accepted
 
 Read §9.0, current participants, and immutable history. Only CLI evidence authorizes batch reduction.
 Preflight reports only. Never infer membership from markers or change the roster.
-New ideas freeze `participant-failure-v2` with `kickoff-and-mid-idea` scope.
+New ideas freeze `participant-failure-v3` with `kickoff-and-mid-idea` scope. V3 keeps every v2 rule.
 `quota_auto_exclude` follows machine → deck → idea precedence; per-idea false opts out.
-Saved v1 and omitted-trigger policies retain their behavior and hashes. Only an owner-bound revision can widen them.
+Saved v1, v2, and omitted-trigger policies retain their behavior and hashes. Only an owner-bound revision can widen them.
 
 Proven native account exhaustion stops that identity immediately in this idea. No retry, probe, or reconnection follows.
 This applies to protected roles and blocked batches. Reset uncertainty does not undo exhaustion.
@@ -160,19 +161,16 @@ A pending terminal/validation record requires output recovery without another ch
 Provider/model/gateway labels prove no shared account. The next idea probes afresh; no machine exhaustion cache exists.
 The CLI cannot undo SDK retries before terminal exhaustion becomes observable.
 
-Other eligible failures retain original plus one retry after five seconds at the frozen ceiling.
-Durable idea/agent/logical-step identity prevents a third attempt across restarts, prompts, and runs.
-Cancellation, control-plane refusal, unresolved writers, and shared-file tampering never authorize dropout.
-Preserve partials privately. Protected transient failures retain existing gates; code-mutating steps gain no automatic retry.
-Streaming defaults remain first output 120s, stall 300s, heartbeat 60s. Heartbeats supply no activity.
-Honor overrides and truthful buffering. Zcode/default Claude text disable soft guards; hard ceilings remain.
-Manual exec/interactive stay hard-only; readiness stays 90s. Silence alone proves no hang.
+Other eligible failures retain original plus one retry after five seconds; durable step identity prevents a third attempt.
+Cancellation, control-plane refusal, unresolved writers, and tampering never authorize dropout.
+Watchdog, buffering, and partial-output rules: §9.0, `references/HEADLESS_LAUNCH.md`, `references/ROSTER_AND_PROTOCOL.md`.
 
 Freeze organizer and original participant order at the v2 boundary. Apply the owner's order after all losses settle:
 organizer → implementer; implementer → organizer; both → first remaining original participant.
 An ordinary participant loss transfers no role. Never skip an unusable selected successor.
 Only the frozen facilitator may join through implementation takeover. It supplies no floor or independent review seat.
-Require two positively usable non-facilitators. Failed floor or successor gates apply no membership change and escalate once.
+V2 requires two positively usable non-facilitators. V3 requires one usable organizer or implementer holder; participants are optional.
+Failed floor or successor gates apply no membership change and escalate once.
 
 Validated history selects the successor-owned `role-handover/<transition-id>.md` as the active execution record.
 Preserve predecessor bytes and all filed positions. Pending handover admits only its selected author and action.
@@ -185,6 +183,8 @@ Prove >=2 Before reviewers and exactly one After reviewer, with the correct impl
 Exclude the frozen facilitator. Validate every loss and require known distinct snapshot models, even with diversity disabled.
 Manual membership edits invalidate prior cause. Current signers, retained dissent, reservations, strict review, and current-tree evidence duties remain.
 A fresh independent process performs the goal check. Valid FAIL is final.
+In v3, proved automatic loss of every reviewer permits zero. The organizer then closes with green checks and current-tree
+AC evidence, and records `independent review: none`. A missing review is never a pass.
 
 Dropout remains permanent through opt-out, downgrade, revision, and catch-up. Dropped authors cannot withdraw filed dissent.
 Use a quoted owner ruling or abandonment/v2. Legacy quota return still requires owner confirmation.

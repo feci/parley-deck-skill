@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.21.0 — 2026-10-31
+
+- Document `participant-failure-v3` for new ideas: participants are optional, and one usable organizer or implementer holder keeps an idea alive.
+- Permit zero independent reviewers only after proved automatic exclusion. The organizer closes with green checks and records `independent review: none`; a missing review is never a pass.
+- Keep saved v1/v2 behavior, the no-retry exhaustion rule, the succession order, and all filed positions.
+- Keep the 20,000-byte core limit by a pointer to existing retry references. Companion CLI is 1.57.0. Core 2.21.0 is staged from 2.20.0 for attended publication.
+
 ## 2.20.0 — 2026-10-29
 
 - Document v2 native exhaustion, immediate suppression, owner-order succession, and successor-owned execution records.

@@ -265,7 +265,7 @@ effort — same model, same effort, faster output — never a downgrade.
 The live protocol's §9.0 binds the decision. `[defaults].quota_auto_exclude` is the
 single presence-aware boolean: machine → deck → idea precedence, with
 `quota_auto_exclude: false` as the per-idea opt-out. New ideas freeze enabled,
-`scope: kickoff-and-mid-idea`, `trigger: participant-failure-v2`. Saved omitted-trigger
+`scope: kickoff-and-mid-idea`, `trigger: participant-failure-v3`. Saved omitted-trigger
 policies retain quota-only semantics and serialized hashes; upgrades/resumes never
 widen them. Explicit owner-bound revisions may widen a saved policy. No roster/model
 changes; `roster_change_policy` does not gate an idea-local reduction.
@@ -279,8 +279,9 @@ BLOCK/disagreement, prevents dropout. Parent cancellation and policy, budget,
 protocol, telemetry or shared-artifact integrity errors never authorize dropout.
 Raw partial output remains private; tampering stops for repair.
 
-The whole batch applies or none, after writers stop. The floor is two positively
-usable non-organizers including the designee/pin when present. Roles alone supply
+The whole batch applies or none, after writers stop. The v2 floor is two positively
+usable non-organizers including the designee/pin when present; v3 needs one usable role
+holder (see `EXHAUSTION_AND_HANDOVER.md`). Roles alone supply
 no usable seat. Protected transient failures retain their gates. Proven v2 exhaustion follows `EXHAUSTION_AND_HANDOVER.md`. Existing
 reviewer/diversity/strict/goal-check gates run BEFORE commit. Only the §9.0 causal
 exception permits one reviewer: validated latest automatic history (or its settled
